@@ -40,8 +40,8 @@ class RegNode:
         if self.marker:
             node_dict['marker'] = self.marker
 
-        if self.mixed_text != []:
-            node_dict['mixed_text'] = self.mixed_text
+        # if self.mixed_text != []:
+        #     node_dict['mixed_text'] = self.mixed_text
 
         return node_dict
 

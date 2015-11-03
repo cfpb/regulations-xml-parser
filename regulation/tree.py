@@ -3,6 +3,7 @@ __author__ = 'vinokurovy'
 from regulation.node import *
 
 import re
+import inflect
 
 import pdb
 
@@ -60,12 +61,16 @@ def build_reg_tree(root, parent=None):
         title = root.find('{eregs}title')
         content = root.find('{eregs}content')
         content_text = xml_node_text(content)
-        if title is not None:
+        if title is not None and title.get('type') != 'keyterm':
             node.title = title.text
         node.marker = root.get('marker')
+        if node.marker == 'none':
+            marker = ''
+        else:
+            marker = node.marker
         node.label = root.get('label').split('-')
         # node.text = content_text
-        node.text = '{} {}'.format(root.get('marker'), content_text)
+        node.text = '{} {}'.format(node.marker, content_text).strip()
         node.node_type = parent.node_type
         node.mixed_text = xml_mixed_text(content)
 
@@ -126,6 +131,8 @@ def build_internal_citations_layer(root):
 
     for paragraph in paragraphs:
         marker = paragraph.get('marker')
+        if marker == 'none':
+            marker = ''
         par_text = marker + ' ' + xml_node_text(paragraph.find('{eregs}content'))
         par_label = paragraph.get('label')
         cites = paragraph.findall('.//{eregs}ref[@reftype="internal"]')
@@ -184,6 +191,8 @@ def build_terms_layer(root):
     definitions_dict = OrderedDict()
     terms_dict = OrderedDict()
 
+    inf_engine = inflect.engine()
+
     paragraphs = root.findall('.//{eregs}paragraph')
 
     for paragraph in paragraphs:
@@ -197,7 +206,10 @@ def build_terms_layer(root):
             terms_dict[label] = []
         for term in terms:
             text = term.text
-            target = text + ':' + term.get('target')
+            if inf_engine.singular_noun(text.lower()):
+                target = inf_engine.singular_noun(text.lower()) + ':' + term.get('target')
+            else:
+                target = text.lower() + ':' + term.get('target')
             # if term.get('target') not in targets:
             # targets.append(term.get('target'))
             positions = find_all_occurrences(par_text, text)
@@ -209,10 +221,14 @@ def build_terms_layer(root):
             if len(ref_dict['offsets']) > 0 and ref_dict not in terms_dict[label]:
                 terms_dict[label].append(ref_dict)
 
-        definitions = paragraph.findall('.//{eregs}def')
+        definitions = paragraph.find('{eregs}content').findall('{eregs}def')
         for defn in definitions:
             defined_term = defn.get('term')
-            key = defined_term + ':' + label
+            if inf_engine.singular_noun(defined_term.lower()):
+                key = inf_engine.singular_noun(defined_term.lower()) + ':' + label
+            else:
+                key = defined_term.lower() + ':' + label
+            # key = inf_engine.singular_noun(defined_term.lower()) + ':' + label
             def_text = defn.text
             positions = find_all_occurrences(par_text, def_text)
             def_dict = OrderedDict()
@@ -230,6 +246,81 @@ def build_terms_layer(root):
     return terms_dict
 
 
+def build_toc_layer(root):
+
+    toc_dict = OrderedDict()
+
+    part = root.find('{eregs}part')
+    part_toc = part.find('{eregs}tableOfContents')
+    part_number = part.get('partNumber')
+    toc_dict[part_number] = []
+
+    for section in part_toc.findall('{eregs}tocSecEntry'):
+        target = section.get('target').split('-')
+        subject = section.find('{eregs}sectionSubject').text
+        toc_entry = {'index': target, 'title': subject}
+        toc_dict[part_number].append(toc_entry)
+
+    for appendix_section in part_toc.findall('{eregs}tocAppEntry'):
+        target = appendix_section.get('target').split('-')
+        subject = appendix_section.find('{eregs}appendixSubject').text
+        toc_entry = {'index': target, 'title': subject}
+        toc_dict[part_number].append(toc_entry)
+
+    subparts = part.find('{eregs}content').findall('{eregs}subpart')
+    for subpart in subparts:
+        subpart_letter = subpart.get('subpartLetter')
+        if subpart_letter is not None:
+            subpart_key = part_number + '-Subpart-' + subpart_letter
+        else:
+            subpart_key = part_number + '-Subpart'
+        toc_dict[subpart_key] = []
+
+        subpart_toc = subpart.find('{eregs}tableOfContents')
+        for section in subpart_toc.findall('{eregs}tocSecEntry'):
+            target = section.get('target').split('-')
+            subject = section.find('{eregs}sectionSubject').text
+            toc_entry = {'index': target, 'title': subject}
+            toc_dict[subpart_key].append(toc_entry)
+
+    appendices = part.find('{eregs}content').findall('{eregs}appendix')
+    for appendix in appendices:
+        appendix_letter = appendix.get('appendixLetter')
+        appendix_key = part_number + '-' + appendix_letter
+        toc_dict[appendix_key] = []
+
+        appendix_toc = appendix.find('{eregs}tableOfContents')
+        for section in appendix_toc.findall('{eregs}tocAppEntry'):
+            target = section.get('target').split('-')
+            subject = section.find('{eregs}appendixSubject').text
+            toc_entry = {'index': target, 'title': subject}
+            toc_dict[appendix_key].append(toc_entry)
+
+    return toc_dict
+
+
+def build_keyterm_layer(root):
+
+    keyterm_dict = OrderedDict()
+
+    subparts = root.findall('.//{eregs}subpart')
+
+    for subpart in subparts:
+        paragraphs = subpart.findall('.//{eregs}paragraph')
+        for paragraph in paragraphs:
+            title = paragraph.find('{eregs}title')
+            if title is not None and title.get('type') == 'keyterm':
+                label = paragraph.get('label')
+                keyterm_dict[label] = [
+                    {
+                        'key_term': title.text,
+                        'locations': [0]
+                    }
+                ]
+
+    return keyterm_dict
+
+
 def build_meta_layer(root):
 
     meta_dict = OrderedDict()
@@ -244,10 +335,10 @@ def build_meta_layer(root):
                       '1022': 'V', '1023': 'W', '1024': 'X',
                       '1025': 'Y', '1026': 'Z'}
 
-    preamble = root.find('{eregs}preambe')
+    preamble = root.find('{eregs}preamble')
     fdsys = root.find('{eregs}fdsys')
     eff_date = preamble.find('{eregs}effectiveDate').text
-    cfr_title_num = fdsys.find('{eregs}cfrTitleNum').text
+    cfr_title_num = int(fdsys.find('{eregs}cfrTitleNum').text)
     cfr_title_text = fdsys.find('{eregs}cfrTitleText').text
     statutory_name = fdsys.find('{eregs}title').text
     part = preamble.find('{eregs}cfr').find('{eregs}section').text
