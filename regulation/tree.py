@@ -27,12 +27,13 @@ def build_reg_tree(root, parent=None):
 
         subparts = root.findall('.//{eregs}subpart')
         appendices = root.findall('.//{eregs}appendix')
+        interpretations = root.findall('.//{eregs}interpretations')
 
-        children = subparts + appendices
+        children = subparts + appendices + interpretations
 
     elif tag == 'subpart':
         title = root.find(ns_prefix + 'title')
-        if title:
+        if title is not None:
             node.node_type == 'subpart'
             node.title = title.text
             node.label = parent.label + ['Subpart', root.get('subpartLetter')]
@@ -97,6 +98,41 @@ def build_reg_tree(root, parent=None):
         node.label = label
 
         children = root.findall('{eregs}paragraph')
+
+    elif tag == 'interpretations':
+
+        title = root.find('{eregs}title')
+        label = root.get('label').split('-')
+        node.node_type = 'interp'
+        node.text = ''
+        node.title = title.text
+        node.label = label
+
+        children = root.findall('{eregs}interpSection')
+
+    elif tag == 'interpSection':
+
+        title = root.find('{eregs}title')
+        label = root.get('label').split('-')
+        node.node_type = 'interp'
+        node.text = ''
+        node.title = title.text
+        node.label = label
+
+        children = root.findall('{eregs}interpParagraph')
+
+    elif tag == 'interpParagraph':
+
+        title = root.find('{eregs}title')
+        content = root.find('{eregs}content')
+        content_text = xml_node_text(content)
+        if title is not None:
+            node.title = title.text
+        node.label = root.get('label').split('-')
+        node.text = content_text
+        node.node_type = 'interp'
+
+        children = root.findall('{eregs}interpParagraph')
 
     else:
         children = []
@@ -182,6 +218,97 @@ def build_external_citations_layer(root):
 
         if citation_list != []:
             layer_dict[par_label] = citation_list
+
+    return layer_dict
+
+
+def build_graphics_layer(root):
+
+    layer_dict = OrderedDict()
+    paragraphs = root.findall('.//{eregs}paragraph')
+
+    for paragraph in paragraphs:
+        content = paragraph.find('{eregs}content')
+        graphics = content.findall('{eregs}graphic')
+        label = paragraph.get('label')
+        if len(graphics) > 0:
+            layer_dict[label] = []
+        for graphic in graphics:
+            text = graphic.find('{eregs}text').text
+            alt_text = graphic.find('{eregs}altText').text
+            if alt_text is None:
+                alt_text = ''
+            url = graphic.find('{eregs}url').text
+            graphic_dict = OrderedDict()
+            graphic_dict['alt'] = alt_text
+            graphic_dict['locations'] = [0]
+            graphic_dict['text'] = text
+            graphic_dict['url'] = url
+
+            layer_dict[label].append(graphic_dict)
+
+    return layer_dict
+
+
+def build_formatting_layer(root):
+
+    layer_dict = OrderedDict()
+    paragraphs = root.findall('.//{eregs}paragraph')
+
+    for paragraph in paragraphs:
+        #content = paragraph.find('{eregs}content')
+        dashes = paragraph.findall('.//{eregs}dash')
+        tables = paragraph.findall('.//{eregs}table')
+        label = paragraph.get('label')
+        if len(dashes) > 0:
+            layer_dict[label] = []
+            for dash in dashes:
+                dash_dict = OrderedDict()
+                dash_text = dash.text
+                if dash_text is None:
+                    dash_text = ''
+                dash_dict['text'] = dash_text + 5*'_'
+                dash_dict['dash_data'] = {'text': dash_text}
+                dash_dict['locations'] = [0]
+                layer_dict[label].append(dash_dict)
+        if len(tables) > 0:
+            if label not in layer_dict:
+                layer_dict[label] = []
+            for table in tables:
+                table_dict = OrderedDict()
+                table_data_dict = OrderedDict()
+                table_data_dict['header'] = []
+                table_data_dict['rows'] = []
+                table_dict['locations'] = [0]
+                header = table.find('{eregs}header')
+                header_rows = header.findall('{eregs}columnHeaderRow')
+                for column_header in header_rows:
+                    columns = column_header.findall('{eregs}column')
+                    column_arr = []
+                    for column in columns:
+                        column_header_dict = OrderedDict()
+                        column_header_dict['colspan'] = column.get('colspan')
+                        column_header_dict['rowspan'] = column.get('rowspan')
+                        column_text = column.text
+                        if column_text is None:
+                            column_text = ''
+                        column_header_dict['text'] = column_text
+                        column_arr.append(column_header_dict)
+                    table_data_dict['header'].append(column_arr)
+
+                data_rows = table.findall('{eregs}row')
+                for row in data_rows:
+                    row_arr = []
+                    cells = row.findall('{eregs}cell')
+                    for cell in cells:
+                        cell_text = cell.text
+                        if cell_text is None:
+                            cell_text = ''
+                        row_arr.append(cell_text)
+                    table_data_dict['rows'].append(row_arr)
+                table_dict['table_data'] = table_data_dict
+                table_dict['text'] = ''
+                layer_dict[label].append(table_dict)
 
     return layer_dict
 
@@ -290,11 +417,13 @@ def build_toc_layer(root):
         toc_dict[appendix_key] = []
 
         appendix_toc = appendix.find('{eregs}tableOfContents')
-        for section in appendix_toc.findall('{eregs}tocAppEntry'):
-            target = section.get('target').split('-')
-            subject = section.find('{eregs}appendixSubject').text
-            toc_entry = {'index': target, 'title': subject}
-            toc_dict[appendix_key].append(toc_entry)
+
+        if appendix_toc is not None:
+            for section in appendix_toc.findall('{eregs}tocAppEntry'):
+                target = section.get('target').split('-')
+                subject = section.find('{eregs}appendixSubject').text
+                toc_entry = {'index': target, 'title': subject}
+                toc_dict[appendix_key].append(toc_entry)
 
     return toc_dict
 
@@ -358,6 +487,19 @@ def build_meta_layer(root):
     return meta_dict
 
 
-def build_formatting_layer(root):
+def build_interp_layer(root):
 
-    formatting_dict = OrderedDict
+    layer_dict = OrderedDict()
+    interpretations = root.find('.//{eregs}interpretations')
+
+    if interpretations is not None:
+        first_label = interpretations.get('label')
+        first_key = first_label.split('-')[0]
+        layer_dict[first_key] = [{'reference': first_label}]
+        interp_paragraphs = interpretations.findall('.//{eregs}interpParagraph')
+        for paragraph in interp_paragraphs:
+            target = paragraph.get('target')
+            label = paragraph.get('label')
+            layer_dict[target] = [{'reference': label}]
+
+    return layer_dict

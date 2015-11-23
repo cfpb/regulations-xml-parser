@@ -43,6 +43,9 @@ def parser_driver(regulation_file, notice_doc_numbers=[]):
     meta = build_meta_layer(xml_tree)
     toc = build_toc_layer(xml_tree)
     keyterms = build_keyterm_layer(xml_tree)
+    graphics = build_graphics_layer(xml_tree)
+    formatting = build_formatting_layer(xml_tree)
+    interps = build_interp_layer(xml_tree)
 
     reg_tree.include_children = True
     reg_json = reg_tree.to_json()
@@ -57,6 +60,9 @@ def parser_driver(regulation_file, notice_doc_numbers=[]):
     write_layer(terms, reg_number, notice, 'layer/terms')
     write_layer(toc, reg_number, notice, 'layer/toc')
     write_layer(keyterms, reg_number, notice, 'layer/keyterms')
+    write_layer(graphics, reg_number, notice, 'layer/graphics')
+    write_layer(formatting, reg_number, notice, 'layer/formatting')
+    write_layer(interps, reg_number, notice, 'layer/interpretations')
 
 if __name__ == '__main__':
 
