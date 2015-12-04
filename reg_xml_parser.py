@@ -12,6 +12,7 @@ from lxml import etree
 from pprint import pprint
 
 from regulation.tree import *
+from regulation.verification import EregsValidator
 
 import settings
 
@@ -33,6 +34,7 @@ def parser_driver(regulation_file, notice_doc_numbers=[]):
     with open(regulation_file, 'r') as f:
         reg_xml = f.read()
     xml_tree = etree.fromstring(reg_xml)
+
     reg_tree = build_reg_tree(xml_tree)
     reg_number = reg_tree.label[0]
 
@@ -46,6 +48,21 @@ def parser_driver(regulation_file, notice_doc_numbers=[]):
     graphics = build_graphics_layer(xml_tree)
     formatting = build_formatting_layer(xml_tree)
     interps = build_interp_layer(xml_tree)
+
+    # validate relative to schema
+    validator = EregsValidator(settings.XSD_FILE)
+    validator.validate_reg(xml_tree)
+
+    # if the validator had problems then we should report them and bail out
+    if not validator.is_valid:
+        for event in validator.events:
+            print str(event)
+        sys.exit(0)
+    else:
+        validator.validate_terms(xml_tree, terms)
+        validator.validate_internal_cites(xml_tree, internal_citations)
+        for event in validator.events:
+            print str(event)
 
     reg_tree.include_children = True
     reg_json = reg_tree.to_json()

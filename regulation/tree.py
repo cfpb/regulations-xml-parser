@@ -7,6 +7,8 @@ import inflect
 
 import pdb
 
+import settings
+
 
 def build_reg_tree(root, parent=None):
 
@@ -34,11 +36,11 @@ def build_reg_tree(root, parent=None):
     elif tag == 'subpart':
         title = root.find(ns_prefix + 'title')
         if title is not None:
-            node.node_type == 'subpart'
+            node.node_type = 'subpart'
             node.title = title.text
             node.label = parent.label + ['Subpart', root.get('subpartLetter')]
         else:
-            node.node_type == 'emptypart'
+            node.node_type = 'emptypart'
             node.title = ''
             node.label = parent.label + ['Subpart']
 
@@ -70,8 +72,12 @@ def build_reg_tree(root, parent=None):
         else:
             marker = node.marker
         node.label = root.get('label').split('-')
-        # node.text = content_text
-        node.text = '{} {}'.format(node.marker, content_text).strip()
+
+        graphic = content.find('{eregs}graphic')
+        if graphic is not None:
+            node.text = graphic.find('{eregs}text').text
+        else:
+            node.text = '{} {}'.format(marker, content_text).strip()
         node.node_type = parent.node_type
         node.mixed_text = xml_mixed_text(content)
 
@@ -287,8 +293,8 @@ def build_formatting_layer(root):
                     column_arr = []
                     for column in columns:
                         column_header_dict = OrderedDict()
-                        column_header_dict['colspan'] = column.get('colspan')
-                        column_header_dict['rowspan'] = column.get('rowspan')
+                        column_header_dict['colspan'] = int(column.get('colspan'))
+                        column_header_dict['rowspan'] = int(column.get('rowspan'))
                         column_text = column.text
                         if column_text is None:
                             column_text = ''
@@ -319,21 +325,25 @@ def build_terms_layer(root):
     terms_dict = OrderedDict()
 
     inf_engine = inflect.engine()
+    inf_engine.defnoun('bonus', 'bonuses')
 
-    paragraphs = root.findall('.//{eregs}paragraph')
+    paragraphs = root.findall('.//{eregs}paragraph') + root.findall('.//{eregs}interpParagraph')
 
     for paragraph in paragraphs:
         content = paragraph.find('{eregs}content')
         terms = content.findall('.//{eregs}ref[@reftype="term"]')
         label = paragraph.get('label')
         marker = paragraph.get('marker')
-        par_text = marker + ' ' + xml_node_text(paragraph.find('{eregs}content'))
+        if marker is None:
+            marker = ''
+
+        par_text = (marker + ' ' + xml_node_text(paragraph.find('{eregs}content'))).strip()
         targets = []
         if len(terms) > 0:
             terms_dict[label] = []
         for term in terms:
             text = term.text
-            if inf_engine.singular_noun(text.lower()):
+            if inf_engine.singular_noun(text.lower()) and not text.lower() in settings.SPECIAL_SINGULAR_NOUNS:
                 target = inf_engine.singular_noun(text.lower()) + ':' + term.get('target')
             else:
                 target = text.lower() + ':' + term.get('target')
@@ -351,7 +361,8 @@ def build_terms_layer(root):
         definitions = paragraph.find('{eregs}content').findall('{eregs}def')
         for defn in definitions:
             defined_term = defn.get('term')
-            if inf_engine.singular_noun(defined_term.lower()):
+            if inf_engine.singular_noun(defined_term.lower()) and \
+                    not defined_term.lower() in settings.SPECIAL_SINGULAR_NOUNS:
                 key = inf_engine.singular_noun(defined_term.lower()) + ':' + label
             else:
                 key = defined_term.lower() + ':' + label
@@ -433,9 +444,12 @@ def build_keyterm_layer(root):
     keyterm_dict = OrderedDict()
 
     subparts = root.findall('.//{eregs}subpart')
+    appendices = root.findall('.//{eregs}appendix')
 
-    for subpart in subparts:
-        paragraphs = subpart.findall('.//{eregs}paragraph')
+    paragraph_locations = subparts + appendices
+
+    for element in paragraph_locations:
+        paragraphs = element.findall('.//{eregs}paragraph')
         for paragraph in paragraphs:
             title = paragraph.find('{eregs}title')
             if title is not None and title.get('type') == 'keyterm':
@@ -462,7 +476,9 @@ def build_meta_layer(root):
                       '1016': 'P', '1017': 'Q', '1018': 'R',
                       '1019': 'S', '1020': 'T', '1021': 'U',
                       '1022': 'V', '1023': 'W', '1024': 'X',
-                      '1025': 'Y', '1026': 'Z'}
+                      '1025': 'Y', '1026': 'Z', '1027': 'AA',
+                      '1028': 'BB', '1029': 'CC', '1030': 'DD',
+                      }
 
     preamble = root.find('{eregs}preamble')
     fdsys = root.find('{eregs}fdsys')
@@ -499,7 +515,8 @@ def build_interp_layer(root):
         interp_paragraphs = interpretations.findall('.//{eregs}interpParagraph')
         for paragraph in interp_paragraphs:
             target = paragraph.get('target')
-            label = paragraph.get('label')
-            layer_dict[target] = [{'reference': label}]
+            if target:
+                label = paragraph.get('label')
+                layer_dict[target] = [{'reference': label}]
 
     return layer_dict
