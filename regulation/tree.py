@@ -572,10 +572,19 @@ def build_notice(root):
 
     Notices currently contain analysis and footnotes
     """
-    # Get document number for the notice
+    # Get the root label
+    label = root.find('.//{eregs}part').attrib['partNumber']
+
+    # Get regulation dates, document number, and url for the notice
+    publication_date = root.find('.//{eregs}fdsys/{eregs}date').text
     document_number = root.find('.//{eregs}documentNumber').text
+    effective_date = root.find('.//{eregs}effectiveDate').text
+    fr_url = root.find('.//{eregs}federalRegisterURL').text
 
     notice_dict = OrderedDict([
+        ('cfr_parts', [label,]),
+        ('effective_on', effective_date),
+        ('fr_url', fr_url),
         ('document_number', document_number),
         ('section_by_section', []),
         ('footnotes', {})

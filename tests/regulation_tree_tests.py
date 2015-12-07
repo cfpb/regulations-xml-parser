@@ -26,6 +26,8 @@ class TreeTestCase(TestCase):
               <section>1234</section>
             </cfr>
             <documentNumber>2015-12345</documentNumber>
+            <effectiveDate>2015-11-17</effectiveDate>
+            <federalRegisterURL>https://www.federalregister.gov/articles/2015/11/17/2015-12345/</federalRegisterURL>
           </preamble>
           <part partNumber="1234">
             <content>
@@ -118,6 +120,9 @@ class TreeTestCase(TestCase):
 
     def test_build_notice(self):
         result_notice = {
+            'cfr_parts': ['1234'], 
+            'effective_on': '2015-11-17', 
+            'fr_url': 'https://www.federalregister.gov/articles/2015/11/17/2015-12345/', 
             'document_number': '2015-12345',
             'section_by_section': [{
                 'labels': ['1234-1'],
@@ -150,7 +155,7 @@ class TreeTestCase(TestCase):
                 '1': 'Paragraphs contain text.',
                 '2': 'Analysis analyzes things.'
             },
-        }
+        }  # noqa
 
         notice_dict = build_notice(self.root)
         self.assertEqual(result_notice, dict(notice_dict))
