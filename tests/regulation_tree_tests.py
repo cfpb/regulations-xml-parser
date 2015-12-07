@@ -4,7 +4,10 @@ from unittest import TestCase
 
 import lxml.etree as etree
 
-from regulation.tree import build_analysis, build_notice
+from regulation.tree import (build_reg_tree,
+                             build_paragraph_marker_layer,
+                             build_analysis,
+                             build_notice)
 
 
 class TreeTestCase(TestCase):
@@ -15,15 +18,28 @@ class TreeTestCase(TestCase):
         <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
           <fdsys>
             <date>2015-11-17</date>
+            <title>REGULATION TESTING</title>
           </fdsys>
           <preamble>
+            <cfr>
+              <title>12</title>
+              <section>1234</section>
+            </cfr>
             <documentNumber>2015-12345</documentNumber>
           </preamble>
           <part partNumber="1234">
             <content>
+
               <subpart>
                 <content>
                   <section label="1234-1">
+                    <subject/>
+                    <paragraph label="1234-1-p1" marker="">
+                      <content>I'm an unmarked paragraph</content>
+                    </paragraph>
+                    <paragraph label="1234-1-a" marker="a">
+                      <content>I'm a marked paragraph</content>
+                    </paragraph>
                     <analysis>
                       <analysisSection>
                         <title>Section 1234.1</title>
@@ -37,6 +53,27 @@ class TreeTestCase(TestCase):
                   </section>
                 </content>
               </subpart>
+
+              <appendix appendixLetter="A" label="1234-A">
+                <appendixTitle>Appendix A to Part 1234</appendixTitle>
+                <appendixSection appendixSecNum="1" label="1234-A-p1">
+                  <subject/>
+                  <paragraph label="1234-A-p1-p1" marker="">
+                    <content>This is some appendix content.</content>
+                  </paragraph>
+                </appendixSection>
+              </appendix>
+
+              <interpretations label="1234-Interp">
+                <title>Supplement I to Part 1234&#8212;Official Interpretations</title>
+                <interpSection label="1234-Interp-h1">
+                  <title>Introduction</title>
+                  <interpParagraph label="1234-Interp-h1-1" target="1013-h1-1">
+                    <content>Some interpretation content here.</content>
+                  </interpParagraph>
+                </interpSection>
+              </interpretations>
+
             </content>
           </part>
         </regulation>
@@ -45,6 +82,24 @@ class TreeTestCase(TestCase):
 
     def tearDown(self):
         pass
+
+    def test_build_reg_tree(self):
+        # Do some basic introspection of the outcome
+        node = build_reg_tree(self.root)
+
+        node_dict = node.to_json()
+        self.assertEqual(node_dict['title'], 'REGULATION TESTING')
+        self.assertEqual(node_dict['label'], ['1234'])
+        self.assertEqual(len(node_dict['children']), 3)
+
+        subpart_dict = node_dict['children'][0]
+        self.assertEqual(subpart_dict['label'], ['1234', 'Subpart'])
+
+        appendix_dict = node_dict['children'][1]
+        self.assertEqual(appendix_dict['label'], ['1234', 'A'])
+
+        interp_dict = node_dict['children'][2]
+        self.assertEqual(interp_dict['label'], ['1234', 'Interp'])
 
     def test_build_analysis(self):
         result_analysis = {
@@ -55,6 +110,11 @@ class TreeTestCase(TestCase):
         }
         analysis_dict = build_analysis(self.root)
         self.assertEqual(result_analysis, dict(analysis_dict))
+
+    def test_build_paragraph_marker_layer(self):
+        result = build_paragraph_marker_layer(self.root)
+        self.assertEqual(result,
+                         {'1234-1-a': [{'locations': [0], 'text': 'a'}]})
 
     def test_build_notice(self):
         result_notice = {
