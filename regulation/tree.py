@@ -520,3 +520,125 @@ def build_interp_layer(root):
                 layer_dict[target] = [{'reference': label}]
 
     return layer_dict
+
+
+def build_analysis(root):
+    """
+    Build the analysis layer from the given root node. This looks for
+    all `analysis` elements and creates references to them.
+
+    The actual analysis is captured in the `build_notice` function
+    below.
+    """
+    analysis_dict = OrderedDict()
+
+    # Find all analysis elements within the regulation
+    analyses = root.findall('.//{eregs}analysis')
+
+    # Get regulation date and document number for the analysis reference
+    publication_date = root.find('.//{eregs}fdsys/{eregs}date').text
+    document_number = root.find('.//{eregs}documentNumber').text
+
+    for analysis_elm in analyses:
+        # Fetch the parent's label
+        label = analysis_elm.xpath('../@label')[0]
+
+        # Labels might have multiple analysis refs. If it's not already 
+        # in the analyses_dict, add it.
+        if label not in analysis_dict:
+            analysis_dict[label] = []
+
+        analysis_dict[label].append({
+            'publication_date': (publication_date),
+            'reference': (document_number, label),
+        })
+
+    return analysis_dict
+
+
+def build_notice(root):
+    """
+    Build the notice dictioanry from the given root node.
+
+    Notices currently contain analysis and footnotes
+    """
+    # Get document number for the notice
+    document_number = root.find('.//{eregs}documentNumber').text
+
+    notice_dict = OrderedDict([
+        ('document_number', document_number),
+        ('section_by_section', []), 
+        ('footnotes', {})
+    ])
+
+    # Analyses
+    analyses = root.findall('.//{eregs}analysis')
+
+    def build_analysis_dict(child_elm):
+        """ Recursively build a dictionary for the given analysis
+            section """
+
+        # Final list of paragraphs in this analysis section
+        paragraphs = []
+
+        # Final list of footnote references in this analysis section
+        footnote_refs = []
+
+        # Paragraphs can contain inline footnote elms. We have to
+        # assemble the paragraph text from the initial paragraph's text
+        # and any footnote's tails
+        paragraph_elms = child_elm.findall('{eregs}analysisParagraph')
+        for paragraph_elm in paragraph_elms:
+            footnote_elms = paragraph_elm.findall('.//{eregs}footnote')
+
+            # Get the initial bit of text
+            paragraph_text = paragraph_elm.text
+
+            # Loop over any footnotes
+            for footnote_elm in footnote_elms:
+                footnote_refs.append({
+                    'offset': len(paragraph_text),
+                    'paragraph': len(paragraphs),
+                    'reference': footnote_elm.attrib['ref']
+                })
+
+                # Append the footnote 'tail' to the paragraph text
+                paragraph_text += footnote_elm.tail
+
+            # Append the full text to the list of paragraphs
+            paragraphs.append(paragraph_text)
+
+        # Grab the title
+        title = child_elm.find('{eregs}title').text
+
+        # Recruse through child analysis sections 
+        children = [build_analysis_dict(c) 
+                    for c in child_elm.findall('{eregs}analysisSection')]
+
+        # Build the dict from all our pieces
+        analysis_dict = {
+            'title': title,
+            'paragraphs': paragraphs, 
+            'footnote_refs': footnote_refs,
+            'children': children,
+        }
+
+        return analysis_dict
+
+    for analysis_elm in analyses:
+        section_elm = analysis_elm.find('{eregs}analysisSection')
+        analysis_dict = build_analysis_dict(section_elm)
+
+        # Add the parent's label to the top-level of the dict
+        analysis_dict['labels'] = analysis_elm.xpath('../@label')
+
+        # Add the analysis to the notice
+        notice_dict['section_by_section'].append(analysis_dict)
+
+    # Footnotes
+    footnotes = root.findall('.//{eregs}footnote')
+    for footnote_elm in footnotes:
+        ref = footnote_elm.attrib['ref']
+        notice_dict['footnotes'][ref] = footnote_elm.text
+
+    return notice_dict

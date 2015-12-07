@@ -48,6 +48,8 @@ def parser_driver(regulation_file, notice_doc_numbers=[]):
     graphics = build_graphics_layer(xml_tree)
     formatting = build_formatting_layer(xml_tree)
     interps = build_interp_layer(xml_tree)
+    analysis = build_analysis(xml_tree)
+    notice = build_notice(xml_tree)
 
     # validate relative to schema
     validator = EregsValidator(settings.XSD_FILE)
@@ -80,6 +82,8 @@ def parser_driver(regulation_file, notice_doc_numbers=[]):
     write_layer(graphics, reg_number, notice, 'layer/graphics')
     write_layer(formatting, reg_number, notice, 'layer/formatting')
     write_layer(interps, reg_number, notice, 'layer/interpretations')
+    write_layer(analysis, reg_number, notice, 'layer/analysis')
+    write_layer(notice, reg_number, notice, 'notice')
 
 if __name__ == '__main__':
 
