@@ -26,7 +26,7 @@ from regulation.validation import EregsValidator
 import settings
 
 if (sys.version_info < (3, 0)):
-    reload(sys)
+    reload(sys) #noqa
     sys.setdefaultencoding('UTF8')
 
 
