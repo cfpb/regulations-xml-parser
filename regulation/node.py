@@ -1,9 +1,7 @@
-__author__ = 'vinokurovy'
-
-import json
-import re
+# -*- coding: utf-8 -*-
 
 from collections import OrderedDict
+
 
 class RegNode:
 
@@ -19,7 +17,8 @@ class RegNode:
         self.mixed_text = []
 
         if 'include_children' in kwargs:
-            if not (kwargs['include_children'] == True or kwargs['include_children'] == False):
+            if not (kwargs['include_children'] is True or 
+                    kwargs['include_children'] is False):
                 raise ValueError('include_children must be True or False!')
             self.include_children = kwargs['include_children']
         else:
@@ -30,7 +29,8 @@ class RegNode:
         node_dict = OrderedDict()
 
         if self.include_children:
-            node_dict['children'] = [node.to_json() for node in self.children]
+            node_dict['children'] = [node.to_json() 
+                                     for node in self.children]
 
         node_dict['label'] = self.label
         node_dict['node_type'] = self.node_type

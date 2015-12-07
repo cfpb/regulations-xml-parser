@@ -1,17 +1,25 @@
 #!/usr/bin/env python
 
-__author__ = 'vinokurovy'
-
 import argparse
 import sys
 import os
 import json
-import codecs
 
 from lxml import etree
-from pprint import pprint
 
-from regulation.tree import *
+from regulation.tree import (build_analysis,
+                             build_external_citations_layer, 
+                             build_formatting_layer,
+                             build_graphics_layer, 
+                             build_internal_citations_layer,
+                             build_interp_layer, 
+                             build_keyterm_layer, 
+                             build_meta_layer,
+                             build_notice, 
+                             build_paragraph_marker_layer, 
+                             build_reg_tree,
+                             build_terms_layer, 
+                             build_toc_layer)
 from regulation.verification import EregsValidator
 
 import settings
@@ -26,11 +34,11 @@ def write_layer(layer_object, reg_number, notice, layer_type):
     if not os.path.exists(layer_path):
         os.mkdir(layer_path)
     layer_file = os.path.join(layer_path, notice)
-    json.dump(layer_object, open(layer_file, 'w'), indent=4, separators=(',', ':'))
+    json.dump(layer_object, open(layer_file, 'w'), indent=4, 
+              separators=(',', ':'))
 
 
 def parser_driver(regulation_file, notice_doc_numbers=[]):
-
     with open(regulation_file, 'r') as f:
         reg_xml = f.read()
     xml_tree = etree.fromstring(reg_xml)
@@ -73,9 +81,12 @@ def parser_driver(regulation_file, notice_doc_numbers=[]):
 
     write_layer(reg_json, reg_number, notice, 'regulation')
     write_layer(meta, reg_number, notice, 'layer/meta')
-    write_layer(paragraph_markers, reg_number, notice, 'layer/paragraph-markers')
-    write_layer(internal_citations, reg_number, notice, 'layer/internal-citations')
-    write_layer(external_citations, reg_number, notice, 'layer/external-citations')
+    write_layer(paragraph_markers, reg_number, notice, 
+                'layer/paragraph-markers')
+    write_layer(internal_citations, reg_number, notice, 
+                'layer/internal-citations')
+    write_layer(external_citations, reg_number, notice, 
+                'layer/external-citations')
     write_layer(terms, reg_number, notice, 'layer/terms')
     write_layer(toc, reg_number, notice, 'layer/toc')
     write_layer(keyterms, reg_number, notice, 'layer/keyterms')
