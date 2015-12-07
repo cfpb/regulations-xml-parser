@@ -49,7 +49,7 @@ class TreeTestCase(TestCase):
     def test_build_analysis(self):
         result_analysis = {
             '1234-1': [{
-                'publication_date': u'2015-11-17', 
+                'publication_date': u'2015-11-17',
                 'reference': (u'2015-12345', u'1234-1')
             }]
         }
@@ -60,29 +60,29 @@ class TreeTestCase(TestCase):
         result_notice = {
             'document_number': '2015-12345',
             'section_by_section': [{
-                'labels': ['1234-1'], 
+                'labels': ['1234-1'],
                 'title': 'Section 1234.1',
                 'paragraphs': [
                     'This paragraph is in the top-level section.',
-                ], 
-                'footnote_refs': [], 
+                ],
+                'footnote_refs': [],
                 'children': [{
-                    'children': [], 
+                    'children': [],
                     'footnote_refs': [
                         {
-                            'offset': 16, 
-                            'paragraph': 0, 
+                            'offset': 16,
+                            'paragraph': 0,
                             'reference': '1'
                         },
                         {
-                            'offset': 31, 
-                            'paragraph': 0, 
+                            'offset': 31,
+                            'paragraph': 0,
                             'reference': '2'
                         },
                     ],
                     'paragraphs': [
-                        'I am a paragraph in an analysis section, love me!', 
-                    ], 
+                        'I am a paragraph in an analysis section, love me!',
+                    ],
                     'title': '(a) Section of the Analysis'
                 }],
             }],

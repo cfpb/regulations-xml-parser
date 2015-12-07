@@ -17,7 +17,7 @@ class RegNode:
         self.mixed_text = []
 
         if 'include_children' in kwargs:
-            if not (kwargs['include_children'] is True or 
+            if not (kwargs['include_children'] is True or
                     kwargs['include_children'] is False):
                 raise ValueError('include_children must be True or False!')
             self.include_children = kwargs['include_children']
@@ -29,7 +29,7 @@ class RegNode:
         node_dict = OrderedDict()
 
         if self.include_children:
-            node_dict['children'] = [node.to_json() 
+            node_dict['children'] = [node.to_json()
                                      for node in self.children]
 
         node_dict['label'] = self.label

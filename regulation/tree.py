@@ -331,7 +331,7 @@ def build_terms_layer(root):
     inf_engine.defnoun('bonus', 'bonuses')
 
     paragraphs = root.findall('.//{eregs}paragraph') + \
-                 root.findall('.//{eregs}interpParagraph')
+        root.findall('.//{eregs}interpParagraph')
 
     for paragraph in paragraphs:
         content = paragraph.find('{eregs}content')
@@ -369,9 +369,8 @@ def build_terms_layer(root):
         definitions = paragraph.find('{eregs}content').findall('{eregs}def')
         for defn in definitions:
             defined_term = defn.get('term')
-            if inf_engine.singular_noun(defined_term.lower()) and \
-                    not defined_term.lower() in \
-                        settings.SPECIAL_SINGULAR_NOUNS:
+            if inf_engine.singular_noun(defined_term.lower()) and not \
+                    defined_term.lower() in settings.SPECIAL_SINGULAR_NOUNS:
                 key = inf_engine.singular_noun(defined_term.lower()) + \
                     ':' + label
             else:
@@ -554,7 +553,7 @@ def build_analysis(root):
         # Fetch the parent's label
         label = analysis_elm.xpath('../@label')[0]
 
-        # Labels might have multiple analysis refs. If it's not already 
+        # Labels might have multiple analysis refs. If it's not already
         # in the analyses_dict, add it.
         if label not in analysis_dict:
             analysis_dict[label] = []
@@ -578,7 +577,7 @@ def build_notice(root):
 
     notice_dict = OrderedDict([
         ('document_number', document_number),
-        ('section_by_section', []), 
+        ('section_by_section', []),
         ('footnotes', {})
     ])
 
@@ -600,21 +599,23 @@ def build_notice(root):
         # and any footnote's tails
         paragraph_elms = child_elm.findall('{eregs}analysisParagraph')
         for paragraph_elm in paragraph_elms:
-            footnote_elms = paragraph_elm.findall('.//{eregs}footnote')
-
             # Get the initial bit of text
-            paragraph_text = paragraph_elm.text
+            paragraph_text = paragraph_elm.text \
+                if paragraph_elm.text is not None \
+                else ''
 
-            # Loop over any footnotes
-            for footnote_elm in footnote_elms:
-                footnote_refs.append({
-                    'offset': len(paragraph_text),
-                    'paragraph': len(paragraphs),
-                    'reference': footnote_elm.attrib['ref']
-                })
+            # Loop over any children and get the text from their tails.
+            # If the child is a footnote, capture its reference.
+            for p_child_elm in paragraph_elm.getchildren():
+                if p_child_elm.tag == '{eregs}footnote':
+                    footnote_refs.append({
+                        'offset': len(paragraph_text),
+                        'paragraph': len(paragraphs),
+                        'reference': p_child_elm.attrib['ref']
+                    })
 
                 # Append the footnote 'tail' to the paragraph text
-                paragraph_text += footnote_elm.tail
+                paragraph_text += p_child_elm.tail
 
             # Append the full text to the list of paragraphs
             paragraphs.append(paragraph_text)
@@ -622,14 +623,14 @@ def build_notice(root):
         # Grab the title
         title = child_elm.find('{eregs}title').text
 
-        # Recruse through child analysis sections 
-        children = [build_analysis_dict(c) 
+        # Recruse through child analysis sections
+        children = [build_analysis_dict(c)
                     for c in child_elm.findall('{eregs}analysisSection')]
 
         # Build the dict from all our pieces
         analysis_dict = {
             'title': title,
-            'paragraphs': paragraphs, 
+            'paragraphs': paragraphs,
             'footnote_refs': footnote_refs,
             'children': children,
         }

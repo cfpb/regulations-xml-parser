@@ -92,7 +92,7 @@ class EregsValidator:
 
     def validate_terms(self, tree, terms_layer):
         """
-        Validate the tree to make sure that all terms referenced in the 
+        Validate the tree to make sure that all terms referenced in the
         terms layer are defined somewhere in the tree.
 
         :param tree: the xml tree of the regulation
@@ -107,7 +107,7 @@ class EregsValidator:
         definitions = terms_layer['referenced']
         def_locations = []
 
-        for key, defn in definitions.iteritems():
+        for key, defn in definitions.items():
             term = defn['term']
             defined_in = defn['reference']
             def_locations.append(defined_in)
@@ -116,7 +116,7 @@ class EregsValidator:
             self.events.append(event)
 
         paragraphs = tree.findall('.//{eregs}paragraph') + \
-                tree.findall('.//{eregs}interpParagraph')
+            tree.findall('.//{eregs}interpParagraph')
 
         for paragraph in paragraphs:
             content = paragraph.find('{eregs}content')
@@ -174,10 +174,10 @@ class EregsValidator:
 
         # cites = tree.findall('.//{eregs}ref[@reftype="internal"]')
         labeled_elements = tree.findall('.//')
-        labels = [elem.get('label') for elem in labeled_elements 
+        labels = [elem.get('label') for elem in labeled_elements
                   if elem.get('label') is not None]
 
-        for label, cites in internal_cites_layer.iteritems():
+        for label, cites in internal_cites_layer.items():
             if label not in labels:
                 msg = 'NONEXISTENT LABEL: ' \
                       'Internal layer attempts to reference label {} ' \
