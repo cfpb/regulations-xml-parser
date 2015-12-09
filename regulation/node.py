@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from collections import OrderedDict
+from termcolor import colored
 
 
 class RegNode:
@@ -124,3 +125,25 @@ def find_all_occurrences(source, target):
             remainder = []
 
     return positions
+
+
+def interpolate_string(text, offsets, values, colorize=False):
+    result = ''
+    current_pos = 0
+    for i, offset in enumerate(offsets):
+        start = offset[0]
+        end = offset[1]
+        if colorize:
+            fragment = colored(text[current_pos:start], 'green')
+        else:
+            fragment = text[current_pos:start]
+        current_pos = end
+        if colorize:
+            result = result + fragment + colored(values[i], 'red')
+        else:
+            result = result + fragment + values[i]
+    if colorize:
+        result = result + colored(text[current_pos:], 'green')
+    else:
+        result = result + text[current_pos:]
+    return result
