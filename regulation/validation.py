@@ -205,7 +205,6 @@ class EregsValidator:
                     plural_term_locations = set(find_all_occurrences(par_text, plural_term))
                     unmarked_locs = list(term_locations.symmetric_difference(plural_term_locations))
                     for term_loc in unmarked_locs:
-                        # print term[0], unmarked_locs
                         if not enclosed_in_tag(par_text, 'ref', term_loc) and not enclosed_in_tag(par_text, 'def', term_loc):
                             if input_state is None:
 
@@ -218,15 +217,11 @@ class EregsValidator:
                                       colored('Would you like the automatically fix this reference in the source?', 'yellow')
                                 print msg
                                 while input_state not in ['y', 'n', 'i']:
-                                    input_state = raw_input('(y)es/(n)o/(i)gnore: ')
+                                    input_state = raw_input('(y)es/(n)o/(i)gnore this term: ')
 
                                 if input_state == 'y':
                                     problem_flag = True
                                     ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[1], term[0])
-                                    #highlight = colored(par_text[0:term_loc], 'cyan') + \
-                                    #            colored(ref, 'red') + \
-                                    #            colored(par_text[term_loc + len(term[0]):], 'cyan')
-                                    #print highlight
                                     offsets_and_values.append((ref, [term_loc, term_loc + len(term[0])]))
                                 elif input_state == 'i':
                                     ignore.add(term[0])
@@ -236,9 +231,6 @@ class EregsValidator:
             if offsets_and_values != []:
                 offsets_and_values = sorted(offsets_and_values, key=lambda x: x[1][0])
                 values, offsets = zip(*offsets_and_values)
-                # print offsets
-                # print values
-                # print par_text
                 new_par_text = interpolate_string(par_text, offsets, values)
                 highlight = interpolate_string(par_text, offsets, values, colorize=True)
                 new_content = etree.fromstring(new_par_text)
