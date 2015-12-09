@@ -168,14 +168,14 @@ def build_paragraph_marker_layer(root):
 
 def build_internal_citations_layer(root):
 
-    paragraphs = root.findall('.//{eregs}paragraph')
+    paragraphs = root.findall('.//{eregs}paragraph') + root.findall('.//{eregs}interpParagraph')
     layer_dict = OrderedDict()
 
     for paragraph in paragraphs:
-        marker = paragraph.get('marker')
-        if marker == 'none':
+        marker = paragraph.get('marker', '')
+        if marker == 'none' or marker is None:
             marker = ''
-        par_text = marker + ' ' + xml_node_text(paragraph.find('{eregs}content'))
+        par_text = (marker + ' ' + xml_node_text(paragraph.find('{eregs}content'))).strip()
         par_label = paragraph.get('label')
         cites = paragraph.findall('.//{eregs}ref[@reftype="internal"]')
         citation_list = []
@@ -347,8 +347,7 @@ def build_terms_layer(root):
                 target = inf_engine.singular_noun(text.lower()) + ':' + term.get('target')
             else:
                 target = text.lower() + ':' + term.get('target')
-            # if term.get('target') not in targets:
-            # targets.append(term.get('target'))
+
             positions = find_all_occurrences(par_text, text)
             ref_dict = OrderedDict()
             ref_dict['offsets'] = []
@@ -392,6 +391,7 @@ def build_toc_layer(root):
     part_toc = part.find('{eregs}tableOfContents')
     part_number = part.get('partNumber')
     toc_dict[part_number] = []
+    appendix_letters = []
 
     for section in part_toc.findall('{eregs}tocSecEntry'):
         target = section.get('target').split('-')
@@ -424,6 +424,7 @@ def build_toc_layer(root):
     appendices = part.find('{eregs}content').findall('{eregs}appendix')
     for appendix in appendices:
         appendix_letter = appendix.get('appendixLetter')
+        appendix_letters.append(appendix_letter)
         appendix_key = part_number + '-' + appendix_letter
         toc_dict[appendix_key] = []
 
@@ -435,6 +436,15 @@ def build_toc_layer(root):
                 subject = section.find('{eregs}appendixSubject').text
                 toc_entry = {'index': target, 'title': subject}
                 toc_dict[appendix_key].append(toc_entry)
+
+    interpretations = part.find('.//{eregs}interpretations').findall('{eregs}interpSection')
+    interp_key = part_number + '-Interp'
+    for interp in interpretations:
+        title = interp.find('{eregs}title').text
+        target = interp.get('label').split('-')
+        if target[-1] not in appendix_letters:
+            toc_entry = {'index': target, 'title': title}
+            toc_dict.setdefault(interp_key, []).append(toc_entry)
 
     return toc_dict
 

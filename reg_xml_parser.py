@@ -12,7 +12,7 @@ from lxml import etree
 from pprint import pprint
 
 from regulation.tree import *
-from regulation.verification import EregsValidator
+from regulation.validation import EregsValidator
 
 import settings
 
@@ -61,6 +61,7 @@ def parser_driver(regulation_file, notice_doc_numbers=[]):
     else:
         validator.validate_terms(xml_tree, terms)
         validator.validate_internal_cites(xml_tree, internal_citations)
+        validator.validate_term_references(xml_tree, terms, regulation_file)
         for event in validator.events:
             print str(event)
 

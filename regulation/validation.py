@@ -7,8 +7,10 @@ import settings
 from enum import Enum
 from termcolor import colored, cprint
 from lxml import etree
+from node import xml_node_text, find_all_occurrences
 
 import inflect
+import re
 
 class Severity(Enum):
 
@@ -149,6 +151,76 @@ class EregsValidator:
             event = EregsValidationEvent(msg, Severity(Severity.OK))
 
         self.events.append(event)
+
+    def validate_term_references(self, tree, terms_layer, regulation_file):
+
+        problem_flag = False
+        inf = inflect.engine()
+
+        definitions = terms_layer['referenced']
+        terms = [(defn['term'], defn['reference']) for key, defn in definitions.iteritems()]
+
+        def enclosed_in_tag(source_text, tag, loc):
+            trailing_text = source_text[loc:]
+            close_tag = '</{}>'.format(tag)
+            first_closed_tag = re.search('<\/.*?>', trailing_text)
+            if not first_closed_tag:
+                return False
+            else:
+                if first_closed_tag.group(0) == close_tag:
+                    return True
+                else:
+                    return False
+
+
+        paragraphs = tree.findall('.//{eregs}paragraph') + tree.findall('.//{eregs}interpParagraph')
+
+        for paragraph in paragraphs:
+            content = paragraph.find('.//{eregs}content')
+            par_text = etree.tostring(content)
+            label = paragraph.get('label')
+
+            for term in terms:
+                input_state = None
+                term_locations = set(find_all_occurrences(par_text, term[0]))
+                plural_term = inf.plural(term[0])
+                plural_term_locations = set(find_all_occurrences(par_text, plural_term))
+                unmarked_locs = term_locations.symmetric_difference(plural_term_locations)
+                for term_loc in unmarked_locs:
+                    if not enclosed_in_tag(par_text, 'ref', term_loc) and not enclosed_in_tag(par_text, 'def', term_loc):
+                        if input_state is None:
+
+                            highlighted_par = colored(par_text[0:term_loc], 'yellow') + \
+                                              colored(term[0], 'red') + \
+                                              colored(par_text[term_loc + len(term[0]):], 'yellow')
+
+                            msg = colored('You appear to have used the term "{}" in {} without referencing it: \n'.format(term[0], label), 'yellow') + \
+                                  '{}\n'.format(highlighted_par) + \
+                                  colored('Would you like the automatically fix this reference in the source?', 'yellow')
+                            print msg
+                            while input_state not in ['y', 'n', 'a', 'N']:
+                                input_state = raw_input('(y)es/(n)o/(a)lways/(N)ever: ')
+
+                            if input_state == 'y':
+                                problem_flag = True
+                                ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[1], term[0])
+                                highlight = colored(par_text[0:term_loc], 'cyan') + \
+                                            colored(ref, 'red') + \
+                                            colored(par_text[term_loc + len(term[0]):], 'cyan')
+                                print highlight
+                                par_text = par_text[0:term_loc] + ref + par_text[term_loc + len(term[0]):]
+                                new_content = etree.fromstring(par_text)
+                                paragraph.replace(content, new_content)
+                                content = new_content
+
+        if problem_flag:
+            print colored('The tree has been altered! Do you want to write the result to disk?')
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('y/n')
+            if answer == 'y':
+                with open(regulation_file, 'w') as f:
+                    f.write(etree.tostring(tree, pretty_print=True))
 
     def validate_internal_cites(self, tree, internal_cites_layer):
         """
