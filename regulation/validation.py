@@ -217,7 +217,7 @@ class EregsValidator:
             print colored('The tree has been altered! Do you want to write the result to disk?')
             answer = None
             while answer not in ['y', 'n']:
-                answer = raw_input('y/n')
+                answer = raw_input('Save? y/n: ')
             if answer == 'y':
                 with open(regulation_file, 'w') as f:
                     f.write(etree.tostring(tree, pretty_print=True))
