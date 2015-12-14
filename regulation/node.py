@@ -2,7 +2,7 @@
 
 from collections import OrderedDict
 from termcolor import colored
-
+import re
 
 class RegNode:
 
@@ -147,3 +147,18 @@ def interpolate_string(text, offsets, values, colorize=False):
     else:
         result = result + text[current_pos:]
     return result
+
+def enclosed_in_tag(source_text, tag, loc):
+    trailing_text = source_text[loc:]
+    close_tag = '</{}>'.format(tag)
+    first_open_tag = re.search('<[^\/].*?>', trailing_text)
+    first_closed_tag = re.search('<\/.*?>', trailing_text)
+    if not first_closed_tag:
+        return False
+    else:
+        if first_open_tag is not None and first_open_tag.start() < first_closed_tag.start():
+            return False
+        elif first_closed_tag.group(0) == close_tag:
+            return True
+        else:
+            return False

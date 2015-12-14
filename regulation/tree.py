@@ -5,8 +5,10 @@ from collections import OrderedDict
 import inflect
 
 from regulation.node import (RegNode, xml_node_text, xml_mixed_text,
-                             find_all_occurrences)
+                             find_all_occurrences, enclosed_in_tag)
 import settings
+
+from lxml import etree
 
 
 def build_reg_tree(root, parent=None):
@@ -78,7 +80,7 @@ def build_reg_tree(root, parent=None):
         else:
             node.text = '{} {}'.format(marker, content_text).strip()
         node.node_type = parent.node_type
-        node.mixed_text = xml_mixed_text(content)
+        # node.mixed_text = xml_mixed_text(content)
 
         children = root.findall('{eregs}paragraph')
 
@@ -174,19 +176,46 @@ def build_internal_citations_layer(root):
         marker = paragraph.get('marker', '')
         if marker == 'none' or marker is None:
             marker = ''
-        par_text = marker + ' ' + xml_node_text(
-            paragraph.find('{eregs}content'))
+        par_text = (marker + ' ' + xml_node_text(
+            paragraph.find('{eregs}content'))).strip()
 
         par_label = paragraph.get('label')
-        cites = paragraph.findall('.//{eregs}ref[@reftype="internal"]')
+
+        if marker != '':
+            marker_offset = len(marker + ' ')
+        else:
+            marker_offset = 0
+
+        cite_positions = OrderedDict()
+        cite_targets = OrderedDict()
+
+        content = paragraph.find('{eregs}content')
+        cites = content.findall('{eregs}ref[@reftype="internal"]')
         citation_list = []
         for cite in cites:
+            # import pdb
+            # pdb.set_trace()
+
             target = cite.get('target').split('-')
             text = cite.text
-            positions = find_all_occurrences(par_text, text)
+
+            running_par_text = content.text or ''
+            for child in content.getchildren():
+                if child != cite:
+                    running_par_text += child.text + child.tail
+                else:
+                    break
+
+            cite_position = len(running_par_text) + marker_offset
+            cite_positions.setdefault(text, []).append(cite_position)
+            cite_targets[text] = target
+            running_par_text = ''
+
+        for cite, positions in cite_positions.iteritems():
+            # positions = find_all_occurrences(par_text, text)
             for pos in positions:
-                cite_dict = {'citation': target,
-                             'offsets': [[pos, pos + len(text)]]}
+                cite_dict = {'citation': cite_targets[cite],
+                             'offsets': [[pos, pos + len(cite)]]}
                 if cite_dict not in citation_list:
                     citation_list.append(cite_dict)
 
@@ -264,9 +293,9 @@ def build_formatting_layer(root):
     paragraphs = root.findall('.//{eregs}paragraph')
 
     for paragraph in paragraphs:
-        # content = paragraph.find('{eregs}content')
-        dashes = paragraph.findall('.//{eregs}dash')
-        tables = paragraph.findall('.//{eregs}table')
+        content = paragraph.find('{eregs}content')
+        dashes = content.findall('.//{eregs}dash')
+        tables = content.findall('.//{eregs}table')
         label = paragraph.get('label')
         if len(dashes) > 0:
             layer_dict[label] = []
@@ -283,6 +312,7 @@ def build_formatting_layer(root):
             if label not in layer_dict:
                 layer_dict[label] = []
             for table in tables:
+                table_md = '|'
                 table_dict = OrderedDict()
                 table_data_dict = OrderedDict()
                 table_data_dict['header'] = []
@@ -303,11 +333,13 @@ def build_formatting_layer(root):
                         if column_text is None:
                             column_text = ''
                         column_header_dict['text'] = column_text
+                        table_md += column_text + '|'
                         column_arr.append(column_header_dict)
                     table_data_dict['header'].append(column_arr)
+                    table_md += '\n|'
 
                 data_rows = table.findall('{eregs}row')
-                for row in data_rows:
+                for i, row in enumerate(data_rows):
                     row_arr = []
                     cells = row.findall('{eregs}cell')
                     for cell in cells:
@@ -315,7 +347,10 @@ def build_formatting_layer(root):
                         if cell_text is None:
                             cell_text = ''
                         row_arr.append(cell_text)
+                        table_md += cell_text + '|'
                     table_data_dict['rows'].append(row_arr)
+                    if i < len(data_rows) - 1:
+                        table_md += '\n|'
                 table_dict['table_data'] = table_data_dict
                 table_dict['text'] = ''
                 layer_dict[label].append(table_dict)
@@ -337,17 +372,31 @@ def build_terms_layer(root):
     for paragraph in paragraphs:
         content = paragraph.find('{eregs}content')
         terms = content.findall('.//{eregs}ref[@reftype="term"]')
+        # terms = sorted(terms, key=lambda term: len(term.text), reverse=True)
         label = paragraph.get('label')
-        marker = paragraph.get('marker')
-        if marker is None:
-            marker = ''
 
-        par_text = (marker + ' ' + xml_node_text(
-            paragraph.find('{eregs}content'))).strip()
-        # targets = []
+        marker = paragraph.get('marker') or ''
+
+        par_text = (marker + ' ' + xml_node_text(content).strip())
+
         if len(terms) > 0:
             terms_dict[label] = []
+
+        if marker != '':
+            marker_offset = len(marker + ' ')
+        else:
+            marker_offset = 0
+        term_positions = OrderedDict()
+        term_targets = OrderedDict()
+
         for term in terms:
+            running_par_text = content.text or ''
+            for child in content.getchildren():
+                if child != term:
+                    running_par_text += child.text + child.tail
+                else:
+                    break
+
             text = term.text
             if inf_engine.singular_noun(text.lower()) and \
                     not text.lower() in settings.SPECIAL_SINGULAR_NOUNS:
@@ -356,11 +405,16 @@ def build_terms_layer(root):
             else:
                 target = text.lower() + ':' + term.get('target')
 
-            positions = find_all_occurrences(par_text, text)
+            term_position = len(running_par_text) + marker_offset
+            term_positions.setdefault(text, []).append(term_position)
+            term_targets[text] = target
+
+        for term, positions in term_positions.iteritems():
+            target = term_targets[term]
             ref_dict = OrderedDict()
             ref_dict['offsets'] = []
             for pos in positions:
-                ref_dict['offsets'].append([pos, pos + len(text)])
+                ref_dict['offsets'].append([pos, pos + len(term)])
             ref_dict['ref'] = target
             if len(ref_dict['offsets']) > 0 and \
                     ref_dict not in terms_dict[label]:

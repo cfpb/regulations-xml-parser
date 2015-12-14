@@ -41,10 +41,19 @@ def write_layer(layer_object, reg_number, notice, layer_type):
               separators=(',', ':'))
 
 
-def parser_driver(regulation_file, notice_doc_numbers=[]):
+def parser_driver(regulation_file, notice_doc_numbers=[], check_terms=False):
     with open(regulation_file, 'r') as f:
         reg_xml = f.read()
     xml_tree = etree.fromstring(reg_xml)
+
+    # validate relative to schema
+    validator = EregsValidator(settings.XSD_FILE)
+    validator.validate_reg(xml_tree)
+
+    if not validator.is_valid:
+        for event in validator.events:
+            print(str(event))
+        sys.exit(0)
 
     reg_tree = build_reg_tree(xml_tree)
     reg_number = reg_tree.label[0]
@@ -62,21 +71,14 @@ def parser_driver(regulation_file, notice_doc_numbers=[]):
     analysis = build_analysis(xml_tree)
     notice_dict = build_notice(xml_tree)
 
-    # validate relative to schema
-    validator = EregsValidator(settings.XSD_FILE)
-    validator.validate_reg(xml_tree)
-
     # if the validator had problems then we should report them and bail out
-    if not validator.is_valid:
-        for event in validator.events:
-            print(str(event))
-        sys.exit(0)
-    else:
-        validator.validate_terms(xml_tree, terms)
-        validator.validate_internal_cites(xml_tree, internal_citations)
+
+    validator.validate_terms(xml_tree, terms)
+    validator.validate_internal_cites(xml_tree, internal_citations)
+    if check_terms:
         validator.validate_term_references(xml_tree, terms, regulation_file)
-        for event in validator.events:
-            print(str(event))
+    for event in validator.events:
+        print(str(event))
 
     reg_tree.include_children = True
     reg_json = reg_tree.to_json()
@@ -106,8 +108,9 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--operation', dest='operation', action='store')
     parser.add_argument('regulation-file', nargs='?')
     parser.add_argument('notice-doc-numbers', nargs='*')
+    parser.add_argument('--with-term-checks', nargs='?', default=False, type=bool)
 
     args = vars(parser.parse_args())
 
     if args['regulation-file'] is not None:
-        parser_driver(args['regulation-file'], args['notice-doc-numbers'])
+        parser_driver(args['regulation-file'], args['notice-doc-numbers'], args['with_term_checks'])

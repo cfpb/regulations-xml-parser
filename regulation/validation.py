@@ -3,7 +3,7 @@
 from enum import Enum
 from termcolor import colored, cprint
 from lxml import etree
-from node import xml_node_text, find_all_occurrences, interpolate_string
+from node import xml_node_text, find_all_occurrences, interpolate_string, enclosed_in_tag
 
 import inflect
 import re
@@ -171,22 +171,6 @@ class EregsValidator:
 
         definitions = terms_layer['referenced']
         terms = [(defn['term'], defn['reference']) for key, defn in definitions.iteritems()]
-
-        def enclosed_in_tag(source_text, tag, loc):
-            trailing_text = source_text[loc:]
-            close_tag = '</{}>'.format(tag)
-            first_open_tag = re.search('<[^\/].*?>', trailing_text)
-            first_closed_tag = re.search('<\/.*?>', trailing_text)
-            if not first_closed_tag:
-                return False
-            else:
-                if first_open_tag is not None and first_open_tag.start() < first_closed_tag.start():
-                    return False
-                elif first_closed_tag.group(0) == close_tag:
-                    return True
-                else:
-                    return False
-
 
         paragraphs = tree.findall('.//{eregs}paragraph') + tree.findall('.//{eregs}interpParagraph')
         ignore = set()
