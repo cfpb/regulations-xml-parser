@@ -13,7 +13,8 @@ from regulation.tree import (build_reg_tree,
 class TreeTestCase(TestCase):
 
     def setUp(self):
-        # A basic test regulation tree
+        # A basic test regulation tree (add stuff as necessary for
+        # testing)
         self.input_xml = """
         <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
           <fdsys>
@@ -27,7 +28,7 @@ class TreeTestCase(TestCase):
             </cfr>
             <documentNumber>2015-12345</documentNumber>
             <effectiveDate>2015-11-17</effectiveDate>
-            <federalRegisterURL>https://www.federalregister.gov/articles/2015/11/17/2015-12345/</federalRegisterURL>
+            <federalRegisterURL>https://www.federalregister.gov/some/url/</federalRegisterURL>
           </preamble>
           <part partNumber="1234">
             <content>
@@ -120,9 +121,10 @@ class TreeTestCase(TestCase):
 
     def test_build_notice(self):
         result_notice = {
-            'cfr_parts': ['1234'], 
-            'effective_on': '2015-11-17', 
-            'fr_url': 'https://www.federalregister.gov/articles/2015/11/17/2015-12345/', 
+            'cfr_parts': ['1234'],
+            'effective_on': '2015-11-17',
+            'publication_date': '2015-11-17',
+            'fr_url': 'https://www.federalregister.gov/some/url/',
             'document_number': '2015-12345',
             'section_by_section': [{
                 'labels': ['1234-1'],
@@ -155,7 +157,7 @@ class TreeTestCase(TestCase):
                 '1': 'Paragraphs contain text.',
                 '2': 'Analysis analyzes things.'
             },
-        }  # noqa
+        }
 
         notice_dict = build_notice(self.root)
         self.assertEqual(result_notice, dict(notice_dict))

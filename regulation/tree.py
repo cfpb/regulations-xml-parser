@@ -647,8 +647,9 @@ def build_notice(root):
     fr_url = root.find('.//{eregs}federalRegisterURL').text
 
     notice_dict = OrderedDict([
-        ('cfr_parts', [label,]),
+        ('cfr_parts', [label, ]),
         ('effective_on', effective_date),
+        ('publication_date', publication_date),
         ('fr_url', fr_url),
         ('document_number', document_number),
         ('section_by_section', []),
