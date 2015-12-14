@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from collections import OrderedDict
+from termcolor import colored
 
 
 class RegNode:
@@ -13,6 +14,7 @@ class RegNode:
         self.text = ''
         self.title = ''
         self.node_type = ''
+        self.hash = ''
 
         self.mixed_text = []
 
@@ -49,19 +51,41 @@ class RegNode:
 
         return str(self.to_json())
 
+    @staticmethod
+    def merkle_hash(node):
+        # Merkle hash implementation
+        if node.children == []:
+            return hash('-'.join(node.label) + node.node_type + node.text)
+        else:
+            child_hashes = ''
+            for child in node.children:
+                child_hash = str(RegNode.merkle_hash(child))
+                child_hashes += child_hash
+            return hash(child_hashes)
 
-def xml_node_text(node):
+    def __hash__(self):
+        self.hash = RegNode.merkle_hash(self)
+        return self.hash
+
+
+def xml_node_text(node, include_children=True):
 
     if node.text:
         node_text = node.text
     else:
         node_text = ''
 
-    for child in node.getchildren():
-        if child.text:
-            node_text += child.text
-        if child.tail:
-            node_text += child.tail
+    if include_children:
+        for child in node.getchildren():
+            if child.text:
+                node_text += child.text
+            if child.tail:
+                node_text += child.tail
+
+    else:
+        for child in node.getchildren():
+            if child.tail:
+                node_text += child.tail.strip()
 
     return node_text
 
@@ -101,3 +125,25 @@ def find_all_occurrences(source, target):
             remainder = []
 
     return positions
+
+
+def interpolate_string(text, offsets, values, colorize=False):
+    result = ''
+    current_pos = 0
+    for i, offset in enumerate(offsets):
+        start = offset[0]
+        end = offset[1]
+        if colorize:
+            fragment = colored(text[current_pos:start], 'green')
+        else:
+            fragment = text[current_pos:start]
+        current_pos = end
+        if colorize:
+            result = result + fragment + colored(values[i], 'red')
+        else:
+            result = result + fragment + values[i]
+    if colorize:
+        result = result + colored(text[current_pos:], 'green')
+    else:
+        result = result + text[current_pos:]
+    return result

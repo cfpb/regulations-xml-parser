@@ -3,8 +3,10 @@
 from enum import Enum
 from termcolor import colored, cprint
 from lxml import etree
+from node import xml_node_text, find_all_occurrences, interpolate_string
 
 import inflect
+import re
 
 import settings
 
@@ -161,6 +163,89 @@ class EregsValidator:
             event = EregsValidationEvent(msg, Severity(Severity.OK))
 
         self.events.append(event)
+
+    def validate_term_references(self, tree, terms_layer, regulation_file):
+
+        problem_flag = False
+        inf = inflect.engine()
+
+        definitions = terms_layer['referenced']
+        terms = [(defn['term'], defn['reference']) for key, defn in definitions.iteritems()]
+
+        def enclosed_in_tag(source_text, tag, loc):
+            trailing_text = source_text[loc:]
+            close_tag = '</{}>'.format(tag)
+            first_open_tag = re.search('<[^\/].*?>', trailing_text)
+            first_closed_tag = re.search('<\/.*?>', trailing_text)
+            if not first_closed_tag:
+                return False
+            else:
+                if first_open_tag is not None and first_open_tag.start() < first_closed_tag.start():
+                    return False
+                elif first_closed_tag.group(0) == close_tag:
+                    return True
+                else:
+                    return False
+
+
+        paragraphs = tree.findall('.//{eregs}paragraph') + tree.findall('.//{eregs}interpParagraph')
+        ignore = set()
+
+        for paragraph in paragraphs:
+            content = paragraph.find('.//{eregs}content')
+            par_text = etree.tostring(content)
+            label = paragraph.get('label')
+            offsets_and_values = []
+
+            for term in terms:
+                if term[0] not in ignore:
+                    input_state = None
+                    term_locations = set(find_all_occurrences(par_text, term[0]))
+                    plural_term = inf.plural(term[0])
+                    plural_term_locations = set(find_all_occurrences(par_text, plural_term))
+                    unmarked_locs = list(term_locations.symmetric_difference(plural_term_locations))
+                    for term_loc in unmarked_locs:
+                        if not enclosed_in_tag(par_text, 'ref', term_loc) and not enclosed_in_tag(par_text, 'def', term_loc):
+                            if input_state is None:
+
+                                highlighted_par = colored(par_text[0:term_loc], 'yellow') + \
+                                                  colored(term[0], 'red') + \
+                                                  colored(par_text[term_loc + len(term[0]):], 'yellow')
+
+                                msg = colored('You appear to have used the term "{}" in {} without referencing it: \n'.format(term[0], label), 'yellow') + \
+                                      '{}\n'.format(highlighted_par) + \
+                                      colored('Would you like the automatically fix this reference in the source?', 'yellow')
+                                print msg
+                                while input_state not in ['y', 'n', 'i']:
+                                    input_state = raw_input('(y)es/(n)o/(i)gnore this term: ')
+
+                                if input_state == 'y':
+                                    problem_flag = True
+                                    ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[1], term[0])
+                                    offsets_and_values.append((ref, [term_loc, term_loc + len(term[0])]))
+                                elif input_state == 'i':
+                                    ignore.add(term[0])
+
+                                input_state = None
+
+            if offsets_and_values != []:
+                offsets_and_values = sorted(offsets_and_values, key=lambda x: x[1][0])
+                values, offsets = zip(*offsets_and_values)
+                new_par_text = interpolate_string(par_text, offsets, values)
+                highlight = interpolate_string(par_text, offsets, values, colorize=True)
+                new_content = etree.fromstring(new_par_text)
+                paragraph.replace(content, new_content)
+                print highlight
+
+
+        if problem_flag:
+            print colored('The tree has been altered! Do you want to write the result to disk?')
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('Save? y/n: ')
+            if answer == 'y':
+                with open(regulation_file, 'w') as f:
+                    f.write(etree.tostring(tree, pretty_print=True))
 
     def validate_internal_cites(self, tree, internal_cites_layer):
         """
