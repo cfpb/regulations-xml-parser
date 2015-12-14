@@ -13,7 +13,8 @@ from regulation.tree import (build_reg_tree,
 class TreeTestCase(TestCase):
 
     def setUp(self):
-        # A basic test regulation tree
+        # A basic test regulation tree (add stuff as necessary for
+        # testing)
         self.input_xml = """
         <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
           <fdsys>
