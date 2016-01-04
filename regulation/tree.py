@@ -11,7 +11,7 @@ import settings
 from lxml import etree
 
 
-def build_reg_tree(root, parent=None):
+def build_reg_tree(root, parent=None, depth=0):
 
     ns_prefix = '{eregs}'
     tag = root.tag.replace(ns_prefix, '')
@@ -80,7 +80,8 @@ def build_reg_tree(root, parent=None):
         else:
             node.text = '{} {}'.format(marker, content_text).strip()
         node.node_type = parent.node_type
-        # node.mixed_text = xml_mixed_text(content)
+        node.mixed_text = xml_mixed_text(content)
+        node.source_xml = etree.tostring(root)
 
         children = root.findall('{eregs}paragraph')
 
@@ -117,7 +118,7 @@ def build_reg_tree(root, parent=None):
 
         children = root.findall('{eregs}interpSection')
 
-    elif tag == 'interpSection':
+    elif tag == 'interpSection' or tag == 'interpAppSection':
 
         title = root.find('{eregs}title')
         label = root.get('label').split('-')
@@ -127,6 +128,17 @@ def build_reg_tree(root, parent=None):
         node.label = label
 
         children = root.findall('{eregs}interpParagraph')
+
+    elif tag == 'interpAppendix':
+
+        title = root.find('{eregs}title')
+        label = root.get('label').split('-')
+        node.node_type = 'interp'
+        node.text = ''
+        node.title = title.text
+        node.label = label
+
+        children = root.findall('{eregs}interpAppSection')
 
     elif tag == 'interpParagraph':
 
@@ -138,14 +150,17 @@ def build_reg_tree(root, parent=None):
         node.label = root.get('label').split('-')
         node.text = content_text
         node.node_type = 'interp'
+        node.source_xml = etree.tostring(root)
 
         children = root.findall('{eregs}interpParagraph')
 
     else:
         children = []
 
+    node.depth = depth
+
     for child in children:
-        node.children.append(build_reg_tree(child, parent=node))
+        node.children.append(build_reg_tree(child, parent=node, depth=depth+1))
 
     return node
 
@@ -202,7 +217,8 @@ def build_internal_citations_layer(root):
             running_par_text = content.text or ''
             for child in content.getchildren():
                 if child != cite:
-                    running_par_text += child.text + child.tail
+                    tail = child.tail or ''
+                    running_par_text += (child.text or '') + tail
                 else:
                     break
 
@@ -214,6 +230,7 @@ def build_internal_citations_layer(root):
         for cite, positions in cite_positions.iteritems():
             # positions = find_all_occurrences(par_text, text)
             for pos in positions:
+                # print cite, positions, par_label
                 cite_dict = {'citation': cite_targets[cite],
                              'offsets': [[pos, pos + len(cite)]]}
                 if cite_dict not in citation_list:
@@ -304,7 +321,7 @@ def build_formatting_layer(root):
                 dash_text = dash.text
                 if dash_text is None:
                     dash_text = ''
-                dash_dict['text'] = dash_text + 5 * '_'
+                dash_dict['text'] = dash_text
                 dash_dict['dash_data'] = {'text': dash_text}
                 dash_dict['locations'] = [0]
                 layer_dict[label].append(dash_dict)
@@ -369,58 +386,21 @@ def build_terms_layer(root):
     paragraphs = root.findall('.//{eregs}paragraph') + \
         root.findall('.//{eregs}interpParagraph')
 
-    for paragraph in paragraphs:
-        content = paragraph.find('{eregs}content')
-        terms = content.findall('.//{eregs}ref[@reftype="term"]')
-        # terms = sorted(terms, key=lambda term: len(term.text), reverse=True)
+    #TODO: redo this part; do the defs outside the paragraph scan and
+    #TODO: then create the layer keys by referencing the definitions dict
+
+    definitions = root.findall('.//{eregs}def')
+
+    paragraphs_with_defs = [par for par in paragraphs if par.find('{eregs}content') is not None
+                            and par.find('{eregs}content').find('{eregs}def') is not None]
+
+    for paragraph in paragraphs_with_defs:
         label = paragraph.get('label')
-
         marker = paragraph.get('marker') or ''
+        content = paragraph.find('{eregs}content')
+        par_text = (marker + ' ' + xml_node_text(content)).strip()
+        definitions = content.findall('{eregs}def')
 
-        par_text = (marker + ' ' + xml_node_text(content).strip())
-
-        if len(terms) > 0:
-            terms_dict[label] = []
-
-        if marker != '':
-            marker_offset = len(marker + ' ')
-        else:
-            marker_offset = 0
-        term_positions = OrderedDict()
-        term_targets = OrderedDict()
-
-        for term in terms:
-            running_par_text = content.text or ''
-            for child in content.getchildren():
-                if child != term:
-                    running_par_text += child.text + child.tail
-                else:
-                    break
-
-            text = term.text
-            if inf_engine.singular_noun(text.lower()) and \
-                    not text.lower() in settings.SPECIAL_SINGULAR_NOUNS:
-                target = inf_engine.singular_noun(text.lower()) + ':' + \
-                    term.get('target')
-            else:
-                target = text.lower() + ':' + term.get('target')
-
-            term_position = len(running_par_text) + marker_offset
-            term_positions.setdefault(text, []).append(term_position)
-            term_targets[text] = target
-
-        for term, positions in term_positions.iteritems():
-            target = term_targets[term]
-            ref_dict = OrderedDict()
-            ref_dict['offsets'] = []
-            for pos in positions:
-                ref_dict['offsets'].append([pos, pos + len(term)])
-            ref_dict['ref'] = target
-            if len(ref_dict['offsets']) > 0 and \
-                    ref_dict not in terms_dict[label]:
-                terms_dict[label].append(ref_dict)
-
-        definitions = paragraph.find('{eregs}content').findall('{eregs}def')
         for defn in definitions:
             defined_term = defn.get('term')
             if inf_engine.singular_noun(defined_term.lower()) and not \
@@ -441,6 +421,65 @@ def build_terms_layer(root):
             def_dict['term'] = defined_term
             if def_dict['position'] != []:
                 definitions_dict[key] = def_dict
+
+    for paragraph in paragraphs:
+        content = paragraph.find('{eregs}content')
+        terms = content.findall('.//{eregs}ref[@reftype="term"]')
+        # terms = sorted(terms, key=lambda term: len(term.text), reverse=True)
+        label = paragraph.get('label')
+        marker = paragraph.get('marker') or ''
+        # par_text = (marker + ' ' + xml_node_text(content)).strip()
+
+        if len(terms) > 0:
+            terms_dict[label] = []
+
+        if marker != '':
+            marker_offset = len(marker + ' ')
+        else:
+            marker_offset = 0
+        term_positions = OrderedDict()
+        term_targets = OrderedDict()
+
+        #definitions = paragraph.find('{eregs}content').findall('{eregs}def')
+
+        for term in terms:
+            running_par_text = content.text or ''
+            for child in content.getchildren():
+                if child != term:
+                    tail = child.tail or ''
+                    running_par_text += child.text + tail
+                else:
+                    break
+
+            text = term.text
+            target = term.get('target')
+            #print [(key, defn) for key, defn in definitions_dict.iteritems()]
+            defn_location = [key for key, defn in definitions_dict.iteritems() if defn['reference'] == target][0]
+            # target = defn_location
+
+            # if inf_engine.singular_noun(text.lower()) and \
+            #         not text.lower() in settings.SPECIAL_SINGULAR_NOUNS:
+            #     target = inf_engine.singular_noun(text.lower()) + ':' + \
+            #         term.get('target')
+            # else:
+            #     target = text.lower() + ':' + term.get('target')
+
+            term_position = len(running_par_text) + marker_offset
+            term_positions.setdefault(text, []).append(term_position)
+            term_targets[text] = defn_location
+
+        for term, positions in term_positions.iteritems():
+            target = term_targets[term]
+            ref_dict = OrderedDict()
+            ref_dict['offsets'] = []
+            for pos in positions:
+                ref_dict['offsets'].append([pos, pos + len(term)])
+            ref_dict['ref'] = target
+            if len(ref_dict['offsets']) > 0 and \
+                    ref_dict not in terms_dict[label]:
+                terms_dict[label].append(ref_dict)
+
+
 
     terms_dict['referenced'] = definitions_dict
 
@@ -501,14 +540,17 @@ def build_toc_layer(root):
                 toc_entry = {'index': target, 'title': subject}
                 toc_dict[appendix_key].append(toc_entry)
 
-    interpretations = part.find('.//{eregs}interpretations').findall('{eregs}interpSection')
-    interp_key = part_number + '-Interp'
-    for interp in interpretations:
-        title = interp.find('{eregs}title').text
-        target = interp.get('label').split('-')
-        if target[-1] not in appendix_letters:
-            toc_entry = {'index': target, 'title': title}
-            toc_dict.setdefault(interp_key, []).append(toc_entry)
+    interpretations = part.find('.//{eregs}interpretations')
+
+    if interpretations is not None:
+        interps = interpretations.findall('{eregs}interpSection')
+        interp_key = part_number + '-Interp'
+        for interp in interps:
+            title = interp.find('{eregs}title').text
+            target = interp.get('label').split('-')
+            if target[-1] not in appendix_letters:
+                toc_entry = {'index': target, 'title': title}
+                toc_dict.setdefault(interp_key, []).append(toc_entry)
 
     return toc_dict
 
@@ -690,7 +732,8 @@ def build_notice(root):
                     })
 
                 # Append the footnote 'tail' to the paragraph text
-                paragraph_text += p_child_elm.tail
+                tail = p_child_elm.tail or ''
+                paragraph_text += tail
 
             # Append the full text to the list of paragraphs
             paragraphs.append(paragraph_text)
@@ -729,3 +772,4 @@ def build_notice(root):
         notice_dict['footnotes'][ref] = footnote_elm.text
 
     return notice_dict
+

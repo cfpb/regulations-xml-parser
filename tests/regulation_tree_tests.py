@@ -4,10 +4,12 @@ from unittest import TestCase
 
 import lxml.etree as etree
 
+from common import test_xml
 from regulation.tree import (build_reg_tree,
                              build_paragraph_marker_layer,
                              build_analysis,
                              build_notice)
+from regulation.node import RegNode
 
 
 class TreeTestCase(TestCase):
@@ -15,72 +17,7 @@ class TreeTestCase(TestCase):
     def setUp(self):
         # A basic test regulation tree (add stuff as necessary for
         # testing)
-        self.input_xml = """
-        <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
-          <fdsys>
-            <date>2015-11-17</date>
-            <title>REGULATION TESTING</title>
-          </fdsys>
-          <preamble>
-            <cfr>
-              <title>12</title>
-              <section>1234</section>
-            </cfr>
-            <documentNumber>2015-12345</documentNumber>
-            <effectiveDate>2015-11-17</effectiveDate>
-            <federalRegisterURL>https://www.federalregister.gov/some/url/</federalRegisterURL>
-          </preamble>
-          <part partNumber="1234">
-            <content>
-
-              <subpart>
-                <content>
-                  <section label="1234-1">
-                    <subject/>
-                    <paragraph label="1234-1-p1" marker="">
-                      <content>I'm an unmarked paragraph</content>
-                    </paragraph>
-                    <paragraph label="1234-1-a" marker="a">
-                      <content>I'm a marked paragraph</content>
-                    </paragraph>
-                    <analysis>
-                      <analysisSection>
-                        <title>Section 1234.1</title>
-                        <analysisParagraph>This paragraph is in the top-level section.</analysisParagraph>
-                        <analysisSection>
-                          <title>(a) Section of the Analysis</title>
-                          <analysisParagraph>I am a paragraph<footnote ref="1">Paragraphs contain text.</footnote> in an analysis<footnote ref="2">Analysis analyzes things.</footnote> section, love me!</analysisParagraph>
-                        </analysisSection>
-                      </analysisSection>
-                    </analysis>
-                  </section>
-                </content>
-              </subpart>
-
-              <appendix appendixLetter="A" label="1234-A">
-                <appendixTitle>Appendix A to Part 1234</appendixTitle>
-                <appendixSection appendixSecNum="1" label="1234-A-p1">
-                  <subject/>
-                  <paragraph label="1234-A-p1-p1" marker="">
-                    <content>This is some appendix content.</content>
-                  </paragraph>
-                </appendixSection>
-              </appendix>
-
-              <interpretations label="1234-Interp">
-                <title>Supplement I to Part 1234&#8212;Official Interpretations</title>
-                <interpSection label="1234-Interp-h1">
-                  <title>Introduction</title>
-                  <interpParagraph label="1234-Interp-h1-1" target="1013-h1-1">
-                    <content>Some interpretation content here.</content>
-                  </interpParagraph>
-                </interpSection>
-              </interpretations>
-
-            </content>
-          </part>
-        </regulation>
-        """  # NOQA
+        self.input_xml = test_xml  # NOQA
         self.root = etree.fromstring(self.input_xml)
 
     def tearDown(self):
@@ -94,15 +31,19 @@ class TreeTestCase(TestCase):
         self.assertEqual(node_dict['title'], 'REGULATION TESTING')
         self.assertEqual(node_dict['label'], ['1234'])
         self.assertEqual(len(node_dict['children']), 3)
+        self.assertEqual(node.depth, 0)
 
         subpart_dict = node_dict['children'][0]
         self.assertEqual(subpart_dict['label'], ['1234', 'Subpart'])
+        self.assertEqual(node.children[0].depth, 1)
 
         appendix_dict = node_dict['children'][1]
         self.assertEqual(appendix_dict['label'], ['1234', 'A'])
+        self.assertEqual(node.children[1].depth, 1)
 
         interp_dict = node_dict['children'][2]
         self.assertEqual(interp_dict['label'], ['1234', 'Interp'])
+        self.assertEqual(node.children[2].depth, 1)
 
     def test_build_analysis(self):
         result_analysis = {
@@ -161,3 +102,75 @@ class TreeTestCase(TestCase):
 
         notice_dict = build_notice(self.root)
         self.assertEqual(result_notice, dict(notice_dict))
+
+    def test_find_node_single(self):
+
+        xml_tree = etree.fromstring(test_xml)
+        reg_tree = build_reg_tree(xml_tree)
+
+        def predicate(node):
+            if node.string_label == '1234-1-a':
+                return True
+            else:
+                return False
+
+        result = reg_tree.find_node(predicate)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].string_label, '1234-1-a')
+        self.assertEqual(result[0].text, "a I'm a marked paragraph")
+        self.assertEqual(result[0].marker, "a")
+        self.assertEqual(result[0].depth, 3)
+
+    def test_find_node_multiple(self):
+
+        xml_tree = etree.fromstring(test_xml)
+        reg_tree = build_reg_tree(xml_tree)
+
+        def predicate(node):
+            if node.text.find('marked') > -1:
+                return True
+            else:
+                return False
+
+        result = reg_tree.find_node(predicate)
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0].string_label, '1234-1-p1')
+        self.assertEqual(result[0].text, "I'm an unmarked paragraph")
+        self.assertEqual(result[0].marker, "")
+        self.assertEqual(result[1].string_label, '1234-1-a')
+        self.assertEqual(result[1].text, "a I'm a marked paragraph")
+        self.assertEqual(result[1].marker, "a")
+
+    def test_flatten_tree(self):
+
+        xml_tree = etree.fromstring(test_xml)
+        reg_tree = build_reg_tree(xml_tree)
+
+        result = reg_tree.flatten()
+
+        print result
+
+        self.assertEqual(1, 1)
+
+    def test_labels(self):
+
+        xml_tree = etree.fromstring(test_xml)
+        reg_tree = build_reg_tree(xml_tree)
+
+        result = reg_tree.labels()
+
+        print result
+
+        self.assertEqual(1, 1)
+
+    def test_height(self):
+
+        xml_tree = etree.fromstring(test_xml)
+        reg_tree = build_reg_tree(xml_tree)
+
+        result = reg_tree.height()
+
+        self.assertEqual(result, 4)
+

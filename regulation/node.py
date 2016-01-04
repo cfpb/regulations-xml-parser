@@ -2,7 +2,10 @@
 
 from collections import OrderedDict
 from termcolor import colored
+
 import re
+import json
+import hashlib
 
 class RegNode:
 
@@ -14,9 +17,11 @@ class RegNode:
         self.text = ''
         self.title = ''
         self.node_type = ''
-        self.hash = ''
+        self.hash = None
+        self.depth = 0
 
         self.mixed_text = []
+        self.source_xml = ''
 
         if 'include_children' in kwargs:
             if not (kwargs['include_children'] is True or
@@ -42,20 +47,31 @@ class RegNode:
         if self.marker:
             node_dict['marker'] = self.marker
 
-        # if self.mixed_text != []:
-        #     node_dict['mixed_text'] = self.mixed_text
+        if self.mixed_text != []:
+            pass
+            #node_dict['mixed_text'] = self.mixed_text
 
         return node_dict
 
     def __repr__(self):
 
-        return str(self.to_json())
+        return json.dumps(self.to_json(), indent=4)
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __eq__(self, other):
+        if self.__class__ == other.__class__ and self.interior_hash == other.interior_hash:
+            return True
+        else:
+            return False
 
     @staticmethod
     def merkle_hash(node):
         # Merkle hash implementation
         if node.children == []:
-            return hash('-'.join(node.label) + node.node_type + node.text)
+            #return hash('-'.join(node.label) + node.node_type + node.text + node.source_xml)
+            return hash(node.node_type + node.text + node.source_xml)
         else:
             child_hashes = ''
             for child in node.children:
@@ -64,8 +80,89 @@ class RegNode:
             return hash(child_hashes)
 
     def __hash__(self):
-        self.hash = RegNode.merkle_hash(self)
+        if self.hash is None:
+            self.hash = RegNode.merkle_hash(self)
         return self.hash
+
+    @property
+    def interior_hash(self):
+        return hash(self.node_type + self.text + self.source_xml)
+
+    @property
+    def string_label(self):
+        return '-'.join(self.label)
+
+    def find_node(self, func):
+        """
+        Find all nodes in the subtree of self that match the specified predicate.
+        :param function: predicate to match
+        :return: a flat list of the nodes matching that predicate
+        """
+        matches = [child for child in self.children if func(child)]
+
+        submatches = []
+        for child in self.children:
+            submatches.extend(child.find_node(func))
+        matches.extend(submatches)
+
+        return matches
+
+
+    def flatten(self):
+        """
+        Return this node and all its children in a flat list
+        :return:
+        """
+
+        #import pdb
+        #pdb.set_trace()
+
+        if self.children == []:
+            new_node = RegNode()
+            new_node.node_type = self.node_type
+            new_node.label = self.label
+            new_node.text = self.text
+            new_node.mixed_text = self.mixed_text
+            new_node.source_xml = self.source_xml
+            return [new_node]
+        else:
+            new_node = RegNode()
+            new_node.node_type = self.node_type
+            new_node.label = self.label
+            new_node.text = self.text
+            new_node.mixed_text = self.mixed_text
+            new_node.source_xml = self.source_xml
+            flatten_children = [new_node]
+            for child in self.children:
+                flatten_children.extend(child.flatten())
+            return flatten_children
+
+    def labels(self):
+        """
+        Return the list of all labels used in the tree
+        :return:
+        """
+
+        import pdb
+        #pdb.set_trace()
+
+        if self.children == []:
+            return [self.string_label]
+        else:
+            child_labels = []
+            for child in self.children:
+                child_labels.extend(child.labels())
+            return [self.string_label] + child_labels
+
+    def height(self):
+        """
+        Calculate the height of the tree starting from the root and down to the lowest leaf/
+        :return: The tree height
+        """
+        if len(self.children) == 0:
+            return 1
+        else:
+            return 1 + max([child.height() for child in self.children])
 
 
 def xml_node_text(node, include_children=True):
@@ -108,6 +205,36 @@ def xml_mixed_text(node):
 
     return text_fragments
 
+
+def xml_node_hash(node):
+
+    hasher = hashlib.sha256()
+    hasher.update(node.tag)
+    if node.tag == '{eregs}paragraph' or node.tag == '{eregs}interpParagraph':
+        title = node.find('{eregs}title')
+        if title is not None:
+            hasher.update(title.text)
+        content = node.find('{eregs}content')
+        if content is not None:
+            defs = content.findall('{eregs}def')
+            refs = content.findall('{eregs}ref')
+            for defn in defs:
+                hasher.update(defn.get('term'))
+                hasher.update(defn.text)
+            for ref in refs:
+                hasher.update(ref.get('target'))
+                hasher.update(ref.get('reftype'))
+                hasher.update(ref.text)
+
+    return hasher.hexdigest()
+
+
+def xml_node_equality(node1, node2):
+
+    if node1.__class__ == node2.__class__ and xml_node_hash(node1) == xml_node_hash(node2):
+        return True
+    else:
+        return False
 
 def find_all_occurrences(source, target):
 

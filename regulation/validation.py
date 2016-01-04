@@ -7,7 +7,7 @@ from node import xml_node_text, find_all_occurrences, interpolate_string, enclos
 
 import inflect
 import re
-
+import json
 import settings
 
 
@@ -108,7 +108,7 @@ class EregsValidator:
 
         definitions = terms_layer['referenced']
         def_locations = []
-
+        # print json.dumps(definitions, indent=4)
         for key, defn in definitions.items():
             term = defn['term']
             defined_in = defn['reference']
@@ -125,23 +125,18 @@ class EregsValidator:
             refs = content.findall('.//{eregs}ref[@reftype="term"]')
             label = paragraph.get('label')
             for ref in refs:
-                term = ref.text
-                if term is None:
-                    term = ''
-
-                term = term.lower()
+                term = (ref.text or '').lower()
 
                 if term not in settings.SPECIAL_SINGULAR_NOUNS and \
                         inf.singular_noun(term):
                     term = inf.singular_noun(term)
 
-                location = ref.get('target')
-                if location is None:
-                    location = ''
+                location = ref.get('target') or ''
 
                 key = '{}:{}'.format(term, location)
 
                 if key not in definitions:
+                    # print key, label, location
                     msg = 'MISSING DEFINITION: ' \
                           'in {} the term "{}" was referenced; it is '\
                           'expected to be defined in {} but is not.'.format(
@@ -171,6 +166,10 @@ class EregsValidator:
 
         definitions = terms_layer['referenced']
         terms = [(defn['term'], defn['reference']) for key, defn in definitions.iteritems()]
+        cap_terms = [(defn['term'][0].upper() + defn['term'][1:], defn['reference'])
+                     for key, defn in definitions.iteritems()]
+
+        terms = terms + cap_terms
 
         paragraphs = tree.findall('.//{eregs}paragraph') + tree.findall('.//{eregs}interpParagraph')
         ignore = set()
@@ -187,16 +186,20 @@ class EregsValidator:
                     term_locations = set(find_all_occurrences(par_text, term[0]))
                     plural_term = inf.plural(term[0])
                     plural_term_locations = set(find_all_occurrences(par_text, plural_term))
-                    unmarked_locs = list(term_locations.symmetric_difference(plural_term_locations))
+                    unmarked_locs = list(plural_term_locations | term_locations ^ plural_term_locations)
                     for term_loc in unmarked_locs:
+                        if term_loc in plural_term_locations:
+                            term_to_use = plural_term
+                        elif term_loc in term_locations:
+                            term_to_use = term[0]
                         if not enclosed_in_tag(par_text, 'ref', term_loc) and not enclosed_in_tag(par_text, 'def', term_loc):
                             if input_state is None:
 
                                 highlighted_par = colored(par_text[0:term_loc], 'yellow') + \
-                                                  colored(term[0], 'red') + \
-                                                  colored(par_text[term_loc + len(term[0]):], 'yellow')
+                                                  colored(term_to_use, 'red') + \
+                                                  colored(par_text[term_loc + len(term_to_use):], 'yellow')
 
-                                msg = colored('You appear to have used the term "{}" in {} without referencing it: \n'.format(term[0], label), 'yellow') + \
+                                msg = colored('You appear to have used the term "{}" in {} without referencing it: \n'.format(term_to_use, label), 'yellow') + \
                                       '{}\n'.format(highlighted_par) + \
                                       colored('Would you like the automatically fix this reference in the source?', 'yellow')
                                 print msg
@@ -205,8 +208,8 @@ class EregsValidator:
 
                                 if input_state == 'y':
                                     problem_flag = True
-                                    ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[1], term[0])
-                                    offsets_and_values.append((ref, [term_loc, term_loc + len(term[0])]))
+                                    ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[1], term_to_use)
+                                    offsets_and_values.append((ref, [term_loc, term_loc + len(term_to_use)]))
                                 elif input_state == 'i':
                                     ignore.add(term[0])
 
