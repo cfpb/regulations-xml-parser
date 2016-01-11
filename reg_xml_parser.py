@@ -23,12 +23,30 @@ from regulation.tree import (build_analysis,
                              build_toc_layer)
 
 from regulation.validation import EregsValidator
+from regulation.diff import *
+from itertools import combinations
 
 import settings
 
 if (sys.version_info < (3, 0)):
     reload(sys)  # noqa
     sys.setdefaultencoding('UTF8')
+
+
+def diff_driver(regulation_files):
+
+    pairs = combinations(regulation_files, 2)
+    for pair in pairs:
+        with open(pair[0], 'r') as f:
+            xml_tree1 = etree.fromstring(f.read())
+
+        with open(pair[1], 'r') as f:
+            xml_tree2 = etree.fromstring(f.read())
+
+        reg_tree1 = build_reg_tree(xml_tree1)
+        reg_tree2 = build_reg_tree(xml_tree2)
+
+        recursive_comparison(reg_tree1, reg_tree2)
 
 
 def write_layer(layer_object, reg_number, notice, layer_type):
@@ -41,7 +59,7 @@ def write_layer(layer_object, reg_number, notice, layer_type):
               separators=(',', ':'))
 
 
-def parser_driver(regulation_file, notice_doc_numbers=[], check_terms=False):
+def parser_driver(regulation_file, check_terms=False):
     with open(regulation_file, 'r') as f:
         reg_xml = f.read()
     xml_tree = etree.fromstring(reg_xml)
@@ -83,7 +101,7 @@ def parser_driver(regulation_file, notice_doc_numbers=[], check_terms=False):
     reg_tree.include_children = True
     reg_json = reg_tree.to_json()
 
-    notice = notice_doc_numbers[0]
+    notice = xml_tree.find('.//{eregs}documentNumber').text
 
     write_layer(reg_json, reg_number, notice, 'regulation')
     write_layer(meta, reg_number, notice, 'layer/meta')
@@ -105,12 +123,19 @@ def parser_driver(regulation_file, notice_doc_numbers=[], check_terms=False):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-o', '--operation', dest='operation', action='store')
-    parser.add_argument('regulation-file', nargs='?')
+    parser.add_argument('operation', action='store', choices=['parse', 'compare'])
+    parser.add_argument('regulation-files', nargs='*')
     parser.add_argument('notice-doc-numbers', nargs='*')
     parser.add_argument('--with-term-checks', nargs='?', default=False, type=bool)
 
     args = vars(parser.parse_args())
 
-    if args['regulation-file'] is not None:
-        parser_driver(args['regulation-file'], args['notice-doc-numbers'], args['with_term_checks'])
+    if args['operation'] == 'parse':
+        if args['regulation-files'] is not None:
+            for regfile in args['regulation-files']:
+                print('Parsing {}'.format(regfile))
+                parser_driver(regfile, args['with_term_checks'])
+
+    elif args['operation'] == 'compare':
+        if args['regulation-files'] is not None:
+            diff_driver(args['regulation-files'])

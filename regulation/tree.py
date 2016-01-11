@@ -230,7 +230,7 @@ def build_internal_citations_layer(root):
         for cite, positions in cite_positions.iteritems():
             # positions = find_all_occurrences(par_text, text)
             for pos in positions:
-                # print cite, positions, par_label
+                #print cite, positions, par_label
                 cite_dict = {'citation': cite_targets[cite],
                              'offsets': [[pos, pos + len(cite)]]}
                 if cite_dict not in citation_list:
@@ -453,8 +453,11 @@ def build_terms_layer(root):
 
             text = term.text
             target = term.get('target')
-            #print [(key, defn) for key, defn in definitions_dict.iteritems()]
-            defn_location = [key for key, defn in definitions_dict.iteritems() if defn['reference'] == target][0]
+            # print [(key, defn) for key, defn in definitions_dict.iteritems()], target
+            defn_location = [key for key, defn in definitions_dict.iteritems() if defn['reference'] == target]
+            if len(defn_location) > 0:
+                defn_location = defn_location[0]
+
             # target = defn_location
 
             # if inf_engine.singular_noun(text.lower()) and \
@@ -464,9 +467,9 @@ def build_terms_layer(root):
             # else:
             #     target = text.lower() + ':' + term.get('target')
 
-            term_position = len(running_par_text) + marker_offset
-            term_positions.setdefault(text, []).append(term_position)
-            term_targets[text] = defn_location
+                term_position = len(running_par_text) + marker_offset
+                term_positions.setdefault(text, []).append(term_position)
+                term_targets[text] = defn_location
 
         for term, positions in term_positions.iteritems():
             target = term_targets[term]
