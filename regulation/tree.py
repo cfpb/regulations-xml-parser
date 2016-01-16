@@ -227,7 +227,7 @@ def build_internal_citations_layer(root):
             cite_targets[text] = target
             running_par_text = ''
 
-        for cite, positions in cite_positions.iteritems():
+        for cite, positions in cite_positions.items():
             # positions = find_all_occurrences(par_text, text)
             for pos in positions:
                 #print cite, positions, par_label
@@ -453,8 +453,8 @@ def build_terms_layer(root):
 
             text = term.text
             target = term.get('target')
-            # print [(key, defn) for key, defn in definitions_dict.iteritems()], target
-            defn_location = [key for key, defn in definitions_dict.iteritems() if defn['reference'] == target]
+            # print [(key, defn) for key, defn in definitions_dict.items()], target
+            defn_location = [key for key, defn in definitions_dict.items() if defn['reference'] == target]
             if len(defn_location) > 0:
                 defn_location = defn_location[0]
 
@@ -471,7 +471,7 @@ def build_terms_layer(root):
                 term_positions.setdefault(text, []).append(term_position)
                 term_targets[text] = defn_location
 
-        for term, positions in term_positions.iteritems():
+        for term, positions in term_positions.items():
             target = term_targets[term]
             ref_dict = OrderedDict()
             ref_dict['offsets'] = []
