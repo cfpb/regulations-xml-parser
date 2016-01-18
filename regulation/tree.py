@@ -495,7 +495,7 @@ def build_toc_layer(root):
 
     part = root.find('{eregs}part')
     part_toc = part.find('{eregs}tableOfContents')
-    part_number = part.get('partNumber')
+    part_number = part.get('label')
     toc_dict[part_number] = []
     appendix_letters = []
 
@@ -683,7 +683,7 @@ def build_notice(root):
     Notices currently contain analysis and footnotes
     """
     # Get the root label
-    label = root.find('.//{eregs}part').attrib['partNumber']
+    label = root.find('.//{eregs}part').attrib['label']
 
     # Get regulation dates, document number, and url for the notice
     publication_date = root.find('.//{eregs}fdsys/{eregs}date').text
