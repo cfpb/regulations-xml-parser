@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-from enum import Enum
+try:
+    from enum import Enum
+except ImportError:
+    from flufl.enum import Enum
+
 from termcolor import colored, cprint
 from lxml import etree
 from .node import xml_node_text, find_all_occurrences, interpolate_string, enclosed_in_tag

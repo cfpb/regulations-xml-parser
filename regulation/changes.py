@@ -8,37 +8,13 @@ import string
 
 from lxml import etree
 
+# Import regparser here with the eventual goal of breaking off the parts
+# we're using in the RegML parser into a library both can share.
+from regparser.tree.paragraph import p_levels
+from regparser.tree.struct import FrozenNode
+from regparser.diff.tree import changes_between
 
-# XXX: We should import the same code from regparser. But it needs to be
-# installable first.
-def roman_nums():
-    """Generator for roman numerals."""
-    mapping = [
-        (1, 'i'), (4, 'iv'), (5, 'v'), (9, 'ix'),
-        (10, 'x'), (40, 'xl'), (50, 'l'), (90, 'xc'),
-        (100, 'c'), (400, 'cd'), (500, 'd'), (900, 'cm'),
-        (1000, 'm')
-        ]
-    i = 1
-    while True:
-        next_str = ''
-        remaining_int = i
-        remaining_mapping = list(mapping)
-        while remaining_mapping:
-            (amount, chars) = remaining_mapping.pop()
-            while remaining_int >= amount:
-                next_str += chars
-                remaining_int -= amount
-        yield next_str
-        i += 1
-
-
-p_levels = [
-    list(string.ascii_lowercase),
-    [str(i) for i in range(1, 51)],
-    list(itertools.islice(roman_nums(), 0, 50)),
-    list(string.ascii_uppercase),
-]
+from regulation.tree import build_reg_tree
 
 
 def get_parent_label(label_parts):
@@ -103,7 +79,7 @@ def get_sibling_label(label_parts):
     return sibling_label
 
 
-def process_changes(original_xml, notice_xml):
+def process_changes(original_xml, notice_xml, dry=False):
     """ Process changes given in the notice xml to modify the
         original_xml. The result is returned as a new XML tree. """
 
@@ -113,11 +89,13 @@ def process_changes(original_xml, notice_xml):
     # Replace the fdsys and preamble with the notice preamble.
     fdsys_elm = new_xml.find('./{eregs}fdsys')
     notice_fdsys_elm = notice_xml.find('./{eregs}fdsys')
-    new_xml.replace(fdsys_elm, notice_fdsys_elm)
+    if not dry:
+        new_xml.replace(fdsys_elm, notice_fdsys_elm)
 
     preamble_elm = new_xml.find('./{eregs}preamble')
     notice_preamble_elm = notice_xml.find('./{eregs}preamble')
-    new_xml.replace(preamble_elm, notice_preamble_elm)
+    if not dry:
+        new_xml.replace(preamble_elm, notice_preamble_elm)
 
     # Get the changes from the notice_xml and iterate over them
     changes = notice_xml.findall('.//{eregs}change')
@@ -147,7 +125,8 @@ def process_changes(original_xml, notice_xml):
                 new_index = parent_elm.index(sibling_elm) + 1
 
             # Insert it!
-            parent_elm.insert(new_index, new_elm)
+            if not dry:
+                parent_elm.insert(new_index, new_elm)
 
         if op in ('modified', 'deleted'):
             # Find a match to the given label
@@ -164,11 +143,24 @@ def process_changes(original_xml, notice_xml):
                     raise ValueError("Tried to modify {}, but no "
                                      "replacement given".format(label))
 
-                new_elm = change.getchildren()[0]
-                match_parent.replace(matching_elm, new_elm)
+                if not dry:
+                    new_elm = change.getchildren()[0]
+                    match_parent.replace(matching_elm, new_elm)
 
             # For deleted labels, find the node and remove it.
             if op == 'deleted':
-                match_parent.remove(matching_elm)
+                if not dry:
+                    match_parent.remove(matching_elm)
 
     return new_xml
+
+
+def generate_diff(left_xml, right_xml):
+    """ Given two full RegML trees, generate a dictionary of changes
+        between the two in the style of regulations-parser. 
+        This wraps regulatons-parser's changes_between() function. """
+    left_tree = build_reg_tree(left_xml)
+    right_tree = build_reg_tree(right_xml)
+    diff = dict(changes_between(FrozenNode.from_node(left_tree),
+                                FrozenNode.from_node(right_tree)))
+    return diff

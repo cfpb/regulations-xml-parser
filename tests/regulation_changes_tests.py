@@ -9,7 +9,8 @@ except ImportError:
 
 import lxml.etree as etree
 
-from regulation.changes import get_parent_label, get_sibling_label, process_changes
+from regulation.changes import (get_parent_label, get_sibling_label,
+                                process_changes, generate_diff)
 
 class ChangesTests(TestCase):
 
@@ -159,6 +160,169 @@ class ChangesTests(TestCase):
         del_paras = new_xml.findall('.//{eregs}paragraph[@label="1234-1"]')
         self.assertEqual(len(del_paras), 0)
 
-    def test_process_changes_nolabel(self):
-        pass
-    
+    def test_generate_diff_added(self):
+        left_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys>
+                <title>TEST CASE RUNNING ACT</title>
+              </fdsys>
+              <preamble>
+                <cfr>
+                  <section>1234</section>
+                </cfr>
+              </preamble>
+              <part label="1234">
+                <content>
+                  <subpart>
+                    <content>
+                      <section label="1234-1" sectionNum="1">
+                        <subject>§ 1234.1 Adding a paragraph</subject>
+                      </section>
+                    </content>
+                  </subpart>
+                </content>
+              </part>
+            </regulation>""")
+        right_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys>
+                <title>TEST CASE RUNNING ACT</title>
+              </fdsys>
+              <preamble>
+                <cfr>
+                  <section>1234</section>
+                </cfr>
+              </preamble>
+              <part label="1234">
+                <content>
+                  <subpart>
+                    <content>
+                      <section label="1234-1" sectionNum="1">
+                        <subject>§ 1234.1 Adding a paragraph</subject>
+                        <paragraph label="1234-1-a" marker="(a)">
+                          <title type="keyterm">Added.</title>
+                          <content>A new paragraph</content>
+                        </paragraph>
+                      </section>
+                    </content>
+                  </subpart>
+                </content>
+              </part>
+            </regulation>""")
+        diff = generate_diff(left_xml, right_xml)
+        self.assertEqual(len(diff.keys()), 1)
+        self.assertTrue('1234-1-a' in diff)
+        self.assertEqual(diff['1234-1-a']['op'], 'added')
+
+    def test_generate_diff_modified(self):
+        left_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys>
+                <title>TEST CASE RUNNING ACT</title>
+              </fdsys>
+              <preamble>
+                <cfr>
+                  <section>1234</section>
+                </cfr>
+              </preamble>
+              <part label="1234">
+                <content>
+                  <subpart>
+                    <content>
+                      <section label="1234-1" sectionNum="1">
+                        <subject>§ 1234.1 Changing a paragraph</subject>
+                        <paragraph label="1234-1-a" marker="(a)">
+                          <title type="keyterm">Existing.</title>
+                          <content>An existing paragraph</content>
+                        </paragraph>
+                      </section>
+                    </content>
+                  </subpart>
+                </content>
+              </part>
+            </regulation>""")
+        right_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys>
+                <title>TEST CASE RUNNING ACT</title>
+              </fdsys>
+              <preamble>
+                <cfr>
+                  <section>1234</section>
+                </cfr>
+              </preamble>
+              <part label="1234">
+                <content>
+                  <subpart>
+                    <content>
+                      <section label="1234-1" sectionNum="1">
+                        <subject>§ 1234.1 Changing a paragraph</subject>
+                        <paragraph label="1234-1-a" marker="(a)">
+                          <title type="keyterm">Modified.</title>
+                          <content>A modified paragraph</content>
+                        </paragraph>
+                      </section>
+                    </content>
+                  </subpart>
+                </content>
+              </part>
+            </regulation>""")
+        diff = generate_diff(left_xml, right_xml)
+        self.assertEqual(len(diff.keys()), 1)
+        self.assertTrue('1234-1-a' in diff)
+        self.assertEqual(diff['1234-1-a']['op'], 'modified')
+
+    def test_generate_diff_deleted(self):
+        left_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys>
+                <title>TEST CASE RUNNING ACT</title>
+              </fdsys>
+              <preamble>
+                <cfr>
+                  <section>1234</section>
+                </cfr>
+              </preamble>
+              <part label="1234">
+                <content>
+                  <subpart>
+                    <content>
+                      <section label="1234-1" sectionNum="1">
+                        <subject>§ 1234.1 Deleting a paragraph</subject>
+                        <paragraph label="1234-1-a" marker="(a)">
+                          <title type="keyterm">Existing.</title>
+                          <content>An existing paragraph</content>
+                        </paragraph>
+                      </section>
+                    </content>
+                  </subpart>
+                </content>
+              </part>
+            </regulation>""")
+        right_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys>
+                <title>TEST CASE RUNNING ACT</title>
+              </fdsys>
+              <preamble>
+                <cfr>
+                  <section>1234</section>
+                </cfr>
+              </preamble>
+              <part label="1234">
+                <content>
+                  <subpart>
+                    <content>
+                      <section label="1234-1" sectionNum="1">
+                        <subject>§ 1234.1 Deleting a paragraph</subject>
+                      </section>
+                    </content>
+                  </subpart>
+                </content>
+              </part>
+            </regulation>""")
+        diff = generate_diff(left_xml, right_xml)
+        self.assertEqual(len(diff.keys()), 1)
+        self.assertTrue('1234-1-a' in diff)
+        self.assertEqual(diff['1234-1-a']['op'], 'deleted')
+
