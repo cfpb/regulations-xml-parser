@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
-try:
-    from enum import Enum
-except ImportError:
-    from flufl.enum import Enum
+from enum import Enum
 
 from termcolor import colored, cprint
 from lxml import etree
@@ -12,8 +9,8 @@ from .node import xml_node_text, find_all_occurrences, interpolate_string, enclo
 
 import inflect
 import re
-import json
-import settings
+
+import regulation.settings as settings
 
 
 class Severity(Enum):
