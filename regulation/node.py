@@ -10,7 +10,6 @@ import hashlib
 class RegNode:
 
     def __init__(self, **kwargs):
-
         self.label = []
         self.marker = None
         self.children = []
@@ -32,7 +31,6 @@ class RegNode:
             self.include_children = False
 
     def to_json(self):
-
         node_dict = OrderedDict()
 
         if self.include_children:
@@ -54,11 +52,13 @@ class RegNode:
         return node_dict
 
     def __repr__(self):
-
         return json.dumps(self.to_json(), indent=4)
 
-    def __str__(self):
-        return self.__repr__()
+    def __cmp__(self, other):
+        return cmp(repr(self), repr(other))
+
+    def label_id(self):
+        return '-'.join(self.label)
 
     def __eq__(self, other):
         if self.__class__ == other.__class__ and self.interior_hash == other.interior_hash:
@@ -275,6 +275,7 @@ def interpolate_string(text, offsets, values, colorize=False):
         result = result + text[current_pos:]
     return result
 
+
 def enclosed_in_tag(source_text, tag, loc):
     trailing_text = source_text[loc:]
     close_tag = '</{}>'.format(tag)
@@ -289,3 +290,5 @@ def enclosed_in_tag(source_text, tag, loc):
             return True
         else:
             return False
+
+
