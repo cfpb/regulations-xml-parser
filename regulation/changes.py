@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 
 from copy import deepcopy
 import itertools
+import logging
 import string
 
 from lxml import etree
@@ -15,6 +16,9 @@ from regparser.tree.struct import FrozenNode
 from regparser.diff.tree import changes_between
 
 from regulation.tree import build_reg_tree
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_parent_label(label_parts):
@@ -57,7 +61,7 @@ def get_sibling_label(label_parts):
         sibling_label = label_parts[0:-2]
 
     # Now find the preceding marker for the last marker.
-    for level in p_levels:
+    for level in reversed(p_levels):
         if last_part in level:
             index = level.index(last_part)
             if index > 0:
@@ -98,11 +102,22 @@ def process_changes(original_xml, notice_xml, dry=False):
         new_xml.replace(preamble_elm, notice_preamble_elm)
 
     # Get the changes from the notice_xml and iterate over them
-    changes = notice_xml.findall('.//{eregs}change')
+    deletions = notice_xml.findall('.//{eregs}change[@operation="deleted"]')
+    modifications = notice_xml.findall('.//{eregs}change[@operation="modified"]')
+    additions = notice_xml.findall('.//{eregs}change[@operation="added"]')
+    
+    # Sort them appropriately by label
+    get_label = lambda c: c.get('label')
+    deletions = list(reversed(sorted(deletions, key=get_label)))
+    modifications = list(reversed(sorted(modifications, key=get_label)))
+    additions = list(sorted(additions, key=get_label))
 
+    changes = itertools.chain(deletions, modifications, additions)
     for change in changes:
         label = change.get('label')
         op = change.get('operation')
+
+        logging.info("Applying {} to {}".format(op, label))
 
         # For added labels, we need to break up the label and find its
         # parent and its preceding sibling to know where to add it.
