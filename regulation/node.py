@@ -54,6 +54,9 @@ class RegNode:
     def __repr__(self):
         return json.dumps(self.to_json(), indent=4)
 
+    def __str__(self):
+        return self.__repr__()
+
     def __cmp__(self, other):
         return cmp(repr(self), repr(other))
 
