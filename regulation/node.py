@@ -293,5 +293,3 @@ def enclosed_in_tag(source_text, tag, loc):
             return True
         else:
             return False
-
-
