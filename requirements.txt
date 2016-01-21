@@ -1,4 +1,4 @@
-click=6.2
+click==6.2
 enum34==1.1.2
 inflect==0.2.5
 lxml==3.5.0
