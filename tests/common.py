@@ -15,7 +15,7 @@ test_xml = """
             <effectiveDate>2015-11-17</effectiveDate>
             <federalRegisterURL>https://www.federalregister.gov/some/url/</federalRegisterURL>
           </preamble>
-          <part partNumber="1234">
+          <part label="1234">
             <content>
 
               <subpart>

@@ -8,7 +8,8 @@ import sys
 
 # Try to load the settings module
 try:
-    local_settings = importlib.import_module(os.environ.get('REGML_SETTINGS_FILE'))
+    local_settings = importlib.import_module(
+            os.environ.get('REGML_SETTINGS_FILE', 'settings'))
     globals().update(local_settings.__dict__)
 except ImportError:
     logger.error("Unable to import settings module. "
