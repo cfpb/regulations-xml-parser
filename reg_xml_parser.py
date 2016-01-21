@@ -102,6 +102,10 @@ def parser_driver(regulation_file, check_terms=False):
     reg_json = reg_tree.to_json()
 
     notice = xml_tree.find('.//{eregs}documentNumber').text
+    version = os.path.split(regulation_file)[-1].replace('.xml', '')
+    if notice != version:
+        print('Notice ({}) different from version ({}), using version'.format(notice, version))
+        notice = version
 
     write_layer(reg_json, reg_number, notice, 'regulation')
     write_layer(meta, reg_number, notice, 'layer/meta')
