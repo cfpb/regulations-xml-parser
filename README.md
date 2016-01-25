@@ -48,6 +48,15 @@ To apply a `notice` file to a `regulation` file:
 This will create a new RegML file with the notice file's changes applied
 to the given regulation file.
 
+The path to the RegML files can be relative to the `XML_ROOT` in your
+`settings.py` file. For example, if you have the RegML files in
+`../../regulations-stub/xml` and your 
+`XML_ROOT="../../regulations-stub/xml"`, you can use:
+
+```
+./regml.py apply 1111/1234-56789.xml 1111/1234-67890.xml
+```
+
 ## Validating RegML
 
 To validate a RegML file against
@@ -70,3 +79,20 @@ If more than one RegML file is given, the JSON files that are created
 will include diff files that contain the changes between each version
 provided.
 
+As with the other RegML commands above, the path to the RegML files 
+can be relative to the `XML_ROOT` in your `settings.py` file. 
+For example, if you have the RegML files in
+`../../regulations-stub/xml` and your 
+`XML_ROOT="../../regulations-stub/xml"`, you can use:
+
+```
+./regml.py json 1111/1234-56789.xml
+```
+
+Additionally, to generate JSON for all RegML files in a particular
+regulation's directory in the `XML_ROOT`, you can simple use the
+regulation directory name (usually the part number):
+
+```
+./regml.py json 1111
+```
