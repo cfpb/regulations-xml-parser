@@ -68,10 +68,10 @@ def find_file(file, is_notice=False, ecfr=False):
             else:
                 regml_base = os.path.join(regml_base, 'regulation')
 
-            if not file.endswith('.xml'):
-                file += '.xml'
-
             file = os.path.join(regml_base, file)
+
+            if not file.endswith('.xml') and not os.path.isdir(file):
+                file += '.xml'
 
     return file
 
@@ -217,10 +217,17 @@ def validate(check_terms, file):
 # If multiple RegML files are given, and belong to the same regulation,
 # diff JSON will be generated between them.
 @cli.command('json')
-@click.argument('regulation_files', nargs=-1)
+@click.argument('regulation_files', nargs=-1, required=True)
 @click.option('--check-terms', is_flag=True)
 def json_command(regulation_files, check_terms=False):
     """ Generate JSON from RegML files """
+
+    # If the "file" is a directory, assume we want to operate on all the
+    # files in that directory in listing order
+    if os.path.isdir(find_file(regulation_files[0])):
+        regulation_dir = find_file(regulation_files[0])
+        regulation_files = [os.path.join(regulation_dir, f) 
+                            for f in os.listdir(regulation_dir)]
 
     # Generate JSON for each version
     versions = {}
