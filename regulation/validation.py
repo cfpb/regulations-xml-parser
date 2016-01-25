@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
 from enum import Enum
+
 from termcolor import colored, cprint
 from lxml import etree
-from node import xml_node_text, find_all_occurrences, interpolate_string, enclosed_in_tag
+from .node import xml_node_text, find_all_occurrences, interpolate_string, enclosed_in_tag
 
 import inflect
 import re
-import json
-import settings
+
+import regulation.settings as settings
 
 
 class Severity(Enum):
@@ -202,7 +204,7 @@ class EregsValidator:
                                 msg = colored('You appear to have used the term "{}" in {} without referencing it: \n'.format(term_to_use, label), 'yellow') + \
                                       '{}\n'.format(highlighted_par) + \
                                       colored('Would you like the automatically fix this reference in the source?', 'yellow')
-                                print msg
+                                print(msg)
                                 while input_state not in ['y', 'n', 'i']:
                                     input_state = raw_input('(y)es/(n)o/(i)gnore this term: ')
 
@@ -222,11 +224,11 @@ class EregsValidator:
                 highlight = interpolate_string(par_text, offsets, values, colorize=True)
                 new_content = etree.fromstring(new_par_text)
                 paragraph.replace(content, new_content)
-                print highlight
+                print(highlight)
 
 
         if problem_flag:
-            print colored('The tree has been altered! Do you want to write the result to disk?')
+            print(colored('The tree has been altered! Do you want to write the result to disk?'))
             answer = None
             while answer not in ['y', 'n']:
                 answer = raw_input('Save? y/n: ')
