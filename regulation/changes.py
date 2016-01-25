@@ -5,9 +5,6 @@ from __future__ import unicode_literals
 from copy import deepcopy
 import itertools
 import logging
-import string
-
-from lxml import etree
 
 # Import regparser here with the eventual goal of breaking off the parts
 # we're using in the RegML parser into a library both can share.
@@ -26,7 +23,7 @@ def get_parent_label(label_parts):
     parent_label = None
 
     # It can't have a parent if it's only one part
-    if len(label_parts) <= 1: 
+    if len(label_parts) <= 1:
         return parent_label
 
     # Not an interpretation label. This is easy.
@@ -41,14 +38,14 @@ def get_parent_label(label_parts):
     return parent_label
 
 
-def get_sibling_label(label_parts): 
+def get_sibling_label(label_parts):
     """ Determine the preceding sibling label for the given label part
         list, if one exists. """
     sibling_label = []
 
     # It can't have a sibling if it's only one part
-    if len(label_parts) <= 1: 
-        return parent_label
+    if len(label_parts) <= 1:
+        return sibling_label
 
     # Start with the parent label. We don't funk interp-resolution here
     # so we won't use the get_parent_label function.
@@ -102,10 +99,13 @@ def process_changes(original_xml, notice_xml, dry=False):
         new_xml.replace(preamble_elm, notice_preamble_elm)
 
     # Get the changes from the notice_xml and iterate over them
-    deletions = notice_xml.findall('.//{eregs}change[@operation="deleted"]')
-    modifications = notice_xml.findall('.//{eregs}change[@operation="modified"]')
-    additions = notice_xml.findall('.//{eregs}change[@operation="added"]')
-    
+    deletions = notice_xml.findall(
+        './/{eregs}change[@operation="deleted"]')
+    modifications = notice_xml.findall(
+        './/{eregs}change[@operation="modified"]')
+    additions = notice_xml.findall(
+        './/{eregs}change[@operation="added"]')
+
     # Sort them appropriately by label
     get_label = lambda c: c.get('label')
     deletions = list(reversed(sorted(deletions, key=get_label)))
@@ -125,7 +125,7 @@ def process_changes(original_xml, notice_xml, dry=False):
             label_parts = label.split('-')
             new_elm = change.getchildren()[0]
             new_index = 0
-            
+
             # Get the parent of the added label
             parent_label = '-'.join(get_parent_label(label_parts))
             parent_elm = new_xml.find('.//*[@label="{}"]'.format(parent_label))
@@ -134,7 +134,8 @@ def process_changes(original_xml, notice_xml, dry=False):
             sibling_label_parts = get_sibling_label(label_parts)
             if sibling_label_parts is not None:
                 sibling_label = '-'.join(sibling_label_parts)
-                sibling_elm = new_xml.find('.//*[@label="{}"]'.format(sibling_label))
+                sibling_elm = new_xml.find(
+                    './/*[@label="{}"]'.format(sibling_label))
 
                 # Figure out where we're inserting this element
                 new_index = parent_elm.index(sibling_elm) + 1
@@ -172,7 +173,7 @@ def process_changes(original_xml, notice_xml, dry=False):
 
 def generate_diff(left_xml, right_xml):
     """ Given two full RegML trees, generate a dictionary of changes
-        between the two in the style of regulations-parser. 
+        between the two in the style of regulations-parser.
         This wraps regulatons-parser's changes_between() function. """
     left_tree = build_reg_tree(left_xml)
     right_tree = build_reg_tree(right_xml)

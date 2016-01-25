@@ -2,21 +2,18 @@
 
 from unittest import TestCase
 
-try:
-    from io import StringIO
-except ImportError:
-    from StringIO import StringIO
-
 import lxml.etree as etree
 
 from regulation.changes import (get_parent_label, get_sibling_label,
                                 process_changes, generate_diff)
 
+
 class ChangesTests(TestCase):
 
     def test_get_parent_label_normal(self):
         label_parts = ['1234', '1', 'g', '2']
-        self.assertEqual(['1234', '1', 'g'], get_parent_label(label_parts))
+        self.assertEqual(['1234', '1', 'g'],
+                         get_parent_label(label_parts))
 
     def test_get_parent_label_root(self):
         label_parts = ['1234']
@@ -24,22 +21,27 @@ class ChangesTests(TestCase):
 
     def test_get_parent_label_interps(self):
         label_parts = ['1234', '1', 'g', '2', 'Interp']
-        self.assertEqual(['1234', '1', 'g', 'Interp'], get_parent_label(label_parts))
+        self.assertEqual(['1234', '1', 'g', 'Interp'],
+                         get_parent_label(label_parts))
 
         label_parts = ['1234', '1', 'g', '2', 'Interp', '2']
-        self.assertEqual(['1234', '1', 'g', '2', 'Interp'], get_parent_label(label_parts))
+        self.assertEqual(['1234', '1', 'g', '2', 'Interp'],
+                         get_parent_label(label_parts))
 
     def test_get_sibling_label_alpha(self):
         label_parts = ['1234', '1', 'g']
-        self.assertEqual(['1234', '1', 'f'], get_sibling_label(label_parts))
+        self.assertEqual(['1234', '1', 'f'],
+                         get_sibling_label(label_parts))
 
     def test_get_sibling_label_numeric(self):
         label_parts = ['1234', '2']
-        self.assertEqual(['1234', '1'], get_sibling_label(label_parts))
+        self.assertEqual(['1234', '1'],
+                         get_sibling_label(label_parts))
 
     def test_get_sibling_label_interp(self):
         label_parts = ['1234', '1', 'g', '2', 'Interp']
-        self.assertEqual(['1234', '1', 'g', '1', 'Interp'], get_sibling_label(label_parts))
+        self.assertEqual(['1234', '1', 'g', '1', 'Interp'],
+                         get_sibling_label(label_parts))
 
     def test_get_sibling_label_none(self):
         label_parts = ['1234', '1', 'a']
@@ -63,7 +65,7 @@ class ChangesTests(TestCase):
               <preamble>
                 Old preamble
               </preamble>
-            </regulation>""")
+            </regulation>""") # noqa
         new_xml = process_changes(original_xml, notice_xml)
         fdsys = new_xml.find('./{eregs}fdsys')
         preamble = new_xml.find('./{eregs}preamble')
@@ -325,4 +327,3 @@ class ChangesTests(TestCase):
         self.assertEqual(len(diff.keys()), 1)
         self.assertTrue('1234-1-a' in diff)
         self.assertEqual(diff['1234-1-a']['op'], 'deleted')
-

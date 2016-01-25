@@ -9,7 +9,6 @@ import os
 import sys
 
 import click
-from termcolor import colored, cprint
 from lxml import etree
 
 from regulation.validation import EregsValidator
@@ -33,24 +32,24 @@ from regulation.changes import process_changes, generate_diff
 # Import regparser here with the eventual goal of breaking off the parts
 # we're using in the RegML parser into a library both can share.
 from regparser.federalregister import fetch_notice_json
-from regparser.builder import Builder, LayerCacheAggregator, tree_and_builder
-from regparser.notice.build import check_local_version_list
+from regparser.builder import LayerCacheAggregator, tree_and_builder
 
 if (sys.version_info < (3, 0)):
     reload(sys)  # noqa
     sys.setdefaultencoding('UTF8')
 
+
 # Utility Functions ####################################################
 
 def find_file(file, is_notice=False, ecfr=False):
-    """ 
+    """
         Find the given file in sources available in configured
-        locations and read it. 
-        
-        For example, if we're looking for a RegML file for version 
-        2222-33333 with the default arguments, 
+        locations and read it.
+
+        For example, if we're looking for a RegML file for version
+        2222-33333 with the default arguments,
         settings.XML_ROOT/regulation will be searched for a matching
-        document. 
+        document.
 
         With ecfr=True and regml=False, eCFR fr-notices
         (settings.LOCAL_XML_PATHS) will be searched.
@@ -60,7 +59,7 @@ def find_file(file, is_notice=False, ecfr=False):
         if ecfr:
             ecfr_base = settings.LOCAL_XML_PATHS[0]
             file = os.path.join(ecfr_base, file)
-        
+
         else:
             regml_base = settings.XML_ROOT
             if is_notice:
@@ -77,13 +76,13 @@ def find_file(file, is_notice=False, ecfr=False):
 
 
 def find_version(part, notice, is_notice=False):
-    """ Wrap find file in a semantic sort of way to find a RegML version 
-        of a particular part"""
+    """ Wrap find file in a semantic sort of way to find a RegML version
+        of a particular part """
     return find_file(os.path.join(part, notice), is_notice=is_notice)
 
 
 def write_layer(layer_object, reg_number, notice, layer_type,
-        diff_notice=None):
+                diff_notice=None):
     """ Write a layer. """
     layer_path = os.path.join(settings.JSON_ROOT, layer_type, reg_number)
     if diff_notice is not None:
@@ -94,6 +93,7 @@ def write_layer(layer_object, reg_number, notice, layer_type,
     print("writing", layer_file)
     json.dump(layer_object, open(layer_file, 'w'), indent=4,
               separators=(',', ':'))
+
 
 def generate_json(regulation_file, check_terms=False):
     with open(find_file(regulation_file), 'r') as f:
@@ -140,7 +140,8 @@ def generate_json(regulation_file, check_terms=False):
     notice = xml_tree.find('.//{eregs}documentNumber').text
     version = os.path.split(regulation_file)[-1].replace('.xml', '')
     if notice != version:
-        print('Notice ({}) different from version ({}), using version'.format(notice, version))
+        print('Notice ({}) different from version ({}), '
+              'using version'.format(notice, version))
         notice = version
 
     write_layer(reg_json, reg_number, notice, 'regulation')
@@ -162,7 +163,7 @@ def generate_json(regulation_file, check_terms=False):
 
     return reg_number, notice, xml_tree
 
-       
+
 # Main CLI Commands ####################################################
 
 # Create a general CLI that can take additional comments
@@ -181,7 +182,7 @@ def validate(check_terms, file):
     with open(find_file(file), 'r') as f:
         reg_xml = f.read()
     xml_tree = etree.fromstring(reg_xml)
-    
+
     # Validate the file relative to schema
     validator = EregsValidator(settings.XSD_FILE)
     validator.validate_reg(xml_tree)
@@ -226,15 +227,15 @@ def json_command(regulation_files, check_terms=False):
     # files in that directory in listing order
     if os.path.isdir(find_file(regulation_files[0])):
         regulation_dir = find_file(regulation_files[0])
-        regulation_files = [os.path.join(regulation_dir, f) 
+        regulation_files = [os.path.join(regulation_dir, f)
                             for f in os.listdir(regulation_dir)]
 
     # Generate JSON for each version
     versions = {}
     reg_number = None
     for file in regulation_files:
-        reg_number, notice, reg_xml_tree = generate_json(file,
-            check_terms=check_terms)
+        reg_number, notice, reg_xml_tree = generate_json(
+            file, check_terms=check_terms)
         versions[notice] = reg_xml_tree
 
     # Generate diff JSON between each version
@@ -243,7 +244,7 @@ def json_command(regulation_files, check_terms=False):
         for right_version, right_tree in versions.items():
             diff = generate_diff(left_tree, right_tree)
             write_layer(diff, reg_number, left_version, 'diff',
-                    diff_notice=right_version)
+                        diff_notice=right_version)
 
 
 # Given a notice, apply it to a previous RegML regulation verson to
@@ -269,9 +270,9 @@ def apply(regulation_file, notice_file):
     new_xml_tree = process_changes(left_xml_tree, notice_xml)
 
     # Write the new xml tree
-    new_xml_string = etree.tostring(new_xml_tree, 
+    new_xml_string = etree.tostring(new_xml_tree,
                                     pretty_print=True,
-                                    xml_declaration=True, 
+                                    xml_declaration=True,
                                     encoding='UTF-8')
     new_path = os.path.join(
         os.path.dirname(regulation_file),
@@ -280,7 +281,7 @@ def apply(regulation_file, notice_file):
         print("Writing regulation to {}".format(new_path))
         f.write(new_xml_string)
 
- 
+
 @cli.command()
 @click.argument('title')
 @click.argument('part')
@@ -301,28 +302,30 @@ def noticelist(title, part):
 @click.option('--act-section', default=0, type=int)
 @click.option('--act-title', default=0, type=int)
 @click.option('--with-all-versions', is_flag=True,
-        help="do not output version reg trees")
+              help="do not output version reg trees")
 @click.option('--without-versions', is_flag=True,
-        help="do not output any version reg trees")
-@click.option('--without-notices', is_flag=True, 
-        help="do not output any notice changesets")
+              help="do not output any version reg trees")
+@click.option('--without-notices', is_flag=True,
+              help="do not output any notice changesets")
 @click.option('--only-notice', default=None,
-        help="only write output for this notice number")
-def ecfr(title, file, act_title, act_section, 
-        with_all_versions=False, without_versions=False, 
-        without_notices=False, only_notice=None):
+              help="only write output for this notice number")
+def ecfr(title, file, act_title, act_section,
+         with_all_versions=False, without_versions=False,
+         without_notices=False, only_notice=None):
     """ Parse eCFR into RegML """
 
     # Get the tree and layers
     reg_tree, builder = tree_and_builder(
-            file, title, writer_type='XML')
+        file, title, writer_type='XML')
     layer_cache = LayerCacheAggregator()
-    layers = builder.generate_layers(reg_tree, [act_title, act_section], layer_cache)
+    layers = builder.generate_layers(reg_tree,
+                                     [act_title, act_section],
+                                     layer_cache)
 
     # Do the first version
     print("Version %s", builder.doc_number)
-    if (only_notice is not None and builder.doc_number == only_notice) or \
-            only_notice is None:
+    if (only_notice is not None and builder.doc_number == only_notice) \
+            or only_notice is None:
         if not without_versions:
             builder.write_regulation(reg_tree, layers=layers)
 
@@ -331,17 +334,17 @@ def ecfr(title, file, act_title, act_section,
         version = last_notice['document_number']
         print("Version %s", version)
         builder.doc_number = version
-        layers = builder.generate_layers(new_tree, 
+        layers = builder.generate_layers(new_tree,
                                          [act_title, act_section],
-                                         layer_cache, 
+                                         layer_cache,
                                          notices)
         if (only_notice is not None and version == only_notice) or \
                 only_notice is None:
             if with_all_versions:
                 builder.write_regulation(new_tree, layers=layers)
             if not without_notices:
-                builder.write_notice(version, 
-                                     old_tree=old, 
+                builder.write_notice(version,
+                                     old_tree=old,
                                      reg_tree=new_tree,
                                      layers=layers)
         layer_cache.invalidate_by_notice(last_notice)
@@ -351,4 +354,3 @@ def ecfr(title, file, act_title, act_section,
 
 if __name__ == "__main__":
     cli()
-
