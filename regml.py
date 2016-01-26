@@ -243,8 +243,8 @@ def json_command(regulation_files, check_terms=False):
     for left_version, left_tree in versions.items():
         for right_version, right_tree in versions.items():
             diff = generate_diff(left_tree, right_tree)
-            write_layer(diff, reg_number, left_version, 'diff',
-                        diff_notice=right_version)
+            write_layer(diff, reg_number, right_version, 'diff',
+                        diff_notice=left_version)
 
 
 # Given a notice, apply it to a previous RegML regulation verson to
