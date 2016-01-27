@@ -285,6 +285,27 @@ class EregsValidator:
 
         self.events.append(event)
 
+    def insert_interp_markers(self, tree, regulation_file):
+        """Add in the markers for interp paragraphs in situations where they're missing.
+        """
+
+        paragraphs = tree.findall('.//{eregs}interpParagraph')
+
+        #import pdb
+        #pdb.set_trace()
+
+        for paragraph in paragraphs:
+            label = paragraph.get('label')
+            split_label = label.split('-')
+            if 'Interp' in split_label:
+                index = split_label.index('Interp')
+                if index + 1 < len(split_label) and split_label[index + 1].isdigit():
+                    marker = split_label[-1] + '.'
+                    paragraph.set('marker', marker)
+
+        with open(regulation_file, 'w') as f:
+            f.write(etree.tostring(tree, pretty_print=True))
+
     @property
     def is_valid(self):
         for error in self.events:

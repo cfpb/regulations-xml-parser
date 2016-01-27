@@ -147,6 +147,10 @@ def build_reg_tree(root, parent=None, depth=0):
         content_text = xml_node_text(content)
         if title is not None:
             node.title = title.text
+        node.marker = root.get('marker', '')
+        if node.marker == 'none':
+            node.marker = ''
+
         node.label = root.get('label').split('-')
         node.text = content_text
         node.node_type = 'interp'
@@ -167,7 +171,7 @@ def build_reg_tree(root, parent=None, depth=0):
 
 def build_paragraph_marker_layer(root):
 
-    parapgraphs = root.findall('.//{eregs}paragraph')
+    parapgraphs = root.findall('.//{eregs}paragraph') # + root.findall('.//{eregs}interpParagraph')
     paragraph_dict = OrderedDict()
 
     for paragraph in parapgraphs:
@@ -196,7 +200,7 @@ def build_internal_citations_layer(root):
 
         par_label = paragraph.get('label')
 
-        if marker != '':
+        if marker != '' and paragraph.tag != '{eregs}interpParagraph':
             marker_offset = len(marker + ' ')
         else:
             marker_offset = 0
@@ -428,12 +432,15 @@ def build_terms_layer(root):
         # terms = sorted(terms, key=lambda term: len(term.text), reverse=True)
         label = paragraph.get('label')
         marker = paragraph.get('marker') or ''
+        #if label == '1030-2-a-Interp-1':
+        #    import pdb
+        #    pdb.set_trace()
         # par_text = (marker + ' ' + xml_node_text(content)).strip()
 
         if len(terms) > 0:
             terms_dict[label] = []
 
-        if marker != '':
+        if marker != '' and paragraph.tag != '{eregs}interpParagraph':
             marker_offset = len(marker + ' ')
         else:
             marker_offset = 0
