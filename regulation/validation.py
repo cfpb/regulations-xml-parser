@@ -290,10 +290,6 @@ class EregsValidator:
         """
 
         paragraphs = tree.findall('.//{eregs}interpParagraph')
-
-        #import pdb
-        #pdb.set_trace()
-
         for paragraph in paragraphs:
             label = paragraph.get('label')
             split_label = label.split('-')
