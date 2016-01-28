@@ -1,6 +1,6 @@
 import os
 
-XML_ROOT = '../regulations-stub/xml'
+XML_ROOT = '../regulations-xml/'
 JSON_ROOT = '../regulations-stub/stub'
 XSD_FILE = '../regulations-schema/src/eregs.xsd'
 
@@ -15,6 +15,6 @@ SPECIAL_SINGULAR_NOUNS = [
 from regparser.default_settings import *
 
 # OUTPUT_DIR=os.environ.get('OUTPUT_DIR', "../regulations-stub/stub/")
-OUTPUT_DIR=os.environ.get('OUTPUT_DIR', "../regulations-stub/xml/")
+OUTPUT_DIR=os.environ.get('OUTPUT_DIR', "../regulations-xml/")
 # OUTPUT_DIR="../regulations-stub/stub/"
 LOCAL_XML_PATHS = ['../fr-notices/',]
