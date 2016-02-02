@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+from __future__ import unicode_literals
+
 from collections import OrderedDict
 
 import inflect
@@ -147,6 +149,10 @@ def build_reg_tree(root, parent=None, depth=0):
         content_text = xml_node_text(content)
         if title is not None:
             node.title = title.text
+        node.marker = root.get('marker', '')
+        if node.marker == 'none':
+            node.marker = ''
+
         node.label = root.get('label').split('-')
         node.text = content_text
         node.node_type = 'interp'
@@ -167,7 +173,7 @@ def build_reg_tree(root, parent=None, depth=0):
 
 def build_paragraph_marker_layer(root):
 
-    parapgraphs = root.findall('.//{eregs}paragraph')
+    parapgraphs = root.findall('.//{eregs}paragraph') # + root.findall('.//{eregs}interpParagraph')
     paragraph_dict = OrderedDict()
 
     for paragraph in parapgraphs:
@@ -196,7 +202,7 @@ def build_internal_citations_layer(root):
 
         par_label = paragraph.get('label')
 
-        if marker != '':
+        if marker != '' and paragraph.tag != '{eregs}interpParagraph':
             marker_offset = len(marker + ' ')
         else:
             marker_offset = 0
@@ -227,7 +233,7 @@ def build_internal_citations_layer(root):
             cite_targets[text] = target
             running_par_text = ''
 
-        for cite, positions in cite_positions.iteritems():
+        for cite, positions in cite_positions.items():
             # positions = find_all_occurrences(par_text, text)
             for pos in positions:
                 #print cite, positions, par_label
@@ -428,12 +434,15 @@ def build_terms_layer(root):
         # terms = sorted(terms, key=lambda term: len(term.text), reverse=True)
         label = paragraph.get('label')
         marker = paragraph.get('marker') or ''
+        #if label == '1030-2-a-Interp-1':
+        #    import pdb
+        #    pdb.set_trace()
         # par_text = (marker + ' ' + xml_node_text(content)).strip()
 
         if len(terms) > 0:
             terms_dict[label] = []
 
-        if marker != '':
+        if marker != '' and paragraph.tag != '{eregs}interpParagraph':
             marker_offset = len(marker + ' ')
         else:
             marker_offset = 0
@@ -453,8 +462,8 @@ def build_terms_layer(root):
 
             text = term.text
             target = term.get('target')
-            # print [(key, defn) for key, defn in definitions_dict.iteritems()], target
-            defn_location = [key for key, defn in definitions_dict.iteritems() if defn['reference'] == target]
+            # print [(key, defn) for key, defn in definitions_dict.items()], target
+            defn_location = [key for key, defn in definitions_dict.items() if defn['reference'] == target]
             if len(defn_location) > 0:
                 defn_location = defn_location[0]
 
@@ -471,7 +480,7 @@ def build_terms_layer(root):
                 term_positions.setdefault(text, []).append(term_position)
                 term_targets[text] = defn_location
 
-        for term, positions in term_positions.iteritems():
+        for term, positions in term_positions.items():
             target = term_targets[term]
             ref_dict = OrderedDict()
             ref_dict['offsets'] = []
@@ -495,7 +504,7 @@ def build_toc_layer(root):
 
     part = root.find('{eregs}part')
     part_toc = part.find('{eregs}tableOfContents')
-    part_number = part.get('partNumber')
+    part_number = part.get('label')
     toc_dict[part_number] = []
     appendix_letters = []
 
@@ -683,7 +692,7 @@ def build_notice(root):
     Notices currently contain analysis and footnotes
     """
     # Get the root label
-    label = root.find('.//{eregs}part').attrib['partNumber']
+    label = root.find('.//{eregs}part').attrib['label']
 
     # Get regulation dates, document number, and url for the notice
     publication_date = root.find('.//{eregs}fdsys/{eregs}date').text

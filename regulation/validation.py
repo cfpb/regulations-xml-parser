@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
 from enum import Enum
+
 from termcolor import colored, cprint
 from lxml import etree
-from node import xml_node_text, find_all_occurrences, interpolate_string, enclosed_in_tag
+from .node import xml_node_text, find_all_occurrences, interpolate_string, enclosed_in_tag
 
 import inflect
 import re
-import json
-import settings
+
+import regulation.settings as settings
 
 
 class Severity(Enum):
@@ -165,14 +167,15 @@ class EregsValidator:
         inf = inflect.engine()
 
         definitions = terms_layer['referenced']
-        terms = [(defn['term'], defn['reference']) for key, defn in definitions.iteritems()]
-        cap_terms = [(defn['term'][0].upper() + defn['term'][1:], defn['reference'])
-                     for key, defn in definitions.iteritems()]
+        terms = set([(defn['term'], defn['reference']) for key, defn in definitions.iteritems()])
+        cap_terms = set([(defn['term'][0].upper() + defn['term'][1:], defn['reference'])
+                     for key, defn in definitions.iteritems()])
 
-        terms = terms + cap_terms
+        terms = terms | cap_terms
 
         paragraphs = tree.findall('.//{eregs}paragraph') + tree.findall('.//{eregs}interpParagraph')
         ignore = set()
+        always = set()
 
         for paragraph in paragraphs:
             content = paragraph.find('.//{eregs}content')
@@ -202,17 +205,18 @@ class EregsValidator:
                                 msg = colored('You appear to have used the term "{}" in {} without referencing it: \n'.format(term_to_use, label), 'yellow') + \
                                       '{}\n'.format(highlighted_par) + \
                                       colored('Would you like the automatically fix this reference in the source?', 'yellow')
-                                print msg
-                                while input_state not in ['y', 'n', 'i']:
-                                    input_state = raw_input('(y)es/(n)o/(i)gnore this term: ')
-
-                                if input_state == 'y':
+                                print(msg)
+                                if term[0] not in always:
+                                    while input_state not in ['y', 'n', 'i', 'a']:
+                                        input_state = raw_input('(y)es/(n)o/(i)gnore this term/(a)lways correct: ')
+                                if input_state in ['y', 'a'] or term[0] in always:
                                     problem_flag = True
                                     ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[1], term_to_use)
                                     offsets_and_values.append((ref, [term_loc, term_loc + len(term_to_use)]))
+                                    if input_state == 'a':
+                                        always.add(term[0])
                                 elif input_state == 'i':
                                     ignore.add(term[0])
-
                                 input_state = None
 
             if offsets_and_values != []:
@@ -222,11 +226,11 @@ class EregsValidator:
                 highlight = interpolate_string(par_text, offsets, values, colorize=True)
                 new_content = etree.fromstring(new_par_text)
                 paragraph.replace(content, new_content)
-                print highlight
+                print(highlight)
 
 
         if problem_flag:
-            print colored('The tree has been altered! Do you want to write the result to disk?')
+            print(colored('The tree has been altered! Do you want to write the result to disk?'))
             answer = None
             while answer not in ['y', 'n']:
                 answer = raw_input('Save? y/n: ')
@@ -282,6 +286,65 @@ class EregsValidator:
             event = EregsValidationEvent(msg, Severity(Severity.OK))
 
         self.events.append(event)
+
+    def headerize_interps(self, tree, regulation_file):
+
+        paragraphs = tree.findall('.//{eregs}interpParagraph')
+        change_flag = False
+
+        for paragraph in paragraphs:
+            title = paragraph.find('{eregs}title')
+            content = paragraph.find('{eregs}content')
+            label = paragraph.get('label')
+            marker = paragraph.get('marker', '')
+            target = paragraph.get('target', '')
+
+            if title is None:
+                current_par = etree.tostring(paragraph)
+                print(colored(current_par, 'yellow'))
+                response = None
+                while response not in ['y', 'n']:
+                    msg = colored('Do you want to titleize this paragraph?')
+                    print(msg)
+                    response = raw_input('(y)es/(n)o: ')
+                if response.lower() == 'y':
+                    response = None
+                    content_text = content.text
+                    first_period = content_text.find('.')
+                    if first_period > -1:
+                        title_string = content_text[:first_period + 1]
+                        new_title = '<title>' + title_string + '</title>'
+                        new_text = '<content>' + xml_node_text(content).replace(title_string, '').strip() + '</content>'
+                        paragraph.insert(0, etree.fromstring(new_title))
+
+                        #new_paragraph = '<interpParagraph label="{}" target="{}" marker="{}">\n'.format(label, target, marker)
+                        #new_paragraph += new_title + '\n'
+                        #new_paragraph += new_text + '\n</interpParagraph>'
+                        #print(colored(new_paragraph, 'green'))
+
+                        change_flag = True
+                    else:
+                        print(colored('Nothing to headerize!', 'red'))
+
+
+
+
+    def insert_interp_markers(self, tree, regulation_file):
+        """Add in the markers for interp paragraphs in situations where they're missing.
+        """
+
+        paragraphs = tree.findall('.//{eregs}interpParagraph')
+        for paragraph in paragraphs:
+            label = paragraph.get('label')
+            split_label = label.split('-')
+            if 'Interp' in split_label:
+                index = split_label.index('Interp')
+                if index + 1 < len(split_label) and split_label[index + 1].isdigit():
+                    marker = split_label[-1] + '.'
+                    paragraph.set('marker', marker)
+
+        with open(regulation_file, 'w') as f:
+            f.write(etree.tostring(tree, pretty_print=True))
 
     @property
     def is_valid(self):
