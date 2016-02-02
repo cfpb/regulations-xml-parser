@@ -25,6 +25,7 @@ from regulation.tree import (build_analysis,
 from regulation.validation import EregsValidator
 from regulation.diff import *
 from itertools import combinations
+from utils.graph import build_graph
 
 import settings
 
@@ -59,7 +60,7 @@ def write_layer(layer_object, reg_number, notice, layer_type):
               separators=(',', ':'))
 
 
-def parser_driver(regulation_file, check_terms=False, correct_interps=False):
+def parser_driver(regulation_file, check_terms=False, correct_interps=False, headerize_interps=False):
     with open(regulation_file, 'r') as f:
         reg_xml = f.read()
     xml_tree = etree.fromstring(reg_xml)
@@ -78,6 +79,8 @@ def parser_driver(regulation_file, check_terms=False, correct_interps=False):
     # we can correct interps right away if necessary
     if correct_interps:
         validator.insert_interp_markers(xml_tree, regulation_file)
+    if headerize_interps:
+        validator.headerize_interps(xml_tree, regulation_file)
 
     paragraph_markers = build_paragraph_marker_layer(xml_tree)
     internal_citations = build_internal_citations_layer(xml_tree)
@@ -130,11 +133,12 @@ def parser_driver(regulation_file, check_terms=False, correct_interps=False):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('operation', action='store', choices=['parse', 'compare'])
+    parser.add_argument('operation', action='store', choices=['parse', 'compare', 'graph'])
     parser.add_argument('regulation-files', nargs='*')
     parser.add_argument('notice-doc-numbers', nargs='*')
     parser.add_argument('--with-term-checks', nargs='?', default=False, type=bool)
     parser.add_argument('--correct-interp-markers', nargs='?', default=False, type=bool)
+    parser.add_argument('--headerize-interps', nargs='?', default=False, type=bool)
 
     args = vars(parser.parse_args())
 
@@ -142,8 +146,15 @@ if __name__ == '__main__':
         if args['regulation-files'] is not None:
             for regfile in args['regulation-files']:
                 print('Parsing {}'.format(regfile))
-                parser_driver(regfile, args['with_term_checks'], args['correct_interp_markers'])
+                parser_driver(regfile, args['with_term_checks'],
+                              args['correct_interp_markers'],
+                              args['headerize_interps'])
 
     elif args['operation'] == 'compare':
         if args['regulation-files'] is not None:
             diff_driver(args['regulation-files'])
+
+    elif args['operation'] == 'graph':
+        if args['regulation-files'] is not None:
+            for regfile in args['regulation-files']:
+                build_graph(regfile)
