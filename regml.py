@@ -175,9 +175,9 @@ def cli():
 # Perform validation on the given RegML file without any additional
 # actions.
 @cli.command()
-@click.option('--check-terms', default=False)
 @click.argument('file')
-def validate(check_terms, file):
+@click.option('--check-terms')
+def validate(file, check_terms=None):
     """ Validate a RegML file """
     with open(find_file(file), 'r') as f:
         reg_xml = f.read()
@@ -200,8 +200,9 @@ def validate(check_terms, file):
         validator.validate_terms(xml_tree, terms)
         validator.validate_internal_cites(xml_tree, internal_citations)
 
-        if check_terms:
-            validator.validate_term_references(xml_tree, terms, file)
+        if check_terms is not None:
+            validator.validate_term_references(xml_tree, terms, file,
+                    label=check_terms)
         for event in validator.events:
             print(str(event))
 
