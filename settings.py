@@ -1,7 +1,7 @@
 import os
 
-XML_ROOT = '../regulations-xml/'
-JSON_ROOT = '../regulations-stub/stub'
+XML_ROOT = '../regulations-stub/xml'
+JSON_ROOT = '../regulations-xml-json'
 XSD_FILE = '../regulations-schema/src/eregs.xsd'
 
 # the inflect module has a few problems... manual override for that
