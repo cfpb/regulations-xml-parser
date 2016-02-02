@@ -333,7 +333,7 @@ def ecfr(title, file, act_title, act_section,
     for last_notice, old, new_tree, notices in builder.revision_generator(
             reg_tree):
         version = last_notice['document_number']
-        print("Version %s", version)
+        print("Version", version)
         builder.doc_number = version
         layers = builder.generate_layers(new_tree,
                                          [act_title, act_section],
