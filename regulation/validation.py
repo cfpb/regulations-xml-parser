@@ -183,8 +183,6 @@ class EregsValidator:
             working_section = tree.find(
                     './/*[@label="{}"]'.format(label))
 
-        import pdb; pdb.set_trace()
-
         paragraphs = working_section.findall('.//{eregs}paragraph') + \
                 working_section.findall('.//{eregs}interpParagraph')
         ignore = set()

@@ -179,7 +179,8 @@ def cli():
 @click.option('--check-terms')
 def validate(file, check_terms=None):
     """ Validate a RegML file """
-    with open(find_file(file), 'r') as f:
+    file = find_file(file)
+    with open(file, 'r') as f:
         reg_xml = f.read()
     xml_tree = etree.fromstring(reg_xml)
 
@@ -221,7 +222,7 @@ def validate(file, check_terms=None):
 @cli.command('json')
 @click.argument('regulation_files', nargs=-1, required=True)
 @click.option('--check-terms', is_flag=True)
-def json_command(regulation_files, check_terms=False):
+def json_command(regulation_files, from_notices=[], check_terms=False):
     """ Generate JSON from RegML files """
 
     # If the "file" is a directory, assume we want to operate on all the
@@ -286,12 +287,15 @@ def apply(regulation_file, notice_file):
 @cli.command()
 @click.argument('title')
 @click.argument('part')
-def noticelist(title, part):
+def versions(title, part):
     """ List notices for regulation title/part """
     notices = fetch_notice_json(title, part, only_final=True)
     doc_numbers = [n['document_number'] for n in notices]
-    for number in doc_numbers:
-        print(number)
+    for n in notices:
+        print(n['document_number'], n['effective_on'])
+
+    # for number in doc_numbers:
+    #     print(number)
 
 
 # eCFR Convenience Commands ############################################
