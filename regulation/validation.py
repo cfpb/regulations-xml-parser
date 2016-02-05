@@ -185,6 +185,7 @@ class EregsValidator:
         paragraphs = working_section.findall('.//{eregs}paragraph') + \
                 working_section.findall('.//{eregs}interpParagraph')
         ignore = set()
+        always = set()
 
         for paragraph in paragraphs:
             content = paragraph.find('.//{eregs}content')
@@ -215,10 +216,17 @@ class EregsValidator:
                                       '{}\n'.format(highlighted_par) + \
                                       colored('Would you like the automatically fix this reference in the source?', 'yellow')
                                 print(msg)
+                                if term[0] not in always:
+                                    while input_state not in ['y', 'n', 'i', 'a']:
+                                        input_state = raw_input('(y)es/(n)o/(i)gnore this term/(a)lways correct: ')
 
+                                if input_state in ['y', 'a'] or term[0] in always:
                                     problem_flag = True
                                     ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[1], term_to_use)
                                     offsets_and_values.append((ref, [term_loc, term_loc + len(term_to_use)]))
+                                    if input_state == 'a':
+                                        always.add(term[0])
+                                    
                                 elif input_state == 'i':
                                     ignore.add(term[0])
 
