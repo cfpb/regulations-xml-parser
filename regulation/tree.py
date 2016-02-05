@@ -640,13 +640,19 @@ def build_interp_layer(root):
         first_label = interpretations.get('label')
         first_key = first_label.split('-')[0]
         layer_dict[first_key] = [{'reference': first_label}]
+
+        interp_sections = interpretations.findall(
+            './/{eregs}interpSection')
         interp_paragraphs = interpretations.findall(
             './/{eregs}interpParagraph')
-        for paragraph in interp_paragraphs:
-            target = paragraph.get('target')
-            if target:
-                label = paragraph.get('label')
-                layer_dict[target] = [{'reference': label}]
+        targetted_interps = [i for i in 
+            interp_sections + interp_paragraphs
+            if i.get('target') is not None]
+
+        for interp in targetted_interps:
+            target = interp.get('target')
+            label = interp.get('label')
+            layer_dict[target] = [{'reference': label}]
 
     return layer_dict
 
