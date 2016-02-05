@@ -161,7 +161,10 @@ class EregsValidator:
 
         self.events.append(event)
 
-    def validate_term_references(self, tree, terms_layer, regulation_file):
+    def validate_term_references(self, tree, terms_layer,
+            regulation_file, label=None):
+        """ Validate term references. If label is given, only validate
+            term references within that label. """
 
         problem_flag = False
         inf = inflect.engine()
@@ -170,10 +173,17 @@ class EregsValidator:
         terms = set([(defn['term'], defn['reference']) for key, defn in definitions.iteritems()])
         cap_terms = set([(defn['term'][0].upper() + defn['term'][1:], defn['reference'])
                      for key, defn in definitions.iteritems()])
-
         terms = terms | cap_terms
 
-        paragraphs = tree.findall('.//{eregs}paragraph') + tree.findall('.//{eregs}interpParagraph')
+        # Pick out our working section of the tree. If no label was
+        # given, it *is* the tree.
+        working_section = tree
+        if label is not None:
+            working_section = tree.find(
+                    './/*[@label="{}"]'.format(label))
+
+        paragraphs = working_section.findall('.//{eregs}paragraph') + \
+                working_section.findall('.//{eregs}interpParagraph')
         ignore = set()
         always = set()
 
@@ -209,14 +219,17 @@ class EregsValidator:
                                 if term[0] not in always:
                                     while input_state not in ['y', 'n', 'i', 'a']:
                                         input_state = raw_input('(y)es/(n)o/(i)gnore this term/(a)lways correct: ')
+
                                 if input_state in ['y', 'a'] or term[0] in always:
                                     problem_flag = True
                                     ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[1], term_to_use)
                                     offsets_and_values.append((ref, [term_loc, term_loc + len(term_to_use)]))
                                     if input_state == 'a':
                                         always.add(term[0])
+                                    
                                 elif input_state == 'i':
                                     ignore.add(term[0])
+
                                 input_state = None
 
             if offsets_and_values != []:
@@ -288,7 +301,6 @@ class EregsValidator:
         self.events.append(event)
 
     def headerize_interps(self, tree, regulation_file):
-
         paragraphs = tree.findall('.//{eregs}interpParagraph')
         change_flag = False
 
@@ -326,13 +338,9 @@ class EregsValidator:
                     else:
                         print(colored('Nothing to headerize!', 'red'))
 
-
-
-
     def insert_interp_markers(self, tree, regulation_file):
-        """Add in the markers for interp paragraphs in situations where they're missing.
-        """
-
+        """ Add in the markers for interp paragraphs in situations where 
+            they're missing. """
         paragraphs = tree.findall('.//{eregs}interpParagraph')
         for paragraph in paragraphs:
             label = paragraph.get('label')

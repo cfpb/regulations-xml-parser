@@ -66,6 +66,34 @@ To validate a RegML file against
 ./regml.py validate [RegML regulation or notice file]
 ```
 
+## RegML Sanitization
+
+Some utilities to sanitize RegML are also included
+
+
+### Term Finder
+
+The term finder prompts the user to place references to defined terms 
+wherever they may be found. These corrections can then be writen back to
+the original RegML file.
+
+```shell
+./regml.py check-terms [RegML regulation file] 
+```
+
+`check-terms` also takes an optional label, which will cause it to only
+operate on that particular part of the regulation (useful for large
+regulations). For example:
+
+```
+./regml.py check-terms 1026/2011-31715 --label 1026-1 
+You appear to have used the term "Credit" in 1026-1-a without referencing it: 
+<content xmlns="eregs">...</content>
+            
+Would you like the automatically fix this reference in the source?
+(y)es/(n)o/(i)gnore this term/(a)lways correct: 
+```
+
 ## Generating JSON from RegML
 
 To generate JSON from RegML for use with

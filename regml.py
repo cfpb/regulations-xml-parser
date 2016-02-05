@@ -95,12 +95,8 @@ def write_layer(layer_object, reg_number, notice, layer_type,
               separators=(',', ':'))
 
 
-def generate_json(regulation_file, check_terms=False):
-    with open(find_file(regulation_file), 'r') as f:
-        reg_xml = f.read()
-    xml_tree = etree.fromstring(reg_xml)
-
-    # validate relative to schema
+def get_validator(xml_tree):
+    # Validate the file relative to schema
     validator = EregsValidator(settings.XSD_FILE)
     validator.validate_reg(xml_tree)
 
@@ -108,6 +104,17 @@ def generate_json(regulation_file, check_terms=False):
         for event in validator.events:
             print(str(event))
         sys.exit(0)
+
+    return validator
+
+
+def generate_json(regulation_file, check_terms=False):
+    with open(find_file(regulation_file), 'r') as f:
+        reg_xml = f.read()
+    xml_tree = etree.fromstring(reg_xml)
+
+    # Validate the file relative to schema
+    validator = get_validator(xml_tree)
 
     reg_tree = build_reg_tree(xml_tree)
     reg_number = reg_tree.label[0]
@@ -175,22 +182,16 @@ def cli():
 # Perform validation on the given RegML file without any additional
 # actions.
 @cli.command()
-@click.option('--check-terms', default=False)
 @click.argument('file')
-def validate(check_terms, file):
+def validate(file):
     """ Validate a RegML file """
-    with open(find_file(file), 'r') as f:
+    file = find_file(file)
+    with open(file, 'r') as f:
         reg_xml = f.read()
     xml_tree = etree.fromstring(reg_xml)
 
     # Validate the file relative to schema
-    validator = EregsValidator(settings.XSD_FILE)
-    validator.validate_reg(xml_tree)
-
-    if not validator.is_valid:
-        for event in validator.events:
-            print(str(event))
-        sys.exit(0)
+    validator = get_validator(xml_tree)
 
     # Validate regulation-specific documents
     if xml_tree.tag == '{eregs}regulation':
@@ -200,8 +201,6 @@ def validate(check_terms, file):
         validator.validate_terms(xml_tree, terms)
         validator.validate_internal_cites(xml_tree, internal_citations)
 
-        if check_terms:
-            validator.validate_term_references(xml_tree, terms, file)
         for event in validator.events:
             print(str(event))
 
@@ -212,6 +211,30 @@ def validate(check_terms, file):
     return validator
 
 
+@cli.command('check-terms')
+@click.argument('file')
+@click.option('--label')
+def check_terms(file, label=None):
+    """ Check the terms in a RegML file """
+
+    file = find_file(file)
+    with open(file, 'r') as f:
+        reg_xml = f.read()
+    xml_tree = etree.fromstring(reg_xml)
+
+    if xml_tree.tag == '{eregs}notice':
+        print("Cannot check terms in notice files")
+        sys.exit(1)
+
+    # Validate the file relative to schema
+    validator = get_validator(xml_tree)
+
+    terms = build_terms_layer(xml_tree)
+    validator.validate_terms(xml_tree, terms)
+    validator.validate_term_references(xml_tree, terms, file,
+            label=label)
+
+
 # Validate the given regulation file (or files) and generate the JSON
 # output expected by regulations-core and regulations-site if the RegML
 # validates.
@@ -220,7 +243,7 @@ def validate(check_terms, file):
 @cli.command('json')
 @click.argument('regulation_files', nargs=-1, required=True)
 @click.option('--check-terms', is_flag=True)
-def json_command(regulation_files, check_terms=False):
+def json_command(regulation_files, from_notices=[], check_terms=False):
     """ Generate JSON from RegML files """
 
     # If the "file" is a directory, assume we want to operate on all the
@@ -285,12 +308,15 @@ def apply(regulation_file, notice_file):
 @cli.command()
 @click.argument('title')
 @click.argument('part')
-def noticelist(title, part):
+def versions(title, part):
     """ List notices for regulation title/part """
     notices = fetch_notice_json(title, part, only_final=True)
     doc_numbers = [n['document_number'] for n in notices]
-    for number in doc_numbers:
-        print(number)
+    for n in notices:
+        print(n['document_number'], n['effective_on'])
+
+    # for number in doc_numbers:
+    #     print(number)
 
 
 # eCFR Convenience Commands ############################################
@@ -332,7 +358,7 @@ def ecfr(title, file, act_title, act_section,
     for last_notice, old, new_tree, notices in builder.revision_generator(
             reg_tree):
         version = last_notice['document_number']
-        print("Version %s", version)
+        print("Version", version)
         builder.doc_number = version
         layers = builder.generate_layers(new_tree,
                                          [act_title, act_section],
