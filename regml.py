@@ -95,12 +95,8 @@ def write_layer(layer_object, reg_number, notice, layer_type,
               separators=(',', ':'))
 
 
-def generate_json(regulation_file, check_terms=False):
-    with open(find_file(regulation_file), 'r') as f:
-        reg_xml = f.read()
-    xml_tree = etree.fromstring(reg_xml)
-
-    # validate relative to schema
+def get_validator(xml_tree):
+    # Validate the file relative to schema
     validator = EregsValidator(settings.XSD_FILE)
     validator.validate_reg(xml_tree)
 
@@ -108,6 +104,17 @@ def generate_json(regulation_file, check_terms=False):
         for event in validator.events:
             print(str(event))
         sys.exit(0)
+
+    return validator
+
+
+def generate_json(regulation_file, check_terms=False):
+    with open(find_file(regulation_file), 'r') as f:
+        reg_xml = f.read()
+    xml_tree = etree.fromstring(reg_xml)
+
+    # Validate the file relative to schema
+    validator = get_validator(xml_tree)
 
     reg_tree = build_reg_tree(xml_tree)
     reg_number = reg_tree.label[0]
@@ -176,8 +183,7 @@ def cli():
 # actions.
 @cli.command()
 @click.argument('file')
-@click.option('--check-terms')
-def validate(file, check_terms=None):
+def validate(file):
     """ Validate a RegML file """
     file = find_file(file)
     with open(file, 'r') as f:
@@ -185,13 +191,7 @@ def validate(file, check_terms=None):
     xml_tree = etree.fromstring(reg_xml)
 
     # Validate the file relative to schema
-    validator = EregsValidator(settings.XSD_FILE)
-    validator.validate_reg(xml_tree)
-
-    if not validator.is_valid:
-        for event in validator.events:
-            print(str(event))
-        sys.exit(0)
+    validator = get_validator(xml_tree)
 
     # Validate regulation-specific documents
     if xml_tree.tag == '{eregs}regulation':
@@ -201,9 +201,6 @@ def validate(file, check_terms=None):
         validator.validate_terms(xml_tree, terms)
         validator.validate_internal_cites(xml_tree, internal_citations)
 
-        if check_terms is not None:
-            validator.validate_term_references(xml_tree, terms, file,
-                    label=check_terms)
         for event in validator.events:
             print(str(event))
 
@@ -212,6 +209,30 @@ def validate(file, check_terms=None):
         pass
 
     return validator
+
+
+@cli.command()
+@click.argument('file')
+@click.option('--label')
+def check_terms(file, label=None):
+    """ Check the terms in a RegML file """
+
+    file = find_file(file)
+    with open(file, 'r') as f:
+        reg_xml = f.read()
+    xml_tree = etree.fromstring(reg_xml)
+
+    if xml_tree.tag == '{eregs}notice':
+        print("Cannot check terms in notice files")
+        sys.exit(1)
+
+    # Validate the file relative to schema
+    validator = get_validator(xml_tree)
+
+    terms = build_terms_layer(xml_tree)
+    validator.validate_terms(xml_tree, terms)
+    validator.validate_term_references(xml_tree, terms, file,
+            label=label)
 
 
 # Validate the given regulation file (or files) and generate the JSON
