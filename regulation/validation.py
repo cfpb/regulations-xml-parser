@@ -170,11 +170,10 @@ class EregsValidator:
         inf = inflect.engine()
 
         definitions = terms_layer['referenced']
-        terms = [(defn['term'], defn['reference']) for key, defn in definitions.iteritems()]
-        cap_terms = [(defn['term'][0].upper() + defn['term'][1:], defn['reference'])
-                     for key, defn in definitions.iteritems()]
-
-        terms = terms + cap_terms
+        terms = set([(defn['term'], defn['reference']) for key, defn in definitions.iteritems()])
+        cap_terms = set([(defn['term'][0].upper() + defn['term'][1:], defn['reference'])
+                     for key, defn in definitions.iteritems()])
+        terms = terms | cap_terms
 
         # Pick out our working section of the tree. If no label was
         # given, it *is* the tree.
@@ -216,10 +215,7 @@ class EregsValidator:
                                       '{}\n'.format(highlighted_par) + \
                                       colored('Would you like the automatically fix this reference in the source?', 'yellow')
                                 print(msg)
-                                while input_state not in ['y', 'n', 'i']:
-                                    input_state = raw_input('(y)es/(n)o/(i)gnore this term: ')
 
-                                if input_state == 'y':
                                     problem_flag = True
                                     ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[1], term_to_use)
                                     offsets_and_values.append((ref, [term_loc, term_loc + len(term_to_use)]))
