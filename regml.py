@@ -211,7 +211,7 @@ def validate(file):
     return validator
 
 
-@cli.command()
+@cli.command('check-terms')
 @click.argument('file')
 @click.option('--label')
 def check_terms(file, label=None):
