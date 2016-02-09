@@ -27,8 +27,6 @@ class EregsValidatorTests(TestCase):
         validator = EregsValidator(settings.XSD_FILE)
         validator.validate_keyterms(tree)
 
-        print(validator.events)
-
         self.assertEqual(len(validator.events), 3)
 
         self.assertEqual(validator.events[0].severity, Severity.ERROR)
@@ -39,4 +37,3 @@ class EregsValidatorTests(TestCase):
 
         self.assertEqual(validator.events[2].severity, Severity.WARNING)
         self.assertTrue('repeating keyterms' in validator.events[2].msg)
-
