@@ -3,6 +3,7 @@
 from __future__ import unicode_literals
 
 from collections import OrderedDict
+import string
 
 import inflect
 
@@ -83,7 +84,7 @@ def build_reg_tree(root, parent=None, depth=0):
             node.text = '{} {}'.format(marker, content_text).strip()
         node.node_type = parent.node_type
         node.mixed_text = xml_mixed_text(content)
-        node.source_xml = etree.tostring(root)
+        node.source_xml = etree.tostring(root, encoding='UTF-8')
 
         children = root.findall('{eregs}paragraph')
 
@@ -156,7 +157,7 @@ def build_reg_tree(root, parent=None, depth=0):
         node.label = root.get('label').split('-')
         node.text = content_text
         node.node_type = 'interp'
-        node.source_xml = etree.tostring(root)
+        node.source_xml = etree.tostring(root, encoding='UTF-8')
 
         children = root.findall('{eregs}interpParagraph')
 

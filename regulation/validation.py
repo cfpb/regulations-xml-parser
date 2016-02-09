@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 
+import copy
 from enum import Enum
+import string
+import re
 
 from termcolor import colored, cprint
 from lxml import etree
@@ -93,6 +96,72 @@ class EregsValidator:
             raise EregsValidationEvent(
                 'Attempting to validate with empty schema!',
                 severity=Severity(Severity.CRITICAL))
+
+    def validate_keyterms(self, tree):
+        """
+        Make sure that keyterm titles aren't repeated in the content of
+        the paragraph they belong to.
+        """
+        problem_flag = False
+        keyterms = tree.findall('.//*[@type="keyterm"]')
+
+        for keyterm in keyterms:
+            # Get the parent and its label
+            parent = keyterm.getparent()
+            label = parent.get('label')
+
+            # Get just the text of the keyterm. If the keyterm has other
+            # tags, like a reference, we need to strip those.
+            keyterm_text = keyterm.text
+            if len(keyterm) > 0:
+                # Note: We don't want to modify the tree
+                keyterm = deepcopy(keyterm)
+                keyterm_text = etree.strip_tags(keyterm_elm, '{*}*')
+
+            # Strip the usual trailing period, just to be sure.
+            keyterm_text = re.sub(r'[\.]', '', keyterm_text)
+
+            # Get the content element of the paragraph. Strip any other
+            # tags, as above.
+            content = parent.find('{eregs}content')
+            content_text = content.text
+            if len(content) > 0:
+                # Note: We don't want to modify the tree
+                content = copy.deepcopy(content)
+                etree.strip_tags(content, '{*}*')
+
+            if content.text is not None:
+                # If the keyterm is there outright, error.
+                if content.text.startswith(keyterm.text):
+                    msg = 'Duplicate keyterm: ' \
+                          'in {} the keyterm "{}" appears both in the title' \
+                          'and the content.'.format(label, keyterm.text)
+                    event = EregsValidationEvent(
+                        msg, severity=Severity(Severity.ERROR))
+                    self.events.append(event)
+                    problem_flag = True
+
+                # Next we check for possible fragments of the keyterm
+                # that could be left in.
+                elif any(w for w in keyterm_text.split() 
+                        if content.text.startswith(w)):
+                    msg = 'Possible keyterm fragment: ' \
+                          'in {} a fragment of keyterm "{}" appears in ' \
+                          'the content.'.format(label, keyterm.text)
+                    event = EregsValidationEvent(
+                        msg, severity=Severity(Severity.WARNING))
+                    self.events.append(event)
+                    problem_flag = True
+
+
+        if problem_flag:
+            msg = 'There were some problems with repeating keyterms. '
+            event = EregsValidationEvent(msg, Severity(Severity.WARNING))
+        else:
+            msg = 'No keyterm titles appear to be repeated'
+            event = EregsValidationEvent(msg, Severity(Severity.OK))
+
+        self.events.append(event)
 
     def validate_terms(self, tree, terms_layer):
         """
@@ -189,7 +258,7 @@ class EregsValidator:
 
         for paragraph in paragraphs:
             content = paragraph.find('.//{eregs}content')
-            par_text = etree.tostring(content)
+            par_text = etree.tostring(content, encoding='UTF-8')
             label = paragraph.get('label')
             offsets_and_values = []
 
@@ -249,7 +318,7 @@ class EregsValidator:
                 answer = raw_input('Save? y/n: ')
             if answer == 'y':
                 with open(regulation_file, 'w') as f:
-                    f.write(etree.tostring(tree, pretty_print=True))
+                    f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
 
     def validate_internal_cites(self, tree, internal_cites_layer):
         """
@@ -312,7 +381,7 @@ class EregsValidator:
             target = paragraph.get('target', '')
 
             if title is None:
-                current_par = etree.tostring(paragraph)
+                current_par = etree.tostring(paragraph, encoding='UTF-8')
                 print(colored(current_par, 'yellow'))
                 response = None
                 while response not in ['y', 'n']:
@@ -352,7 +421,7 @@ class EregsValidator:
                     paragraph.set('marker', marker)
 
         with open(regulation_file, 'w') as f:
-            f.write(etree.tostring(tree, pretty_print=True))
+            f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
 
     @property
     def is_valid(self):
