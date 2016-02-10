@@ -69,7 +69,12 @@ def build_reg_tree(root, parent=None, depth=0):
         content_text = xml_node_text(content)
 
         if title is not None:
-            node.title = title.text
+            if title.get('type') != 'keyterm':
+                node.title = title.text
+            else:
+                # Keyterms are expected by reg-site to be included in
+                # the content text rather than the title of a node.
+                content_text = title.text + content_text
 
         node.marker = root.get('marker')
         if node.marker == 'none':
