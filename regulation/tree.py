@@ -64,18 +64,12 @@ def build_reg_tree(root, parent=None, depth=0):
         children = root.findall('{eregs}paragraph')
 
     elif tag == 'paragraph':
+
         title = root.find('{eregs}title')
         content = root.find('{eregs}content')
         content_text = xml_node_text(content)
-
-        if title is not None:
-            if title.get('type') != 'keyterm':
-                node.title = title.text
-            else:
-                # Keyterms are expected by reg-site to be included in
-                # the content text rather than the title of a node.
-                content_text = title.text + content_text
-
+        if title is not None and title.get('type') != 'keyterm':
+            node.title = title.text
         node.marker = root.get('marker')
         if node.marker == 'none':
             marker = ''
