@@ -105,6 +105,8 @@ class EregsValidator:
         problem_flag = False
         keyterms = tree.findall('.//*[@type="keyterm"]')
 
+        keyterm_events = []
+
         for keyterm in keyterms:
             # Get the parent and its label
             parent = keyterm.getparent()
@@ -134,11 +136,11 @@ class EregsValidator:
                 # If the keyterm is there outright, error.
                 if content.text.startswith(keyterm.text):
                     msg = 'Duplicate keyterm: ' \
-                          'in {} the keyterm "{}" appears both in the title' \
+                          'in {} the keyterm "{}" appears both in the title ' \
                           'and the content.'.format(label, keyterm.text)
                     event = EregsValidationEvent(
                         msg, severity=Severity(Severity.ERROR))
-                    self.events.append(event)
+                    keyterm_events.append(event)
                     problem_flag = True
 
                 # Next we check for possible fragments of the keyterm
@@ -150,12 +152,15 @@ class EregsValidator:
                           'the content.'.format(label, keyterm.text)
                     event = EregsValidationEvent(
                         msg, severity=Severity(Severity.WARNING))
-                    self.events.append(event)
+                    keyterm_events.append(event)
                     problem_flag = True
 
+        self.events = self.events + keyterm_events
 
         if problem_flag:
-            msg = 'There were some problems with repeating keyterms. '
+            msg = 'There were {} potential problems with repeating ' \
+                  'keyterms.'.format(
+                    len(keyterm_events))
             event = EregsValidationEvent(msg, Severity(Severity.WARNING))
         else:
             msg = 'No keyterm titles appear to be repeated'
