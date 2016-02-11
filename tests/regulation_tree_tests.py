@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 
 from unittest import TestCase
 
@@ -7,6 +8,7 @@ import lxml.etree as etree
 from common import test_xml
 from regulation.tree import (build_reg_tree,
                              build_paragraph_marker_layer,
+                             build_interp_layer,
                              build_analysis,
                              build_notice)
 from regulation.node import RegNode
@@ -17,7 +19,7 @@ class TreeTestCase(TestCase):
     def setUp(self):
         # A basic test regulation tree (add stuff as necessary for
         # testing)
-        self.input_xml = test_xml  # NOQA
+        self.input_xml = test_xml
         self.root = etree.fromstring(self.input_xml)
 
     def tearDown(self):
@@ -44,6 +46,16 @@ class TreeTestCase(TestCase):
         interp_dict = node_dict['children'][2]
         self.assertEqual(interp_dict['label'], ['1234', 'Interp'])
         self.assertEqual(node.children[2].depth, 1)
+
+    def test_build_interp_layer(self):
+        interp_dict = build_interp_layer(self.root)
+        expected_result = {
+                '1234': [{u'reference': '1234-Interp'}], 
+                '1234-1': [{u'reference': '1234-1-Interp'}], 
+                '1234-1-A': [{u'reference': '1234-1-A-Interp'}], 
+        }
+        print(dict(interp_dict))
+        self.assertEqual(expected_result, interp_dict)
 
     def test_build_analysis(self):
         result_analysis = {
@@ -150,8 +162,6 @@ class TreeTestCase(TestCase):
 
         result = reg_tree.flatten()
 
-        print result
-
         self.assertEqual(1, 1)
 
     def test_labels(self):
@@ -160,8 +170,6 @@ class TreeTestCase(TestCase):
         reg_tree = build_reg_tree(xml_tree)
 
         result = reg_tree.labels()
-
-        print result
 
         self.assertEqual(1, 1)
 

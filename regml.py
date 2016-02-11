@@ -136,6 +136,7 @@ def generate_json(regulation_file, check_terms=False):
 
     validator.validate_terms(xml_tree, terms)
     validator.validate_internal_cites(xml_tree, internal_citations)
+    validator.validate_keyterms(xml_tree)
     if check_terms:
         validator.validate_term_references(xml_tree, terms, regulation_file)
     for event in validator.events:
@@ -183,7 +184,13 @@ def cli():
 # actions.
 @cli.command()
 @click.argument('file')
-def validate(file):
+@click.option('--no-terms', is_flag=True, 
+    help="don't try to validate terms")
+@click.option('--no-citations', is_flag=True, 
+    help="don't try to validate citations")
+@click.option('--no-keyterms', is_flag=True, 
+    help="don't try to validate keyterms")
+def validate(file, no_terms=False, no_citations=False, no_keyterms=False):
     """ Validate a RegML file """
     file = find_file(file)
     with open(file, 'r') as f:
@@ -198,8 +205,12 @@ def validate(file):
         terms = build_terms_layer(xml_tree)
         internal_citations = build_internal_citations_layer(xml_tree)
 
-        validator.validate_terms(xml_tree, terms)
-        validator.validate_internal_cites(xml_tree, internal_citations)
+        if not no_terms:
+            validator.validate_terms(xml_tree, terms)
+        if not no_citations:
+            validator.validate_internal_cites(xml_tree, internal_citations)
+        if not no_keyterms:
+            validator.validate_keyterms(xml_tree)
 
         for event in validator.events:
             print(str(event))

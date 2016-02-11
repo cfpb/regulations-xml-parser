@@ -3,6 +3,7 @@
 from __future__ import unicode_literals
 
 from collections import OrderedDict
+import string
 
 import inflect
 
@@ -83,7 +84,7 @@ def build_reg_tree(root, parent=None, depth=0):
             node.text = '{} {}'.format(marker, content_text).strip()
         node.node_type = parent.node_type
         node.mixed_text = xml_mixed_text(content)
-        node.source_xml = etree.tostring(root)
+        node.source_xml = etree.tostring(root, encoding='UTF-8')
 
         children = root.findall('{eregs}paragraph')
 
@@ -156,7 +157,7 @@ def build_reg_tree(root, parent=None, depth=0):
         node.label = root.get('label').split('-')
         node.text = content_text
         node.node_type = 'interp'
-        node.source_xml = etree.tostring(root)
+        node.source_xml = etree.tostring(root, encoding='UTF-8')
 
         children = root.findall('{eregs}interpParagraph')
 
@@ -640,13 +641,19 @@ def build_interp_layer(root):
         first_label = interpretations.get('label')
         first_key = first_label.split('-')[0]
         layer_dict[first_key] = [{'reference': first_label}]
+
+        interp_sections = interpretations.findall(
+            './/{eregs}interpSection')
         interp_paragraphs = interpretations.findall(
             './/{eregs}interpParagraph')
-        for paragraph in interp_paragraphs:
-            target = paragraph.get('target')
-            if target:
-                label = paragraph.get('label')
-                layer_dict[target] = [{'reference': label}]
+        targetted_interps = [i for i in 
+            interp_sections + interp_paragraphs
+            if i.get('target') is not None]
+
+        for interp in targetted_interps:
+            target = interp.get('target')
+            label = interp.get('label')
+            layer_dict[target] = [{'reference': label}]
 
     return layer_dict
 
