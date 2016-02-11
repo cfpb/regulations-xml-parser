@@ -10,7 +10,8 @@ from regulation.tree import (build_reg_tree,
                              build_paragraph_marker_layer,
                              build_interp_layer,
                              build_analysis,
-                             build_notice)
+                             build_notice,
+                             build_formatting_layer)
 from regulation.node import RegNode
 
 
@@ -54,7 +55,6 @@ class TreeTestCase(TestCase):
                 '1234-1': [{u'reference': '1234-1-Interp'}], 
                 '1234-1-A': [{u'reference': '1234-1-A-Interp'}], 
         }
-        print(dict(interp_dict))
         self.assertEqual(expected_result, interp_dict)
 
     def test_build_analysis(self):
@@ -181,4 +181,58 @@ class TreeTestCase(TestCase):
         result = reg_tree.height()
 
         self.assertEqual(result, 4)
+
+    def test_build_formatting_layer_variable(self):
+        tree = etree.fromstring("""
+        <section xmlns="eregs">
+          <paragraph label="foo">
+            <content>
+              <variable>Val<subscript>n</subscript></variable>
+            </content>
+          </paragraph>
+        </section>
+        """)
+        expected_result = {
+            'foo': [{
+                'locations': [0], 
+                'subscript_data': {
+                    'subscript': 'n', 
+                    'variable': 'Val'
+                }, 
+                'text': 'Val_{n}'
+            }]
+        }
+        result = build_formatting_layer(tree)
+        self.assertEqual(expected_result, result)
+
+    def test_build_formatting_layer_callout(self):
+        tree = etree.fromstring("""
+        <section xmlns="eregs">
+          <paragraph label="foo">
+            <content>
+              <callout type="note">
+                <line>Note:</line>
+                <line>Some notes</line>
+              </callout>
+            </content>
+          </paragraph>
+        </section>
+        """)
+        expected_result = {
+            'foo': [{
+                'fence_data': {
+                    'lines': [
+                        'Note:', 
+                        'Some notes'
+                    ], 
+                    'type': 'note'
+                }, 
+                'locations': [
+                    0
+                ], 
+                'text': '```note\nNote:\nSome notes\n```'
+            }]
+        }
+        result = build_formatting_layer(tree)
+        self.assertEqual(expected_result, result)
 

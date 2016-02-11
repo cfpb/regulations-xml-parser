@@ -322,7 +322,10 @@ def build_formatting_layer(root):
         content = paragraph.find('{eregs}content')
         dashes = content.findall('.//{eregs}dash')
         tables = content.findall('.//{eregs}table')
+        variables = content.findall('.//{eregs}variable')
+        callouts = content.findall('.//{eregs}callout')
         label = paragraph.get('label')
+
         if len(dashes) > 0:
             layer_dict[label] = []
             for dash in dashes:
@@ -334,6 +337,37 @@ def build_formatting_layer(root):
                 dash_dict['dash_data'] = {'text': dash_text}
                 dash_dict['locations'] = [0]
                 layer_dict[label].append(dash_dict)
+
+        if len(variables) > 0:
+            if label not in layer_dict:
+                layer_dict[label] = []
+
+            for variable in variables:
+                subscript = variable.find('{eregs}subscript')
+                var_dict = OrderedDict()
+                var_dict['subscript_data'] = {
+                    'variable': variable.text,
+                    'subscript': subscript.text,
+                }
+                var_dict['locations'] = [0]
+                var_dict['text'] = ''
+                layer_dict[label].append(var_dict)
+
+        if len(callouts) > 0:
+            if label not in layer_dict:
+                layer_dict[label] = []
+
+            for callout in callouts:
+                lines = callout.findall('{eregs}line')
+                callout_dict = OrderedDict()
+                callout_dict['fence_data'] = {
+                    'lines': [l.text for l in lines],
+                    'type': callout.get('type')
+                }
+                callout_dict['locations'] = [0]
+                callout_dict['text'] = ''
+                layer_dict[label].append(callout_dict)
+
         if len(tables) > 0:
             if label not in layer_dict:
                 layer_dict[label] = []
