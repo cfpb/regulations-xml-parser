@@ -300,6 +300,87 @@ class EregsValidator:
 
         self.events.append(event)
 
+    def fix_omitted_cites(self, tree, regulation_file):
+        """
+        Try a simple fix to pick up internal citations that have been missed by regparser.
+        There's no complicated grammar parsing going on here, just stupid regexing.
+        :param tree: the xml tree
+        :return:
+        """
+        paragraphs = tree.findall('.//{eregs}paragraph') + tree.findall('.//{eregs}interpParagraph')
+        pattern = re.compile('([0-9]{4}\.([0-9]+)(\(([a-zA-Z]|[0-9])+\))+)')
+        ignore = set()
+        always = set()
+        problem_flag = False
+
+        def marker_to_target(marker_string):
+            marker = marker_string.replace('.', '-')
+            marker = marker.replace(')(', '-')
+            marker = marker.replace('(', '-')
+            marker = marker.replace(')', '')
+            # marker = marker[:-1]
+            return marker
+
+        for paragraph in paragraphs:
+            content = paragraph.find('{eregs}content')
+            par_text = etree.tostring(content)
+            matches = set([match[0] for match in pattern.findall(par_text)])
+            label = paragraph.get('label')
+            offsets_and_values = []
+
+            # if matches != set([]):
+            #     import ipdb; ipdb.set_trace()
+
+            for match in matches:
+                locations = set(find_all_occurrences(par_text, match))
+                input_state = None
+                for loc in locations:
+                    if not enclosed_in_tag(par_text, 'ref', loc):
+                        highlighted_par = colored(par_text[0:loc], 'yellow') + \
+                                          colored(match, 'red') + \
+                                          colored(par_text[loc + len(match):], 'yellow')
+
+                        msg = colored('You appear to have used a reference to "{}" in {} without tagging it: \n'.format(
+                              match, label), 'yellow') + \
+                              '{}\n'.format(highlighted_par) + \
+                              colored('Would you like the automatically fix this reference in the source?', 'yellow')
+                        print(msg)
+                        if match not in always:
+                            while input_state not in ['y', 'n', 'i', 'a']:
+                                input_state = raw_input('(y)es/(n)o/(i)gnore this reference/(a)lways correct: ')
+
+                            if input_state in ['y', 'a'] or match in always:
+                                problem_flag = True
+                                ref = '<ref target="{}" reftype="internal">{}</ref>'.format(
+                                    marker_to_target(match), match)
+                                offsets_and_values.append((ref, [loc, loc + len(match)]))
+                                if input_state == 'a':
+                                    always.add(match)
+
+                            elif input_state == 'i':
+                                ignore.add(match)
+
+                            input_state = None
+
+            if offsets_and_values != []:
+                offsets_and_values = sorted(offsets_and_values, key=lambda x: x[1][0])
+                values, offsets = zip(*offsets_and_values)
+                new_par_text = interpolate_string(par_text, offsets, values)
+                highlight = interpolate_string(par_text, offsets, values, colorize=True)
+                new_content = etree.fromstring(new_par_text)
+                paragraph.replace(content, new_content)
+                print(highlight)
+
+        if problem_flag:
+            print(colored('The tree has been altered! Do you want to write the result to disk?'))
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('Save? y/n: ')
+            if answer == 'y':
+                with open(regulation_file, 'w') as f:
+                    f.write(etree.tostring(tree, pretty_print=True))
+
+
     def headerize_interps(self, tree, regulation_file):
         paragraphs = tree.findall('.//{eregs}interpParagraph')
         change_flag = False
