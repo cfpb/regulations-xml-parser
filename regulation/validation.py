@@ -3,7 +3,6 @@ from __future__ import print_function
 
 import copy
 from enum import Enum
-import string
 import re
 
 from termcolor import colored, cprint
