@@ -433,3 +433,129 @@ class EregsValidator:
             if error.severity != Severity.OK:
                 return False
         return True
+
+    def validate_interp_targets(self, tree, regulation_file, label=None):
+        """ Validate interpretation targets within a given label with
+            the option to write corrected targets out to the
+            regulation_file. """
+            
+        problem_flag = False
+
+        # Pick out our working section of the tree. If no label was
+        # given, we're working on the interpretations node in the tree.
+        if label is not None:
+            working_section = tree.find(
+                    './/*[@label="{}"]'.format(label))
+            if working_section.tag not in (
+                    '{eregs}interpretations',
+                    '{eregs}interpSection', 
+                    '{eregs}interpParagraph'):
+                print("{} is not a part of an interpretation".format(
+                    label))
+                return 
+        else:
+            working_section = tree.find('.//{eregs}interpretations')
+
+        # Find all paragraphs with a target attribute
+        paragraphs = working_section.findall(
+                './/{eregs}interpParagraph[@target]')
+
+        for paragraph in paragraphs:
+            target = paragraph.get('target')
+            label = paragraph.get('label')
+            
+            # If the label doesn't end with '-Interp' it shouldn't have
+            # a target.
+            if not label.endswith('-Interp') and target is not None:
+                problem_flag = True
+                print(colored('Removing bad target {} in {}'.format(
+                        target, label), 'yellow'))
+                del paragraph.attrib['target']
+                continue
+
+            # Break down the label and figure out the paragraph the
+            # paragraph should be assigned to. If it doesn't match the
+            # target, it's a bad target.
+            label_target = label[:label.find('-Interp')]
+            if label_target != target:
+                problem_flag = True
+                print(colored('Fixing bad target {} in {}'.format(
+                        target, label), 'yellow'))
+                paragraph.set('target', label_target)
+                continue
+
+            print(colored('Leaving good target {} in {}'.format(
+                    target, label), 'green'))
+
+        if problem_flag:
+            print(colored('The tree has been altered! Do you want to' 
+                'write the result to disk?', 'red'))
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('Save? y/n: ')
+            if answer == 'y':
+                with open(regulation_file, 'w') as f:
+                    f.write(etree.tostring(tree, pretty_print=True))
+
+    def validate_interp_targets(self, tree, regulation_file, label=None):
+        """ Validate interpretation targets within a given label with
+            the option to write corrected targets out to the
+            regulation_file. """
+            
+        problem_flag = False
+
+        # Pick out our working section of the tree. If no label was
+        # given, we're working on the interpretations node in the tree.
+        if label is not None:
+            working_section = tree.find(
+                    './/*[@label="{}"]'.format(label))
+            if working_section.tag not in (
+                    '{eregs}interpretations',
+                    '{eregs}interpSection', 
+                    '{eregs}interpParagraph'):
+                print("{} is not a part of an interpretation".format(
+                    label))
+                return 
+        else:
+            working_section = tree.find('.//{eregs}interpretations')
+
+        # Find all paragraphs with a target attribute
+        paragraphs = working_section.findall(
+                './/{eregs}interpParagraph[@target]')
+
+        for paragraph in paragraphs:
+            target = paragraph.get('target')
+            label = paragraph.get('label')
+            
+            # If the label doesn't end with '-Interp' it shouldn't have
+            # a target.
+            if not label.endswith('-Interp') and target is not None:
+                problem_flag = True
+                print(colored('Removing bad target {} in {}'.format(
+                        target, label), 'yellow'))
+                del paragraph.attrib['target']
+                continue
+
+            # Break down the label and figure out the paragraph the
+            # paragraph should be assigned to. If it doesn't match the
+            # target, it's a bad target.
+            label_target = label[:label.find('-Interp')]
+            if label_target != target:
+                problem_flag = True
+                print(colored('Fixing bad target {} in {}'.format(
+                        target, label), 'yellow'))
+                paragraph.set('target', label_target)
+                continue
+
+            print(colored('Leaving good target {} in {}'.format(
+                    target, label), 'green'))
+
+        if problem_flag:
+            print(colored('The tree has been altered! Do you want to' 
+                'write the result to disk?', 'red'))
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('Save? y/n: ')
+            if answer == 'y':
+                with open(regulation_file, 'w') as f:
+                    f.write(etree.tostring(tree, pretty_print=True))
