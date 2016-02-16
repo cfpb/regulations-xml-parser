@@ -268,4 +268,40 @@ class TreeTestCase(TestCase):
         result = apply_formatting(content)
         self.assertEqual(expected_result.text.strip(), result.text)
 
+    def test_build_reg_tree_intro_para(self):
+        tree = etree.fromstring("""
+        <section label="foo" xmlns="eregs">
+          <subject>Some Subject</subject>
+          <paragraph label="foo-p1" marker="none">
+            <content>
+              An unmarked intro paragraph.
+            </content>
+          </paragraph>
+          <paragraph label="foo-a" marker="a">
+            <content>A marked paragraph</content>
+          </paragraph>
+        </section>
+        """)
+        expected_result = {
+            'children': [
+                {
+                    'children': [], 
+                    'label': [
+                        'foo', 
+                        'a'
+                    ], 
+                    'node_type': 'regtext', 
+                    'text': 'a A marked paragraph', 
+                    'marker': 'a'
+                }
+            ], 
+            'label': [
+                'foo'
+            ], 
+            'node_type': 'regtext', 
+            'text': 'An unmarked intro paragraph.', 
+            'title': 'Some Subject'
+        }
+        result = build_reg_tree(tree)
+        self.assertEqual(expected_result, result.to_json())
 
