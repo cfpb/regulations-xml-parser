@@ -11,7 +11,8 @@ from regulation.tree import (build_reg_tree,
                              build_interp_layer,
                              build_analysis,
                              build_notice,
-                             build_formatting_layer)
+                             build_formatting_layer,
+                             apply_formatting)
 from regulation.node import RegNode
 
 
@@ -205,6 +206,20 @@ class TreeTestCase(TestCase):
         result = build_formatting_layer(tree)
         self.assertEqual(expected_result, result)
 
+    def test_apply_formatting_variable(self):
+        content = etree.fromstring("""
+        <content xmlns="eregs">
+          The variable <variable>Val<subscript>n</subscript></variable> means something.
+        </content>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        expected_result = etree.fromstring("""
+        <content xmlns="eregs">
+          The variable Val_{n} means something.
+        </content>
+        """,)
+        result = apply_formatting(content)
+        self.assertEqual(expected_result.text, result.text)
+
     def test_build_formatting_layer_callout(self):
         tree = etree.fromstring("""
         <section xmlns="eregs">
@@ -217,7 +232,7 @@ class TreeTestCase(TestCase):
             </content>
           </paragraph>
         </section>
-        """)
+        """, parser=etree.XMLParser(remove_blank_text=True))
         expected_result = {
             'foo': [{
                 'fence_data': {
@@ -230,9 +245,27 @@ class TreeTestCase(TestCase):
                 'locations': [
                     0
                 ], 
-                'text': '```note\nNote:\nSome notes\n```'
+                'text': 'Note:Some notes',
             }]
         }
         result = build_formatting_layer(tree)
         self.assertEqual(expected_result, result)
+
+    def test_apply_formatting_callout_note(self):
+        content = etree.fromstring("""
+        <content xmlns="eregs">
+          <callout type="note">
+            <line>Note:</line>
+            <line>Some notes</line>
+          </callout>
+        </content>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        expected_result = etree.fromstring("""
+        <content xmlns="eregs">
+          Note:Some notes
+        </content>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        result = apply_formatting(content)
+        self.assertEqual(expected_result.text.strip(), result.text)
+
 

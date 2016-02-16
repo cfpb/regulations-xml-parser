@@ -2,6 +2,7 @@
 
 from __future__ import unicode_literals
 
+from copy import deepcopy
 from collections import OrderedDict
 import string
 
@@ -65,7 +66,7 @@ def build_reg_tree(root, parent=None, depth=0):
 
     elif tag == 'paragraph':
         title = root.find('{eregs}title')
-        content = root.find('{eregs}content')
+        content = apply_formatting(root.find('{eregs}content'))
         content_text = xml_node_text(content)
 
         if title is not None:
@@ -81,6 +82,7 @@ def build_reg_tree(root, parent=None, depth=0):
             marker = ''
         else:
             marker = node.marker
+
         node.label = root.get('label').split('-')
 
         graphic = content.find('{eregs}graphic')
@@ -88,6 +90,7 @@ def build_reg_tree(root, parent=None, depth=0):
             node.text = graphic.find('{eregs}text').text
         else:
             node.text = '{} {}'.format(marker, content_text).strip()
+
         node.node_type = parent.node_type
         node.mixed_text = xml_mixed_text(content)
         node.source_xml = etree.tostring(root, encoding='UTF-8')
@@ -355,7 +358,8 @@ def build_formatting_layer(root):
                     'subscript': subscript.text,
                 }
                 var_dict['locations'] = [0]
-                var_dict['text'] = ''
+                var_dict['text'] = '{var}_{{{sub}}}'.format(
+                        var=variable.text, sub=subscript.text)
                 layer_dict[label].append(var_dict)
 
         if len(callouts) > 0:
@@ -370,7 +374,12 @@ def build_formatting_layer(root):
                     'type': callout.get('type')
                 }
                 callout_dict['locations'] = [0]
-                callout_dict['text'] = ''
+                if callout.get('type') == 'note':
+                    callout_dict['text'] = xml_node_text(callout).strip()
+                elif callout.get('type') == 'code':
+                    callout_dict['text'] = '```\n' + \
+                        '\n'.join([l.text for l in lines]) + \
+                        '```'
                 layer_dict[label].append(callout_dict)
 
         if len(tables) > 0:
@@ -421,6 +430,61 @@ def build_formatting_layer(root):
                 layer_dict[label].append(table_dict)
 
     return layer_dict
+
+
+def apply_formatting(content_elm):
+    """ Certain formatting is expected of variables and callouts when
+        the formatting layer is applied. This function applies that
+        formatting to the content element of a paragraph. """
+    working_content = deepcopy(content_elm)
+
+    # Before building the content text, replace any variable 
+    # elements with Var_{sub} so that reg-site will know what to 
+    # do with them.
+    variables = working_content.findall('{eregs}variable') or []
+    for variable in variables:
+        # Note: lxml/etree API makes this a lot harder than it
+        # should be by use text/tail instead of text nodes.
+        subscript = variable.find('{eregs}subscript')
+        replacement_text = '{var}_{{{sub}}}'.format(
+            var=variable.text, sub=subscript.text)
+        if variable.tail is not None:
+            replacement_text += variable.tail
+
+        # If there's a previous node, simply append the text to its
+        # tail.
+        if variable.getprevious() is not None:
+            previous = variable.getprevious()
+            if previous.tail is None:
+                previous.tail = ''
+            previous.tail += replacement_text
+
+        # Otherwise, operate on the parent
+        else:
+            v_parent = variable.getparent()
+            if v_parent.text is None:
+                v_parent.text = ''
+            v_parent.text += replacement_text
+
+        # Remove the variable node
+        variable.getparent().remove(variable)
+
+    # Do the same for callouts
+    callouts = working_content.findall('.//{eregs}callout')
+    for callout in callouts:
+        lines = callout.findall('{eregs}line')
+        callout_text = xml_node_text(callout).strip()
+        # Callouts *should* be the only things within the content
+        # element of a paragraph. Assume that.
+        callout.getparent().remove(callout)
+        if callout.get('type') == 'note':
+            working_content.text = xml_node_text(callout).strip()
+        elif callout.get('type') == 'code':
+            working_content.text = '```\n' + \
+                        '\n'.join([l.text for l in lines]) + \
+                        '```'
+
+    return working_content
 
 
 def build_terms_layer(root):
