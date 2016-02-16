@@ -221,6 +221,8 @@ def build_internal_citations_layer(root):
 
     for paragraph in paragraphs:
         marker = paragraph.get('marker', '')
+        title = paragraph.find('{eregs}title')
+
         if marker == 'none' or marker is None:
             marker = ''
         par_text = (marker + ' ' + xml_node_text(
@@ -232,6 +234,11 @@ def build_internal_citations_layer(root):
             marker_offset = len(marker + ' ')
         else:
             marker_offset = 0
+
+        if title is not None and title.get('type') == 'keyterm':
+            keyterm_offset = len(title.text)
+        else:
+            keyterm_offset = 0
 
         cite_positions = OrderedDict()
         cite_targets = OrderedDict()
@@ -254,7 +261,7 @@ def build_internal_citations_layer(root):
                 else:
                     break
 
-            cite_position = len(running_par_text) + marker_offset
+            cite_position = len(running_par_text) + marker_offset + keyterm_offset
             cite_positions.setdefault(text, []).append(cite_position)
             cite_targets[text] = target
             running_par_text = ''
@@ -552,13 +559,9 @@ def build_terms_layer(root):
     for paragraph in paragraphs:
         content = paragraph.find('{eregs}content')
         terms = content.findall('.//{eregs}ref[@reftype="term"]')
-        # terms = sorted(terms, key=lambda term: len(term.text), reverse=True)
+        title = paragraph.find('{eregs}title')
         label = paragraph.get('label')
         marker = paragraph.get('marker') or ''
-        #if label == '1030-2-a-Interp-1':
-        #    import pdb
-        #    pdb.set_trace()
-        # par_text = (marker + ' ' + xml_node_text(content)).strip()
 
         if len(terms) > 0:
             terms_dict[label] = []
@@ -567,10 +570,14 @@ def build_terms_layer(root):
             marker_offset = len(marker + ' ')
         else:
             marker_offset = 0
+
+        if title is not None and title.get('type') == 'keyterm':
+            keyterm_offset = len(title.text)
+        else:
+            keyterm_offset = 0
+
         term_positions = OrderedDict()
         term_targets = OrderedDict()
-
-        #definitions = paragraph.find('{eregs}content').findall('{eregs}def')
 
         for term in terms:
             running_par_text = content.text or ''
@@ -583,21 +590,10 @@ def build_terms_layer(root):
 
             text = term.text
             target = term.get('target')
-            # print [(key, defn) for key, defn in definitions_dict.items()], target
             defn_location = [key for key, defn in definitions_dict.items() if defn['reference'] == target]
             if len(defn_location) > 0:
                 defn_location = defn_location[0]
-
-            # target = defn_location
-
-            # if inf_engine.singular_noun(text.lower()) and \
-            #         not text.lower() in settings.SPECIAL_SINGULAR_NOUNS:
-            #     target = inf_engine.singular_noun(text.lower()) + ':' + \
-            #         term.get('target')
-            # else:
-            #     target = text.lower() + ':' + term.get('target')
-
-                term_position = len(running_par_text) + marker_offset
+                term_position = len(running_par_text) + marker_offset + keyterm_offset
                 term_positions.setdefault(text, []).append(term_position)
                 term_targets[text] = defn_location
 
