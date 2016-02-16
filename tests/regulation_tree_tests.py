@@ -10,7 +10,9 @@ from regulation.tree import (build_reg_tree,
                              build_paragraph_marker_layer,
                              build_interp_layer,
                              build_analysis,
-                             build_notice)
+                             build_notice,
+                             build_formatting_layer,
+                             apply_formatting)
 from regulation.node import RegNode
 
 
@@ -54,7 +56,6 @@ class TreeTestCase(TestCase):
                 '1234-1': [{u'reference': '1234-1-Interp'}], 
                 '1234-1-A': [{u'reference': '1234-1-A-Interp'}], 
         }
-        print(dict(interp_dict))
         self.assertEqual(expected_result, interp_dict)
 
     def test_build_analysis(self):
@@ -181,4 +182,90 @@ class TreeTestCase(TestCase):
         result = reg_tree.height()
 
         self.assertEqual(result, 4)
+
+    def test_build_formatting_layer_variable(self):
+        tree = etree.fromstring("""
+        <section xmlns="eregs">
+          <paragraph label="foo">
+            <content>
+              <variable>Val<subscript>n</subscript></variable>
+            </content>
+          </paragraph>
+        </section>
+        """)
+        expected_result = {
+            'foo': [{
+                'locations': [0], 
+                'subscript_data': {
+                    'subscript': 'n', 
+                    'variable': 'Val'
+                }, 
+                'text': 'Val_{n}'
+            }]
+        }
+        result = build_formatting_layer(tree)
+        self.assertEqual(expected_result, result)
+
+    def test_apply_formatting_variable(self):
+        content = etree.fromstring("""
+        <content xmlns="eregs">
+          The variable <variable>Val<subscript>n</subscript></variable> means something.
+        </content>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        expected_result = etree.fromstring("""
+        <content xmlns="eregs">
+          The variable Val_{n} means something.
+        </content>
+        """,)
+        result = apply_formatting(content)
+        self.assertEqual(expected_result.text, result.text)
+
+    def test_build_formatting_layer_callout(self):
+        tree = etree.fromstring("""
+        <section xmlns="eregs">
+          <paragraph label="foo">
+            <content>
+              <callout type="note">
+                <line>Note:</line>
+                <line>Some notes</line>
+              </callout>
+            </content>
+          </paragraph>
+        </section>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        expected_result = {
+            'foo': [{
+                'fence_data': {
+                    'lines': [
+                        'Note:', 
+                        'Some notes'
+                    ], 
+                    'type': 'note'
+                }, 
+                'locations': [
+                    0
+                ], 
+                'text': 'Note:Some notes',
+            }]
+        }
+        result = build_formatting_layer(tree)
+        self.assertEqual(expected_result, result)
+
+    def test_apply_formatting_callout_note(self):
+        content = etree.fromstring("""
+        <content xmlns="eregs">
+          <callout type="note">
+            <line>Note:</line>
+            <line>Some notes</line>
+          </callout>
+        </content>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        expected_result = etree.fromstring("""
+        <content xmlns="eregs">
+          Note:Some notes
+        </content>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        result = apply_formatting(content)
+        self.assertEqual(expected_result.text.strip(), result.text)
+
 
