@@ -149,9 +149,9 @@ class TreeTestCase(TestCase):
         result = reg_tree.find_node(predicate)
 
         self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].string_label, '1234-1-p1')
+        self.assertEqual(result[0].string_label, '1234-1')
         self.assertEqual(result[0].text, "I'm an unmarked paragraph")
-        self.assertEqual(result[0].marker, "")
+        self.assertEqual(result[0].marker, None)
         self.assertEqual(result[1].string_label, '1234-1-a')
         self.assertEqual(result[1].text, "a I'm a marked paragraph")
         self.assertEqual(result[1].marker, "a")
