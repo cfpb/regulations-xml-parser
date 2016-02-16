@@ -306,10 +306,11 @@ def json_command(regulation_files, from_notices=[], check_terms=False):
 @cli.command()
 @click.argument('regulation_file')
 @click.argument('notice_file')
-def apply(regulation_file, notice_file):
+def apply_notice(regulation_file, notice_file):
     """ Apply notice changes """
     # Read the RegML starting point
     regulation_file = find_file(regulation_file)
+
     with open(regulation_file, 'r') as f:
         left_reg_xml = f.read()
     left_xml_tree = etree.fromstring(left_reg_xml)
@@ -334,6 +335,47 @@ def apply(regulation_file, notice_file):
     with open(new_path, 'w') as f:
         print("Writing regulation to {}".format(new_path))
         f.write(new_xml_string)
+
+
+# Given a regulation part number, version, and a set of notices
+# apply the notices to the regulation file in sequential order,
+# producing intermediate XML files along the way.
+@cli.command('apply-notices')
+@click.argument('cfr_part')
+@click.argument('version')
+@click.argument('notices', nargs=-1)
+def apply_notices(cfr_part, version, notices):
+    regulation_file = find_file(os.path.join(cfr_part, version))
+    with open(regulation_file, 'r') as f:
+        left_reg_xml = f.read()
+    left_xml_tree = etree.fromstring(left_reg_xml)
+
+    prev_notice = version
+    prev_tree = left_xml_tree
+    for notice in notices:
+        print('Applying notice {} to version {}'.format(notice, prev_notice))
+        notice_file = find_file(os.path.join(cfr_part, notice), is_notice=True)
+        with open(notice_file, 'r') as f:
+            notice_string = f.read()
+        notice_xml = etree.fromstring(notice_string)
+
+        # Process the notice changeset
+        new_xml_tree = process_changes(prev_tree, notice_xml)
+
+        # Write the new xml tree
+        new_xml_string = etree.tostring(new_xml_tree,
+                                        pretty_print=True,
+                                        xml_declaration=True,
+                                        encoding='UTF-8')
+        new_path = os.path.join(
+            os.path.dirname(regulation_file),
+            os.path.basename(notice_file))
+        with open(new_path, 'w') as f:
+            print("Writing regulation to {}".format(new_path))
+            f.write(new_xml_string)
+
+        prev_notice = notice
+        prev_tree = new_xml_tree
 
 
 @cli.command()

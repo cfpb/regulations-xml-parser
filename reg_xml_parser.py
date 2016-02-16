@@ -60,7 +60,11 @@ def write_layer(layer_object, reg_number, notice, layer_type):
               separators=(',', ':'))
 
 
-def parser_driver(regulation_file, check_terms=False, correct_interps=False, headerize_interps=False):
+def parser_driver(regulation_file,
+                  check_terms=False,
+                  correct_interps=False,
+                  headerize_interps=False,
+                  fix_missed_cites=False):
     with open(regulation_file, 'r') as f:
         reg_xml = f.read()
     xml_tree = etree.fromstring(reg_xml)
@@ -81,6 +85,8 @@ def parser_driver(regulation_file, check_terms=False, correct_interps=False, hea
         validator.insert_interp_markers(xml_tree, regulation_file)
     if headerize_interps:
         validator.headerize_interps(xml_tree, regulation_file)
+    if fix_missed_cites:
+        validator.fix_omitted_cites(xml_tree, regulation_file)
 
     paragraph_markers = build_paragraph_marker_layer(xml_tree)
     internal_citations = build_internal_citations_layer(xml_tree)
@@ -139,6 +145,7 @@ if __name__ == '__main__':
     parser.add_argument('--with-term-checks', nargs='?', default=False, type=bool)
     parser.add_argument('--correct-interp-markers', nargs='?', default=False, type=bool)
     parser.add_argument('--headerize-interps', nargs='?', default=False, type=bool)
+    parser.add_argument('--fix-missed-cites', nargs='?', default=False, type=bool)
 
     args = vars(parser.parse_args())
 
@@ -148,7 +155,8 @@ if __name__ == '__main__':
                 print('Parsing {}'.format(regfile))
                 parser_driver(regfile, args['with_term_checks'],
                               args['correct_interp_markers'],
-                              args['headerize_interps'])
+                              args['headerize_interps'],
+                              args['fix_missed_cites'])
 
     elif args['operation'] == 'compare':
         if args['regulation-files'] is not None:
