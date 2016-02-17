@@ -54,10 +54,13 @@ test_xml = """
 
               <interpretations label="1234-Interp">
                 <title>Supplement I to Part 1234&#8212;Official Interpretations</title>
-                <interpSection label="1234-Interp-h1">
+                <interpSection label="1234-1-Interp" target="1234-1">
                   <title>Introduction</title>
-                  <interpParagraph label="1234-Interp-h1-1" target="1013-h1-1">
+                  <interpParagraph label="1234-1-A-Interp" target="1234-1-A">
                     <content>Some interpretation content here.</content>
+                  </interpParagraph>
+                  <interpParagraph label="1234-1-A-Interp-1">
+                    <content>Interp paragraph without target.</content>
                   </interpParagraph>
                 </interpSection>
               </interpretations>

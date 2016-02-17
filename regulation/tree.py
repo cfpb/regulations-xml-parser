@@ -2,7 +2,9 @@
 
 from __future__ import unicode_literals
 
+from copy import deepcopy
 from collections import OrderedDict
+import string
 
 import inflect
 
@@ -63,17 +65,24 @@ def build_reg_tree(root, parent=None, depth=0):
         children = root.findall('{eregs}paragraph')
 
     elif tag == 'paragraph':
-
         title = root.find('{eregs}title')
-        content = root.find('{eregs}content')
+        content = apply_formatting(root.find('{eregs}content'))
         content_text = xml_node_text(content)
-        if title is not None and title.get('type') != 'keyterm':
-            node.title = title.text
+
+        if title is not None:
+            if title.get('type') != 'keyterm':
+                node.title = title.text
+            else:
+                # Keyterms are expected by reg-site to be included in
+                # the content text rather than the title of a node.
+                content_text = title.text + content_text
+
         node.marker = root.get('marker')
         if node.marker == 'none':
             marker = ''
         else:
             marker = node.marker
+
         node.label = root.get('label').split('-')
 
         graphic = content.find('{eregs}graphic')
@@ -81,9 +90,10 @@ def build_reg_tree(root, parent=None, depth=0):
             node.text = graphic.find('{eregs}text').text
         else:
             node.text = '{} {}'.format(marker, content_text).strip()
+
         node.node_type = parent.node_type
         node.mixed_text = xml_mixed_text(content)
-        node.source_xml = etree.tostring(root)
+        node.source_xml = etree.tostring(root, encoding='UTF-8')
 
         children = root.findall('{eregs}paragraph')
 
@@ -149,6 +159,7 @@ def build_reg_tree(root, parent=None, depth=0):
         content_text = xml_node_text(content)
         if title is not None:
             node.title = title.text
+
         node.marker = root.get('marker', '')
         if node.marker == 'none':
             node.marker = ''
@@ -156,7 +167,7 @@ def build_reg_tree(root, parent=None, depth=0):
         node.label = root.get('label').split('-')
         node.text = content_text
         node.node_type = 'interp'
-        node.source_xml = etree.tostring(root)
+        node.source_xml = etree.tostring(root, encoding='UTF-8')
 
         children = root.findall('{eregs}interpParagraph')
 
@@ -195,6 +206,8 @@ def build_internal_citations_layer(root):
 
     for paragraph in paragraphs:
         marker = paragraph.get('marker', '')
+        title = paragraph.find('{eregs}title')
+
         if marker == 'none' or marker is None:
             marker = ''
         par_text = (marker + ' ' + xml_node_text(
@@ -206,6 +219,11 @@ def build_internal_citations_layer(root):
             marker_offset = len(marker + ' ')
         else:
             marker_offset = 0
+
+        if title is not None and title.get('type') == 'keyterm':
+            keyterm_offset = len(title.text)
+        else:
+            keyterm_offset = 0
 
         cite_positions = OrderedDict()
         cite_targets = OrderedDict()
@@ -228,7 +246,7 @@ def build_internal_citations_layer(root):
                 else:
                     break
 
-            cite_position = len(running_par_text) + marker_offset
+            cite_position = len(running_par_text) + marker_offset + keyterm_offset
             cite_positions.setdefault(text, []).append(cite_position)
             cite_targets[text] = target
             running_par_text = ''
@@ -319,7 +337,10 @@ def build_formatting_layer(root):
         content = paragraph.find('{eregs}content')
         dashes = content.findall('.//{eregs}dash')
         tables = content.findall('.//{eregs}table')
+        variables = content.findall('.//{eregs}variable')
+        callouts = content.findall('.//{eregs}callout')
         label = paragraph.get('label')
+
         if len(dashes) > 0:
             layer_dict[label] = []
             for dash in dashes:
@@ -331,6 +352,43 @@ def build_formatting_layer(root):
                 dash_dict['dash_data'] = {'text': dash_text}
                 dash_dict['locations'] = [0]
                 layer_dict[label].append(dash_dict)
+
+        if len(variables) > 0:
+            if label not in layer_dict:
+                layer_dict[label] = []
+
+            for variable in variables:
+                subscript = variable.find('{eregs}subscript')
+                var_dict = OrderedDict()
+                var_dict['subscript_data'] = {
+                    'variable': variable.text,
+                    'subscript': subscript.text,
+                }
+                var_dict['locations'] = [0]
+                var_dict['text'] = '{var}_{{{sub}}}'.format(
+                        var=variable.text, sub=subscript.text)
+                layer_dict[label].append(var_dict)
+
+        if len(callouts) > 0:
+            if label not in layer_dict:
+                layer_dict[label] = []
+
+            for callout in callouts:
+                lines = callout.findall('{eregs}line')
+                callout_dict = OrderedDict()
+                callout_dict['fence_data'] = {
+                    'lines': [l.text for l in lines],
+                    'type': callout.get('type')
+                }
+                callout_dict['locations'] = [0]
+                if callout.get('type') == 'note':
+                    callout_dict['text'] = xml_node_text(callout).strip()
+                elif callout.get('type') == 'code':
+                    callout_dict['text'] = '```\n' + \
+                        '\n'.join([l.text for l in lines]) + \
+                        '```'
+                layer_dict[label].append(callout_dict)
+
         if len(tables) > 0:
             if label not in layer_dict:
                 layer_dict[label] = []
@@ -379,6 +437,61 @@ def build_formatting_layer(root):
                 layer_dict[label].append(table_dict)
 
     return layer_dict
+
+
+def apply_formatting(content_elm):
+    """ Certain formatting is expected of variables and callouts when
+        the formatting layer is applied. This function applies that
+        formatting to the content element of a paragraph. """
+    working_content = deepcopy(content_elm)
+
+    # Before building the content text, replace any variable 
+    # elements with Var_{sub} so that reg-site will know what to 
+    # do with them.
+    variables = working_content.findall('{eregs}variable') or []
+    for variable in variables:
+        # Note: lxml/etree API makes this a lot harder than it
+        # should be by use text/tail instead of text nodes.
+        subscript = variable.find('{eregs}subscript')
+        replacement_text = '{var}_{{{sub}}}'.format(
+            var=variable.text, sub=subscript.text)
+        if variable.tail is not None:
+            replacement_text += variable.tail
+
+        # If there's a previous node, simply append the text to its
+        # tail.
+        if variable.getprevious() is not None:
+            previous = variable.getprevious()
+            if previous.tail is None:
+                previous.tail = ''
+            previous.tail += replacement_text
+
+        # Otherwise, operate on the parent
+        else:
+            v_parent = variable.getparent()
+            if v_parent.text is None:
+                v_parent.text = ''
+            v_parent.text += replacement_text
+
+        # Remove the variable node
+        variable.getparent().remove(variable)
+
+    # Do the same for callouts
+    callouts = working_content.findall('.//{eregs}callout')
+    for callout in callouts:
+        lines = callout.findall('{eregs}line')
+        callout_text = xml_node_text(callout).strip()
+        # Callouts *should* be the only things within the content
+        # element of a paragraph. Assume that.
+        callout.getparent().remove(callout)
+        if callout.get('type') == 'note':
+            working_content.text = xml_node_text(callout).strip()
+        elif callout.get('type') == 'code':
+            working_content.text = '```\n' + \
+                        '\n'.join([l.text for l in lines]) + \
+                        '```'
+
+    return working_content
 
 
 def build_terms_layer(root):
@@ -431,13 +544,9 @@ def build_terms_layer(root):
     for paragraph in paragraphs:
         content = paragraph.find('{eregs}content')
         terms = content.findall('.//{eregs}ref[@reftype="term"]')
-        # terms = sorted(terms, key=lambda term: len(term.text), reverse=True)
+        title = paragraph.find('{eregs}title')
         label = paragraph.get('label')
         marker = paragraph.get('marker') or ''
-        #if label == '1030-2-a-Interp-1':
-        #    import pdb
-        #    pdb.set_trace()
-        # par_text = (marker + ' ' + xml_node_text(content)).strip()
 
         if len(terms) > 0:
             terms_dict[label] = []
@@ -446,10 +555,14 @@ def build_terms_layer(root):
             marker_offset = len(marker + ' ')
         else:
             marker_offset = 0
+
+        if title is not None and title.get('type') == 'keyterm':
+            keyterm_offset = len(title.text)
+        else:
+            keyterm_offset = 0
+
         term_positions = OrderedDict()
         term_targets = OrderedDict()
-
-        #definitions = paragraph.find('{eregs}content').findall('{eregs}def')
 
         for term in terms:
             running_par_text = content.text or ''
@@ -462,21 +575,10 @@ def build_terms_layer(root):
 
             text = term.text
             target = term.get('target')
-            # print [(key, defn) for key, defn in definitions_dict.items()], target
             defn_location = [key for key, defn in definitions_dict.items() if defn['reference'] == target]
             if len(defn_location) > 0:
                 defn_location = defn_location[0]
-
-            # target = defn_location
-
-            # if inf_engine.singular_noun(text.lower()) and \
-            #         not text.lower() in settings.SPECIAL_SINGULAR_NOUNS:
-            #     target = inf_engine.singular_noun(text.lower()) + ':' + \
-            #         term.get('target')
-            # else:
-            #     target = text.lower() + ':' + term.get('target')
-
-                term_position = len(running_par_text) + marker_offset
+                term_position = len(running_par_text) + marker_offset + keyterm_offset
                 term_positions.setdefault(text, []).append(term_position)
                 term_targets[text] = defn_location
 
@@ -640,13 +742,19 @@ def build_interp_layer(root):
         first_label = interpretations.get('label')
         first_key = first_label.split('-')[0]
         layer_dict[first_key] = [{'reference': first_label}]
+
+        interp_sections = interpretations.findall(
+            './/{eregs}interpSection')
         interp_paragraphs = interpretations.findall(
             './/{eregs}interpParagraph')
-        for paragraph in interp_paragraphs:
-            target = paragraph.get('target')
-            if target:
-                label = paragraph.get('label')
-                layer_dict[target] = [{'reference': label}]
+        targetted_interps = [i for i in 
+            interp_sections + interp_paragraphs
+            if i.get('target') is not None]
+
+        for interp in targetted_interps:
+            target = interp.get('target')
+            label = interp.get('label')
+            layer_dict[target] = [{'reference': label}]
 
     return layer_dict
 
