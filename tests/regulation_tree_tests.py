@@ -272,7 +272,7 @@ class TreeTestCase(TestCase):
         tree = etree.fromstring("""
         <section label="foo" xmlns="eregs">
           <subject>Some Subject</subject>
-          <paragraph label="foo-p1" marker="none">
+          <paragraph label="foo-p1" marker="">
             <content>
               An unmarked intro paragraph.
             </content>
