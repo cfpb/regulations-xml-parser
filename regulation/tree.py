@@ -228,7 +228,7 @@ def build_internal_citations_layer(root):
         cite_positions = OrderedDict()
         cite_targets = OrderedDict()
 
-        content = paragraph.find('{eregs}content')
+        content = apply_formatting(paragraph.find('{eregs}content'))
         cites = content.findall('{eregs}ref[@reftype="internal"]')
         citation_list = []
         for cite in cites:
@@ -517,7 +517,7 @@ def build_terms_layer(root):
     for paragraph in paragraphs_with_defs:
         label = paragraph.get('label')
         marker = paragraph.get('marker') or ''
-        content = paragraph.find('{eregs}content')
+        content = apply_formatting(paragraph.find('{eregs}content'))
         par_text = (marker + ' ' + xml_node_text(content)).strip()
         definitions = content.findall('{eregs}def')
 
@@ -543,7 +543,7 @@ def build_terms_layer(root):
                 definitions_dict[key] = def_dict
 
     for paragraph in paragraphs:
-        content = paragraph.find('{eregs}content')
+        content = apply_formatting(paragraph.find('{eregs}content'))
         terms = content.findall('.//{eregs}ref[@reftype="term"]')
         title = paragraph.find('{eregs}title')
         label = paragraph.get('label')
