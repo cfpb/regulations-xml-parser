@@ -850,6 +850,14 @@ def build_notice(root):
                         'paragraph': len(paragraphs),
                         'reference': p_child_elm.attrib['ref']
                     })
+                # TODO: for the moment we are reduced to inlining analysis
+                # TODO: as <img> elements. In our bold new future where layers
+                # TODO: are abolished, this should be fixed to properly embed
+                # TODO: graphics in analysis
+                elif p_child_elm.tag == '{eregs}graphic':
+                    url = p_child_elm.find('{eregs}url').text
+                    inline_img = '<img src="{}">'.format(url)
+                    paragraph_text += '\n' + inline_img + '\n'
 
                 # Append the footnote 'tail' to the paragraph text
                 tail = p_child_elm.tail or ''
