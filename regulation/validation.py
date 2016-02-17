@@ -373,6 +373,87 @@ class EregsValidator:
 
         self.events.append(event)
 
+    def fix_omitted_cites(self, tree, regulation_file):
+        """
+        Try a simple fix to pick up internal citations that have been missed by regparser.
+        There's no complicated grammar parsing going on here, just stupid regexing.
+        :param tree: the xml tree
+        :return:
+        """
+        paragraphs = tree.findall('.//{eregs}paragraph') + tree.findall('.//{eregs}interpParagraph')
+        pattern = re.compile('([0-9]{4}\.([0-9]+)(\(([a-zA-Z]|[0-9])+\))+)')
+        ignore = set()
+        always = set()
+        problem_flag = False
+
+        def marker_to_target(marker_string):
+            marker = marker_string.replace('.', '-')
+            marker = marker.replace(')(', '-')
+            marker = marker.replace('(', '-')
+            marker = marker.replace(')', '')
+            # marker = marker[:-1]
+            return marker
+
+        for paragraph in paragraphs:
+            content = paragraph.find('{eregs}content')
+            par_text = etree.tostring(content)
+            matches = set([match[0] for match in pattern.findall(par_text)])
+            label = paragraph.get('label')
+            offsets_and_values = []
+
+            # if matches != set([]):
+            #     import ipdb; ipdb.set_trace()
+
+            for match in matches:
+                locations = set(find_all_occurrences(par_text, match))
+                input_state = None
+                for loc in locations:
+                    if not enclosed_in_tag(par_text, 'ref', loc):
+                        highlighted_par = colored(par_text[0:loc], 'yellow') + \
+                                          colored(match, 'red') + \
+                                          colored(par_text[loc + len(match):], 'yellow')
+
+                        msg = colored('You appear to have used a reference to "{}" in {} without tagging it: \n'.format(
+                              match, label), 'yellow') + \
+                              '{}\n'.format(highlighted_par) + \
+                              colored('Would you like the automatically fix this reference in the source?', 'yellow')
+                        print(msg)
+                        if match not in always:
+                            while input_state not in ['y', 'n', 'i', 'a']:
+                                input_state = raw_input('(y)es/(n)o/(i)gnore this reference/(a)lways correct: ')
+
+                            if input_state in ['y', 'a'] or match in always:
+                                problem_flag = True
+                                ref = '<ref target="{}" reftype="internal">{}</ref>'.format(
+                                    marker_to_target(match), match)
+                                offsets_and_values.append((ref, [loc, loc + len(match)]))
+                                if input_state == 'a':
+                                    always.add(match)
+
+                            elif input_state == 'i':
+                                ignore.add(match)
+
+                            input_state = None
+
+            if offsets_and_values != []:
+                offsets_and_values = sorted(offsets_and_values, key=lambda x: x[1][0])
+                values, offsets = zip(*offsets_and_values)
+                new_par_text = interpolate_string(par_text, offsets, values)
+                highlight = interpolate_string(par_text, offsets, values, colorize=True)
+                new_content = etree.fromstring(new_par_text)
+                paragraph.replace(content, new_content)
+                print(highlight)
+
+        if problem_flag:
+            print(colored('The tree has been altered! Do you want to write the result to disk?'))
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('Save? y/n: ')
+            if answer == 'y':
+                with open(regulation_file, 'w') as f:
+                    f.write(etree.tostring(tree, pretty_print=True))
+
+
     def headerize_interps(self, tree, regulation_file):
         paragraphs = tree.findall('.//{eregs}interpParagraph')
         change_flag = False
@@ -433,3 +514,129 @@ class EregsValidator:
             if error.severity != Severity.OK:
                 return False
         return True
+
+    def validate_interp_targets(self, tree, regulation_file, label=None):
+        """ Validate interpretation targets within a given label with
+            the option to write corrected targets out to the
+            regulation_file. """
+            
+        problem_flag = False
+
+        # Pick out our working section of the tree. If no label was
+        # given, we're working on the interpretations node in the tree.
+        if label is not None:
+            working_section = tree.find(
+                    './/*[@label="{}"]'.format(label))
+            if working_section.tag not in (
+                    '{eregs}interpretations',
+                    '{eregs}interpSection', 
+                    '{eregs}interpParagraph'):
+                print("{} is not a part of an interpretation".format(
+                    label))
+                return 
+        else:
+            working_section = tree.find('.//{eregs}interpretations')
+
+        # Find all paragraphs with a target attribute
+        paragraphs = working_section.findall(
+                './/{eregs}interpParagraph[@target]')
+
+        for paragraph in paragraphs:
+            target = paragraph.get('target')
+            label = paragraph.get('label')
+            
+            # If the label doesn't end with '-Interp' it shouldn't have
+            # a target.
+            if not label.endswith('-Interp') and target is not None:
+                problem_flag = True
+                print(colored('Removing bad target {} in {}'.format(
+                        target, label), 'yellow'))
+                del paragraph.attrib['target']
+                continue
+
+            # Break down the label and figure out the paragraph the
+            # paragraph should be assigned to. If it doesn't match the
+            # target, it's a bad target.
+            label_target = label[:label.find('-Interp')]
+            if label_target != target:
+                problem_flag = True
+                print(colored('Fixing bad target {} in {}'.format(
+                        target, label), 'yellow'))
+                paragraph.set('target', label_target)
+                continue
+
+            print(colored('Leaving good target {} in {}'.format(
+                    target, label), 'green'))
+
+        if problem_flag:
+            print(colored('The tree has been altered! Do you want to' 
+                'write the result to disk?', 'red'))
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('Save? y/n: ')
+            if answer == 'y':
+                with open(regulation_file, 'w') as f:
+                    f.write(etree.tostring(tree, pretty_print=True))
+
+    def validate_interp_targets(self, tree, regulation_file, label=None):
+        """ Validate interpretation targets within a given label with
+            the option to write corrected targets out to the
+            regulation_file. """
+            
+        problem_flag = False
+
+        # Pick out our working section of the tree. If no label was
+        # given, we're working on the interpretations node in the tree.
+        if label is not None:
+            working_section = tree.find(
+                    './/*[@label="{}"]'.format(label))
+            if working_section.tag not in (
+                    '{eregs}interpretations',
+                    '{eregs}interpSection', 
+                    '{eregs}interpParagraph'):
+                print("{} is not a part of an interpretation".format(
+                    label))
+                return 
+        else:
+            working_section = tree.find('.//{eregs}interpretations')
+
+        # Find all paragraphs with a target attribute
+        paragraphs = working_section.findall(
+                './/{eregs}interpParagraph[@target]')
+
+        for paragraph in paragraphs:
+            target = paragraph.get('target')
+            label = paragraph.get('label')
+            
+            # If the label doesn't end with '-Interp' it shouldn't have
+            # a target.
+            if not label.endswith('-Interp') and target is not None:
+                problem_flag = True
+                print(colored('Removing bad target {} in {}'.format(
+                        target, label), 'yellow'))
+                del paragraph.attrib['target']
+                continue
+
+            # Break down the label and figure out the paragraph the
+            # paragraph should be assigned to. If it doesn't match the
+            # target, it's a bad target.
+            label_target = label[:label.find('-Interp')]
+            if label_target != target:
+                problem_flag = True
+                print(colored('Fixing bad target {} in {}'.format(
+                        target, label), 'yellow'))
+                paragraph.set('target', label_target)
+                continue
+
+            print(colored('Leaving good target {} in {}'.format(
+                    target, label), 'green'))
+
+        if problem_flag:
+            print(colored('The tree has been altered! Do you want to' 
+                'write the result to disk?', 'red'))
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('Save? y/n: ')
+            if answer == 'y':
+                with open(regulation_file, 'w') as f:
+                    f.write(etree.tostring(tree, pretty_print=True))
