@@ -71,7 +71,7 @@ def build_reg_tree(root, parent=None, depth=0):
             # if it doesn't have a title, doesn't have a marker, and
             # doesn't have children, it is an intro paragraph.
             if first_child.find('{eregs}title') is None and \
-                    first_child.get('marker') in ('', 'none') and \
+                    first_child.get('marker') == '' and \
                     len(first_child.findall('{eregs}paragraph')) == 0:
                 content = xml_node_text(first_child.find('{eregs}content'))
                 node.text = content.strip()
@@ -229,6 +229,13 @@ def build_internal_citations_layer(root):
             paragraph.find('{eregs}content'))).strip()
 
         par_label = paragraph.get('label')
+        if paragraph.getparent().tag == '{eregs}section' and \
+                paragraph.find('{eregs}title') is None and \
+                paragraph.get('marker') == '' and \
+                len(paragraph.findall('{eregs}paragraph')) == 0:
+            # This paragraph will get attached to its parent node by
+            # build_reg_text
+            par_label = paragraph.getparent().get('label')
 
         if marker != '' and paragraph.tag != '{eregs}interpParagraph':
             marker_offset = len(marker + ' ')
@@ -560,8 +567,16 @@ def build_terms_layer(root):
         content = paragraph.find('{eregs}content')
         terms = content.findall('.//{eregs}ref[@reftype="term"]')
         title = paragraph.find('{eregs}title')
-        label = paragraph.get('label')
         marker = paragraph.get('marker') or ''
+
+        label = paragraph.get('label')
+        if paragraph.getparent().tag == '{eregs}section' and \
+                paragraph.find('{eregs}title') is None and \
+                paragraph.get('marker') == '' and \
+                len(paragraph.findall('{eregs}paragraph')) == 0:
+            # This paragraph will get attached to its parent node by
+            # build_reg_text
+            label = paragraph.getparent().get('label')
 
         if len(terms) > 0:
             terms_dict[label] = []
@@ -607,8 +622,6 @@ def build_terms_layer(root):
             if len(ref_dict['offsets']) > 0 and \
                     ref_dict not in terms_dict[label]:
                 terms_dict[label].append(ref_dict)
-
-
 
     terms_dict['referenced'] = definitions_dict
 
