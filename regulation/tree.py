@@ -220,7 +220,12 @@ def build_internal_citations_layer(root):
         else:
             marker_offset = 0
 
-        if title is not None and title.get('type') == 'keyterm':
+        # Keyterm offset.
+        # Note: reg-site treats interp-paragraphs as "special" — they
+        # don't get the keyterm text included, so we don't include an
+        # offset here.
+        if title is not None and title.get('type') == 'keyterm' and \
+                paragraph.tag != '{eregs}interpParagraph':
             keyterm_offset = len(title.text)
         else:
             keyterm_offset = 0
@@ -556,7 +561,12 @@ def build_terms_layer(root):
         else:
             marker_offset = 0
 
-        if title is not None and title.get('type') == 'keyterm':
+        # Keyterm offset.
+        # Note: reg-site treats interp-paragraphs as "special" — they
+        # don't get the keyterm text included, so we don't include an
+        # offset here.
+        if title is not None and title.get('type') == 'keyterm' and \
+                paragraph.tag != '{eregs}interpParagraph':
             keyterm_offset = len(title.text)
         else:
             keyterm_offset = 0
@@ -592,8 +602,6 @@ def build_terms_layer(root):
             if len(ref_dict['offsets']) > 0 and \
                     ref_dict not in terms_dict[label]:
                 terms_dict[label].append(ref_dict)
-
-
 
     terms_dict['referenced'] = definitions_dict
 
