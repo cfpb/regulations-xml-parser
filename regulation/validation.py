@@ -253,11 +253,13 @@ class EregsValidator:
             try:
                 reference = next((defn['reference'] for key, defn in
                     definitions.items() if defn['term'] == term))
+                print(reference)
             except StopIteration:
                 print(colored("{} is not a defined term".format(term),
                     'red'))
                 return
-            terms = set([(term, term[0].upper() + term[1:], reference)])
+            terms = set([(term, reference), 
+                         (term[0].upper() + term[1:], reference)])
 
         # Pick out our working section of the tree. If no label was
         # given, it *is* the tree.
@@ -306,6 +308,7 @@ class EregsValidator:
                                         input_state = raw_input('(y)es/(n)o/(i)gnore this term/(a)lways correct: ')
 
                                 if input_state in ['y', 'a'] or term[0] in always:
+                                    import pdb; pdb.set_trace()
                                     problem_flag = True
                                     ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[1], term_to_use)
                                     offsets_and_values.append((ref, [term_loc, term_loc + len(term_to_use)]))
