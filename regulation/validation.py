@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
+from __future__ import unicode_literals
 
 import copy
 from enum import Enum
@@ -272,7 +273,8 @@ class EregsValidator:
 
         for paragraph in paragraphs:
             content = paragraph.find('.//{eregs}content')
-            par_text = etree.tostring(content, encoding='UTF-8')
+            par_text = unicode(etree.tostring(content,
+                encoding='UTF-8'))
             label = paragraph.get('label')
             offsets_and_values = []
 
