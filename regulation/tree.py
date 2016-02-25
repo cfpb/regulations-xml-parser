@@ -170,7 +170,7 @@ def build_reg_tree(root, parent=None, depth=0):
     elif tag == 'interpParagraph':
 
         title = root.find('{eregs}title')
-        content = root.find('{eregs}content')
+        content = apply_formatting(root.find('{eregs}content'))
         content_text = xml_node_text(content)
         if title is not None:
             node.title = title.text
@@ -255,7 +255,7 @@ def build_internal_citations_layer(root):
         cite_positions = OrderedDict()
         cite_targets = OrderedDict()
 
-        content = paragraph.find('{eregs}content')
+        content = apply_formatting(paragraph.find('{eregs}content'))
         cites = content.findall('{eregs}ref[@reftype="internal"]')
         citation_list = []
         for cite in cites:
@@ -358,7 +358,8 @@ def build_graphics_layer(root):
 def build_formatting_layer(root):
 
     layer_dict = OrderedDict()
-    paragraphs = root.findall('.//{eregs}paragraph')
+    paragraphs = root.findall('.//{eregs}paragraph') + \
+        root.findall('.//{eregs}interpParagraph')
 
     for paragraph in paragraphs:
         content = paragraph.find('{eregs}content')
@@ -543,7 +544,7 @@ def build_terms_layer(root):
     for paragraph in paragraphs_with_defs:
         label = paragraph.get('label')
         marker = paragraph.get('marker') or ''
-        content = paragraph.find('{eregs}content')
+        content = apply_formatting(paragraph.find('{eregs}content'))
         par_text = (marker + ' ' + xml_node_text(content)).strip()
         definitions = content.findall('{eregs}def')
 
@@ -569,7 +570,7 @@ def build_terms_layer(root):
                 definitions_dict[key] = def_dict
 
     for paragraph in paragraphs:
-        content = paragraph.find('{eregs}content')
+        content = apply_formatting(paragraph.find('{eregs}content'))
         terms = content.findall('.//{eregs}ref[@reftype="term"]')
         title = paragraph.find('{eregs}title')
         marker = paragraph.get('marker') or ''
