@@ -423,7 +423,8 @@ def ecfr(title, file, act_title, act_section,
                                      layer_cache)
 
     # Do the first version
-    print("Version %s", builder.doc_number)
+    last_version = builder.doc_number
+    print("Version {}".format(last_version))
     if (only_notice is not None and builder.doc_number == only_notice) \
             or only_notice is None:
         if not without_versions:
@@ -432,7 +433,7 @@ def ecfr(title, file, act_title, act_section,
     for last_notice, old, new_tree, notices in builder.revision_generator(
             reg_tree):
         version = last_notice['document_number']
-        print("Version", version)
+        print("Version {}".format(version))
         builder.doc_number = version
         layers = builder.generate_layers(new_tree,
                                          [act_title, act_section],
@@ -446,9 +447,11 @@ def ecfr(title, file, act_title, act_section,
                 builder.write_notice(version,
                                      old_tree=old,
                                      reg_tree=new_tree,
-                                     layers=layers)
+                                     layers=layers,
+                                     last_version=last_version)
         layer_cache.invalidate_by_notice(last_notice)
         layer_cache.replace_using(new_tree)
+        last_version = version
         del last_notice, old, new_tree, notices     # free some memory
 
 
