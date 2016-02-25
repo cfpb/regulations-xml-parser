@@ -225,7 +225,8 @@ def validate(file, no_terms=False, no_citations=False, no_keyterms=False):
 @cli.command('check-terms')
 @click.argument('file')
 @click.option('--label')
-def check_terms(file, label=None):
+@click.option('--term')
+def check_terms(file, label=None, term=None):
     """ Check the terms in a RegML file """
 
     file = find_file(file)
@@ -243,7 +244,7 @@ def check_terms(file, label=None):
     terms = build_terms_layer(xml_tree)
     validator.validate_terms(xml_tree, terms)
     validator.validate_term_references(xml_tree, terms, file,
-            label=label)
+            label=label, term=term)
 
 
 @cli.command()

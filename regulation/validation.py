@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
+from __future__ import unicode_literals
 
 import copy
 from enum import Enum
@@ -235,18 +236,29 @@ class EregsValidator:
         self.events.append(event)
 
     def validate_term_references(self, tree, terms_layer,
-            regulation_file, label=None):
+            regulation_file, label=None, term=None):
         """ Validate term references. If label is given, only validate
-            term references within that label. """
+            term references within that label. If term is given, only
+            validate references to that term. """
 
         problem_flag = False
         inf = inflect.engine()
 
         definitions = terms_layer['referenced']
-        terms = set([(defn['term'], defn['reference']) for key, defn in definitions.iteritems()])
+        terms = set([(defn['term'], defn['reference']) for key, defn in definitions.items()])
         cap_terms = set([(defn['term'][0].upper() + defn['term'][1:], defn['reference'])
                      for key, defn in definitions.iteritems()])
         terms = terms | cap_terms
+        if term is not None:
+            try:
+                reference = next((defn['reference'] for key, defn in
+                    definitions.items() if defn['term'] == term))
+            except StopIteration:
+                print(colored("{} is not a defined term".format(term),
+                    'red'))
+                return
+            terms = set([(term, reference), 
+                         (term[0].upper() + term[1:], reference)])
 
         # Pick out our working section of the tree. If no label was
         # given, it *is* the tree.
@@ -262,7 +274,8 @@ class EregsValidator:
 
         for paragraph in paragraphs:
             content = paragraph.find('.//{eregs}content')
-            par_text = etree.tostring(content, encoding='UTF-8')
+            par_text = unicode(etree.tostring(content,
+                encoding='UTF-8'))
             label = paragraph.get('label')
             offsets_and_values = []
 
