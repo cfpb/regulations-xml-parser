@@ -56,13 +56,26 @@ def build_reg_tree(root, parent=None, depth=0):
 
     elif tag == 'section' and root.attrib != {}:
         subject = root.find(ns_prefix + 'subject')
-        # print root, parent.node_type, subject.text
         label = root.get('label').split('-')
         node.title = subject.text
         node.node_type = 'regtext'
         node.label = label
 
         children = root.findall('{eregs}paragraph')
+
+        # Check to see if the first child is an unmarked intro
+        # paragraph. Reg-site expects those to be be the 'text' of this
+        # node rather than child nodes in their own right.
+        if len(children) > 0:
+            first_child = children[0]
+            # if it doesn't have a title, doesn't have a marker, and
+            # doesn't have children, it is an intro paragraph.
+            if first_child.find('{eregs}title') is None and \
+                    first_child.get('marker') == '' and \
+                    len(first_child.findall('{eregs}paragraph')) == 0:
+                content = xml_node_text(first_child.find('{eregs}content'))
+                node.text = content.strip()
+                del children[0]
 
     elif tag == 'paragraph':
         title = root.find('{eregs}title')
@@ -96,6 +109,8 @@ def build_reg_tree(root, parent=None, depth=0):
         node.source_xml = etree.tostring(root, encoding='UTF-8')
 
         children = root.findall('{eregs}paragraph')
+
+        # If the title, 
 
     elif tag == 'appendix':
 
@@ -214,13 +229,25 @@ def build_internal_citations_layer(root):
             paragraph.find('{eregs}content'))).strip()
 
         par_label = paragraph.get('label')
+        if paragraph.getparent().tag == '{eregs}section' and \
+                paragraph.find('{eregs}title') is None and \
+                paragraph.get('marker') == '' and \
+                len(paragraph.findall('{eregs}paragraph')) == 0:
+            # This paragraph will get attached to its parent node by
+            # build_reg_text
+            par_label = paragraph.getparent().get('label')
 
         if marker != '' and paragraph.tag != '{eregs}interpParagraph':
             marker_offset = len(marker + ' ')
         else:
             marker_offset = 0
 
-        if title is not None and title.get('type') == 'keyterm':
+        # Keyterm offset.
+        # Note: reg-site treats interp-paragraphs as "special" — they
+        # don't get the keyterm text included, so we don't include an
+        # offset here.
+        if title is not None and title.get('type') == 'keyterm' and \
+                paragraph.tag != '{eregs}interpParagraph':
             keyterm_offset = len(title.text)
         else:
             keyterm_offset = 0
@@ -545,8 +572,16 @@ def build_terms_layer(root):
         content = paragraph.find('{eregs}content')
         terms = content.findall('.//{eregs}ref[@reftype="term"]')
         title = paragraph.find('{eregs}title')
-        label = paragraph.get('label')
         marker = paragraph.get('marker') or ''
+
+        label = paragraph.get('label')
+        if paragraph.getparent().tag == '{eregs}section' and \
+                paragraph.find('{eregs}title') is None and \
+                paragraph.get('marker') == '' and \
+                len(paragraph.findall('{eregs}paragraph')) == 0:
+            # This paragraph will get attached to its parent node by
+            # build_reg_text
+            label = paragraph.getparent().get('label')
 
         if len(terms) > 0:
             terms_dict[label] = []
@@ -556,7 +591,12 @@ def build_terms_layer(root):
         else:
             marker_offset = 0
 
-        if title is not None and title.get('type') == 'keyterm':
+        # Keyterm offset.
+        # Note: reg-site treats interp-paragraphs as "special" — they
+        # don't get the keyterm text included, so we don't include an
+        # offset here.
+        if title is not None and title.get('type') == 'keyterm' and \
+                paragraph.tag != '{eregs}interpParagraph':
             keyterm_offset = len(title.text)
         else:
             keyterm_offset = 0
@@ -592,8 +632,6 @@ def build_terms_layer(root):
             if len(ref_dict['offsets']) > 0 and \
                     ref_dict not in terms_dict[label]:
                 terms_dict[label].append(ref_dict)
-
-
 
     terms_dict['referenced'] = definitions_dict
 
