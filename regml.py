@@ -379,20 +379,6 @@ def apply_notices(cfr_part, version, notices):
         prev_tree = new_xml_tree
 
 
-@cli.command()
-@click.argument('title')
-@click.argument('part')
-def versions(title, part):
-    """ List notices for regulation title/part """
-    notices = fetch_notice_json(title, part, only_final=True)
-    doc_numbers = [n['document_number'] for n in notices]
-    for n in notices:
-        print(n['document_number'], n['effective_on'])
-
-    # for number in doc_numbers:
-    #     print(number)
-
-
 # eCFR Convenience Commands ############################################
 
 # Wrap the eCFR parser as a library for the purposes of our workflow
