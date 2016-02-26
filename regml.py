@@ -416,7 +416,7 @@ def versions(title, part, from_fr=False, from_regml=True):
             './{eregs}changeset').get('leftDocumentNumber')
         regml_notices.append((doc_number, effective_date, applies_to))
 
-    regml_notices.sort(key=lambda n: n[2])
+    regml_notices.sort(key=lambda n: n[1])
     for notice in regml_notices:
         print("\t", notice[0])
         print("\t\teffective on", notice[1])
