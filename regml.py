@@ -340,6 +340,35 @@ def apply_notice(regulation_file, notice_file):
         f.write(new_xml_string)
 
 
+# Given a notice, apply it to a previous RegML regulation verson to
+# generate a new version in RegML.
+@cli.command('notice-changes')
+@click.argument('notice_file')
+def notice_changes(notice_file):
+    """ List changes in a given notice file """
+    # Read the notice file
+    notice_file = find_file(notice_file, is_notice=True)
+    with open(notice_file, 'r') as f:
+        notice_string = f.read()
+    notice_xml = etree.fromstring(notice_string)
+    doc_number = notice_xml.find(
+            './{eregs}preamble/{eregs}documentNumber').text
+
+    print(colored("{} makes the following changes:".format(doc_number), 
+                  attrs=['bold']))
+
+    changes = notice_xml.findall('./{eregs}changeset/{eregs}change')
+    for change in changes:
+        label = change.get('label')
+        op = change.get('operation')
+        if op == 'added':
+            print('\t', colored(op, 'green'), label)
+        if op == 'modified':
+            print('\t', colored(op, 'yellow'), label)
+        if op == 'deleted':
+            print('\t', colored(op, 'red'), label)
+
+
 # Given a regulation part number, version, and a set of notices
 # apply the notices to the regulation file in sequential order,
 # producing intermediate XML files along the way.
