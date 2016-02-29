@@ -4,12 +4,14 @@
 """
 from __future__ import print_function
 
+import glob
 import json
 import os
 import sys
 
 import click
 from lxml import etree
+from termcolor import colored, cprint
 
 from regulation.validation import EregsValidator
 import regulation.settings as settings
@@ -304,7 +306,7 @@ def json_command(regulation_files, from_notices=[], check_terms=False):
 
 # Given a notice, apply it to a previous RegML regulation verson to
 # generate a new version in RegML.
-@cli.command()
+@cli.command('apply-notice')
 @click.argument('regulation_file')
 @click.argument('notice_file')
 def apply_notice(regulation_file, notice_file):
@@ -382,15 +384,55 @@ def apply_notices(cfr_part, version, notices):
 @cli.command()
 @click.argument('title')
 @click.argument('part')
-def versions(title, part):
+@click.option('--from-fr', is_flag=True,
+              help="check for notices in the Federal Register")
+def versions(title, part, from_fr=False, from_regml=True):
     """ List notices for regulation title/part """
-    notices = fetch_notice_json(title, part, only_final=True)
-    doc_numbers = [n['document_number'] for n in notices]
-    for n in notices:
-        print(n['document_number'], n['effective_on'])
 
-    # for number in doc_numbers:
-    #     print(number)
+    if from_fr:
+        # Get notices from the FR
+        fr_notices = fetch_notice_json(title, part, only_final=True)
+        print(colored("The Federal Register reports the following "
+                      "final notices:", attrs=['bold']))
+        for notice in fr_notices:
+            print("\t", notice['document_number'])
+            print("\t\tinitially effective on", notice['effective_on'])
+
+    # Look for locally available notices
+    regml_notice_dir = os.path.join(settings.XML_ROOT, 'notice', part, '*.xml')
+    regml_notice_files = glob.glob(regml_notice_dir)
+    # regml_notice_files = os.listdir(regml_notice_dir)
+    print(colored("RegML Notices are available for:", attrs=['bold']))
+    regml_notices = []
+    for notice_file in regml_notice_files:
+        with open(os.path.join(notice_file), 'r') as f:
+            notice_xml = f.read()
+        xml_tree = etree.fromstring(notice_xml)
+        doc_number = xml_tree.find(
+            './{eregs}preamble/{eregs}documentNumber').text
+        effective_date = xml_tree.find(
+            './{eregs}preamble/{eregs}effectiveDate').text
+        applies_to = xml_tree.find(
+            './{eregs}changeset').get('leftDocumentNumber')
+        regml_notices.append((doc_number, effective_date, applies_to))
+
+    regml_notices.sort(key=lambda n: n[1])
+    for notice in regml_notices:
+        print("\t", notice[0])
+        print("\t\teffective on", notice[1])
+        print("\t\tapplies to", notice[2])
+
+        # Verify that there's a logical sequence of applies_to
+        index = regml_notices.index(notice)
+        if index == 0:
+            continue
+
+        previous_notice = regml_notices[regml_notices.index(notice)-1]
+        if previous_notice[0] != notice[2]:
+            print(colored("\t\tWarning: {} does not apply to "
+                          "previous notice {}".format(
+                                notice[0], 
+                                previous_notice[0]), 'yellow'))
 
 
 # eCFR Convenience Commands ############################################
