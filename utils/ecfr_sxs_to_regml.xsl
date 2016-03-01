@@ -5,8 +5,8 @@
         analysis to a RegML <analysis> element. 
 
         This stylesheet assumes the input file to be transformed has 
-        one top-level element and only contains eCFR XML for the 
-        section-by-section anlaysis only.
+        one top-level element and ONLY contains eCFR XML for the 
+        section-by-section anlaysis.
 
         SxS should look something like this:
 
