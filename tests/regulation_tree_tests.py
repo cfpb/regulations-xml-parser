@@ -149,9 +149,9 @@ class TreeTestCase(TestCase):
         result = reg_tree.find_node(predicate)
 
         self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].string_label, '1234-1-p1')
+        self.assertEqual(result[0].string_label, '1234-1')
         self.assertEqual(result[0].text, "I'm an unmarked paragraph")
-        self.assertEqual(result[0].marker, "")
+        self.assertEqual(result[0].marker, None)
         self.assertEqual(result[1].string_label, '1234-1-a')
         self.assertEqual(result[1].text, "a I'm a marked paragraph")
         self.assertEqual(result[1].marker, "a")
@@ -268,4 +268,40 @@ class TreeTestCase(TestCase):
         result = apply_formatting(content)
         self.assertEqual(expected_result.text.strip(), result.text)
 
+    def test_build_reg_tree_intro_para(self):
+        tree = etree.fromstring("""
+        <section label="foo" xmlns="eregs">
+          <subject>Some Subject</subject>
+          <paragraph label="foo-p1" marker="">
+            <content>
+              An unmarked intro paragraph.
+            </content>
+          </paragraph>
+          <paragraph label="foo-a" marker="a">
+            <content>A marked paragraph</content>
+          </paragraph>
+        </section>
+        """)
+        expected_result = {
+            'children': [
+                {
+                    'children': [], 
+                    'label': [
+                        'foo', 
+                        'a'
+                    ], 
+                    'node_type': 'regtext', 
+                    'text': 'a A marked paragraph', 
+                    'marker': 'a'
+                }
+            ], 
+            'label': [
+                'foo'
+            ], 
+            'node_type': 'regtext', 
+            'text': 'An unmarked intro paragraph.', 
+            'title': 'Some Subject'
+        }
+        result = build_reg_tree(tree)
+        self.assertEqual(expected_result, result.to_json())
 
