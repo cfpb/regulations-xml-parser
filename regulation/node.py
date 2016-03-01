@@ -9,8 +9,13 @@ import re
 import json
 import hashlib
 
-class RegNode:
 
+class RegNode:
+    """
+    The RegNode class represents a regular text node in a regulation.
+    It provides for some convenience functions for manipulating the
+    tree hierarchy if necessary.
+    """
     def __init__(self, **kwargs):
         self.label = []
         self.marker = None
@@ -33,6 +38,11 @@ class RegNode:
             self.include_children = False
 
     def to_json(self):
+        """
+        Convert yourself, and possibly all your children, into JSON.
+        :return: A dict representing the node, suitable for direct
+        use wherever JSON is expected.
+        """
         node_dict = OrderedDict()
 
         if self.include_children:
@@ -112,7 +122,6 @@ class RegNode:
 
         return matches
 
-
     def flatten(self):
         """
         Return this node and all its children in a flat list
@@ -148,9 +157,6 @@ class RegNode:
         :return:
         """
 
-        import pdb
-        #pdb.set_trace()
-
         if self.children == []:
             return [self.string_label]
         else:
@@ -171,6 +177,12 @@ class RegNode:
 
 
 def xml_node_text(node, include_children=True):
+    """
+
+    :param node:
+    :param include_children:
+    :return:
+    """
 
     if node.text:
         node_text = node.text
