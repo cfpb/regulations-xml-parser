@@ -78,7 +78,7 @@ def get_sibling_label(label_parts):
 
     if len(sibling_label) != len(label_parts):
         # We weren't able to find the last part in the marker levels? So
-        # there is no proceeding sibling.
+        # there is no preceding sibling.
         return None
 
     return sibling_label
