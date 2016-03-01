@@ -85,8 +85,10 @@ def get_sibling_label(label_parts):
 
 
 def process_changes(original_xml, notice_xml, dry=False):
-    """ Process changes given in the notice xml to modify the
-        original_xml. The result is returned as a new XML tree. """
+    """ Process changes given in the notice_xml to modify the
+        original_xml. The 'dry' param controls whether this is a
+        dry run (True) or to apply the xml changes (False).
+        The result is returned as a new XML tree. """
 
     # Copy the original XML for our new tree
     new_xml = deepcopy(original_xml)
@@ -109,6 +111,12 @@ def process_changes(original_xml, notice_xml, dry=False):
         './/{eregs}change[@operation="modified"]')
     additions = notice_xml.findall(
         './/{eregs}change[@operation="added"]')
+
+    # Find the tables of contents in the original xml
+    # for handy reference later when updating TOC entries
+    # tocs = new_xml.findall('.//{eregs}tableOfContents')
+    tocs = find_tocs(new_xml)
+    logging.info("Found {} TOCs".format(len(tocs)))
 
     # Sort them appropriately by label
     # Note: Interp labels are special. For comparison purposes, we just
@@ -160,7 +168,12 @@ def process_changes(original_xml, notice_xml, dry=False):
                 # end of the parent.
                 new_index = len(parent_elm.getchildren())
 
-            # Insert it!
+            # TODO: Perform TOC updates if needed
+            # - Determine whether the sibling's label appears in TOC(s)
+            # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
+            # - Insert the new tocSecEntry after the sibling's tocSecEntry
+
+            # Insert the new xml!
             if not dry:
                 parent_elm.insert(new_index, new_elm)
 
@@ -179,12 +192,41 @@ def process_changes(original_xml, notice_xml, dry=False):
                     raise ValueError("Tried to modify {}, but no "
                                      "replacement given".format(label))
 
+                # Look for whether a modified label exists in a TOC and if so, update the TOC name
+                # If the label exists as a tocSecEntry target, update the sectionSubject
+
+                # In a modified <change>, the <section> tag has a label and a sectionNum
+                # - Check if the label exists as a tocSecEntry target
+                # - Replace the tocSecEntry's child <sectionNum> content with sectionNum specified
+                # - Replace the tocSecEntry's child <sectionSubject> content with changed <subject> content
+                # Note: This label may exist as a target in multiple TOCs - all need to be updated
+                sections = [el for el in change.iterchildren() if el.tag == "{eregs}section"]
+
+                logging.debug("Found {} sections in this change".format(len(sections)))
+                
+                for section in sections:
+                    toc_label = section.get('label')
+                    toc_secnum = section.get('sectionNum')
+                    toc_subject = section.find('{eregs}subject').text
+
+                    toc_updates = multi_find_toc_entry(tocs, toc_label)
+
+                    logging.debug("{} TOC updates for section {} ('{}'): '{}'".format(len(toc_updates),toc_secnum,  toc_label, toc_subject))
+
+                    if not dry:
+                        for toc_entry in toc_updates:
+                            update_toc_entry(toc_entry, toc_secnum, toc_subject)
+
                 if not dry:
                     new_elm = change.getchildren()[0]
                     match_parent.replace(matching_elm, new_elm)
 
             # For deleted labels, find the node and remove it.
             if op == 'deleted':
+                # Look for whether a deleted label exists in TOCs and if so, delete the TOC entry
+                # If the label exists as a tocSecEntry target, delete the TOC entry and its children
+                # Note: This label may exist as a target in multiple TOCs - all need to be updated
+
                 if not dry:
                     match_parent.remove(matching_elm)
 
@@ -200,3 +242,66 @@ def generate_diff(left_xml, right_xml):
     diff = dict(changes_between(FrozenNode.from_node(left_tree),
                                 FrozenNode.from_node(right_tree)))
     return diff
+
+
+def find_tocs(source_xml):
+    """
+    Finds <tableOfContents> nodes inside the source_xml and returns a list of them
+    """
+    return source_xml.findall('.//{eregs}tableOfContents')
+
+def get_toc_entries(toc_root):
+    """
+    Retrieves a list of Table of Contents section entries (<tocSecEntry>) for the specified TOC
+    """
+    # Get a list of toc section entries
+    sec_entries = [el for el in toc_root.iterchildren()]
+
+    # Sort list by toc section targets - should already be sorted by target but just to be sure
+    get_target = lambda c: c.get('target')
+    sec_entries = list(reversed(sorted(sec_entries, key=get_target)))
+
+    return sec_entries
+
+
+def find_toc_entry(toc_root, toc_target):
+    """
+    Finds a Table of Contents entry by target inside the given <tableOfContents> element.
+
+    Returns the found tocSecEntry node or returns None.
+    """
+    # Get all secEntries
+    sec_entries = get_toc_entries(toc_root)
+
+    # Look for matching target inside
+    for sec in sec_entries:
+        if sec.get('target') == toc_target:
+            return sec
+
+    # raise KeyError("Unable to find TOC entry with target '{}'.".format(toc_target))
+    return None
+
+
+def multi_find_toc_entry(tocs, toc_target):
+    """
+    Finds a <tocSecEntry> by target in multiple TOCs. 
+    Returns a list of all found entries or an empty list if no entries are found.
+    """
+    found_entries = []
+
+    for toc in tocs:
+        found = find_toc_entry(toc, toc_target)
+        if found is not None:
+            found_entries.append(found)
+
+    return found_entries
+
+
+def update_toc_entry(toc_entry, new_secnum, new_subject):
+    """
+    Updates the specified tocSecEntry with the given section number and subject.
+    """
+
+
+    return
+
