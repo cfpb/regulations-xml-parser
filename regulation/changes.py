@@ -126,6 +126,13 @@ def process_changes(original_xml, notice_xml, dry=False):
             new_elm = change.getchildren()[0]
             new_index = 0
 
+            # First make sure the label doesn't already exist
+            matching_elm = new_xml.find('.//*[@label="{}"]'.format(label))
+            if matching_elm is not None:
+                raise KeyError("Label {} cannot be added because it "
+                               "already exists. Was it added in another "
+                               "change?".format(label))
+
             # Get the parent of the added label
             parent_label = '-'.join(get_parent_label(label_parts))
             parent_elm = new_xml.find('.//*[@label="{}"]'.format(parent_label))
