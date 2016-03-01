@@ -116,7 +116,7 @@ def process_changes(original_xml, notice_xml, dry=False):
     # for handy reference later when updating TOC entries
     # tocs = new_xml.findall('.//{eregs}tableOfContents')
     tocs = find_tocs(new_xml)
-    logging.info("Found {} TOCs".format(len(tocs)))
+    logging.debug("Found {} TOCs in document".format(len(tocs)))
 
     # Sort them appropriately by label
     # Note: Interp labels are special. For comparison purposes, we just
@@ -134,7 +134,7 @@ def process_changes(original_xml, notice_xml, dry=False):
         label = change.get('label')
         op = change.get('operation')
 
-        logging.info("Applying {} to {}".format(op, label))
+        logging.info("Applying operation '{}' to {}".format(op, label))
 
         # For added labels, we need to break up the label and find its
         # parent and its preceding sibling to know where to add it.
@@ -200,7 +200,8 @@ def process_changes(original_xml, notice_xml, dry=False):
                 # - Replace the tocSecEntry's child <sectionNum> content with sectionNum specified
                 # - Replace the tocSecEntry's child <sectionSubject> content with changed <subject> content
                 # Note: This label may exist as a target in multiple TOCs - all need to be updated
-                sections = [el for el in change.iterchildren() if el.tag == "{eregs}section"]
+                # sections = [el for el in change.iterchildren() if el.tag == "{eregs}section"]
+                sections = change.findall('{eregs}section')
 
                 logging.debug("Found {} sections in this change".format(len(sections)))
                 
@@ -211,11 +212,18 @@ def process_changes(original_xml, notice_xml, dry=False):
 
                     toc_updates = multi_find_toc_entry(tocs, toc_label)
 
-                    logging.debug("{} TOC updates for section {} ('{}'): '{}'".format(len(toc_updates),toc_secnum,  toc_label, toc_subject))
+                    logging.debug("Found {} TOC entries for section {} ('{}'): '{}'".format(len(toc_updates),
+                                                                                            toc_secnum,
+                                                                                            toc_label,
+                                                                                            toc_subject))
 
                     if not dry:
+                        changed = 0
                         for toc_entry in toc_updates:
-                            update_toc_entry(toc_entry, toc_secnum, toc_subject)
+                            changed += update_toc_entry(toc_entry, toc_secnum, toc_subject)
+                        logging.info("Made {} updates to TOC entries for section {} ('{}')".format(changed,
+                                                                                            toc_secnum,
+                                                                                            toc_label))
 
                 if not dry:
                     new_elm = change.getchildren()[0]
@@ -300,8 +308,30 @@ def multi_find_toc_entry(tocs, toc_target):
 def update_toc_entry(toc_entry, new_secnum, new_subject):
     """
     Updates the specified tocSecEntry with the given section number and subject.
+    Returns whether anything changed inside the toc_entry
     """
 
+    old_num = toc_entry.find('{eregs}sectionNum').text
+    old_subject = toc_entry.find('{eregs}sectionSubject').text
 
-    return
+    changed = False
+
+    # If num changes, update it
+    if int(old_num) != int(new_secnum):
+        changed = True
+        # TODO: Actually update this
+        toc_entry.find('{eregs}sectionNum').text = new_secnum
+        logging.debug("Updating TOC section number: {} -> {}".format(old_num, new_secnum))
+
+    # If subject changes, update it
+    if old_subject != new_subject:
+        changed = True
+        # TODO: Actually update this
+        toc_entry.find('{eregs}sectionSubject').text = new_subject
+        logging.debug("Updating TOC contents:\nOld: '{}'\nNew: '{}'".format(old_subject, new_subject))
+
+    if not changed:
+        logging.debug("No TOC updates needed")
+    
+    return changed
 
