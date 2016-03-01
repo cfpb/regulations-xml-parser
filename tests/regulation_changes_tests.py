@@ -28,6 +28,11 @@ class ChangesTests(TestCase):
         self.assertEqual(['1234', '1', 'g', '2', 'Interp'],
                          get_parent_label(label_parts))
 
+    def test_get_parent_label_part_interp(self):
+        label_parts = ['1234', 'Interp']
+        self.assertEqual(['1234', ],
+                         get_parent_label(label_parts))
+        
     def test_get_sibling_label_alpha(self):
         label_parts = ['1234', '1', 'g']
         self.assertEqual(['1234', '1', 'f'],
@@ -43,6 +48,10 @@ class ChangesTests(TestCase):
         self.assertEqual(['1234', '1', 'g', '1', 'Interp'],
                          get_sibling_label(label_parts))
 
+    def test_get_sibling_label_part_interp(self):
+        label_parts = ['1234', 'Interp']
+        self.assertEqual(None, get_sibling_label(label_parts))
+        
     def test_get_sibling_label_none(self):
         label_parts = ['1234', '1', 'a']
         self.assertEqual(None, get_sibling_label(label_parts))
@@ -139,6 +148,32 @@ class ChangesTests(TestCase):
             </regulation>""")
         with self.assertRaises(KeyError):
             process_changes(original_xml, notice_xml)
+
+    def test_process_changes_added_interp(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="added" label="1234-Interp">
+                  <interpretations label="1234-Interp">
+                    <title>Supplement I to Part 1234</title>
+                  </interpretations>
+                </change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <subpart></subpart>
+                <appendix label="1234-A"></appendix>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        new_interp = new_xml.find('.//{eregs}interpretations[@label="1234-Interp"]')
+        self.assertNotEqual(new_interp, None)
+        self.assertEqual(new_interp.getparent().index(new_interp), 2)
 
     def test_process_changes_modified(self):
         notice_xml = etree.fromstring("""

@@ -26,6 +26,10 @@ def get_parent_label(label_parts):
     if len(label_parts) <= 1:
         return parent_label
 
+    # If it's the interps for the whole part, return the part
+    if len(label_parts) == 2:
+        return label_parts[:1]
+
     # Not an interpretation label. This is easy.
     parent_label = label_parts[0:-1]
 
@@ -73,9 +77,9 @@ def get_sibling_label(label_parts):
         sibling_label.append('Interp')
 
     if len(sibling_label) != len(label_parts):
-        # We weren't able to find the last part in the marker levels?
-        raise IndexError("Unable to locate sibling for '{}'".format(
-            last_part))
+        # We weren't able to find the last part in the marker levels? So
+        # there is no preceding sibling.
+        return None
 
     return sibling_label
 
@@ -107,7 +111,12 @@ def process_changes(original_xml, notice_xml, dry=False):
         './/{eregs}change[@operation="added"]')
 
     # Sort them appropriately by label
-    get_label = lambda c: c.get('label')
+    # Note: Interp labels are special. For comparison purposes, we just
+    # remove the '-Interp' from the label. Otherwse we would end up with
+    # something like '1234-Interp' being sorted after '1234-1-Interp'.
+    get_label = lambda c: c.get('label') \
+                          if 'Interp' not in c.get('label') \
+                          else c.get('label').replace('-Interp', '')
     deletions = list(reversed(sorted(deletions, key=get_label)))
     modifications = list(reversed(sorted(modifications, key=get_label)))
     additions = list(sorted(additions, key=get_label))
@@ -146,6 +155,10 @@ def process_changes(original_xml, notice_xml, dry=False):
 
                 # Figure out where we're inserting this element
                 new_index = parent_elm.index(sibling_elm) + 1
+            else:
+                # If the sibling label is none, just append it to the
+                # end of the parent.
+                new_index = len(parent_elm.getchildren())
 
             # Insert it!
             if not dry:
