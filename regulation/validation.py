@@ -466,7 +466,6 @@ class EregsValidator:
                 with open(regulation_file, 'w') as f:
                     f.write(etree.tostring(tree, pretty_print=True))
 
-
     def headerize_interps(self, tree, regulation_file):
         paragraphs = tree.findall('.//{eregs}interpParagraph')
         change_flag = False
@@ -483,27 +482,40 @@ class EregsValidator:
                 print(colored(current_par, 'yellow'))
                 response = None
                 while response not in ['y', 'n']:
-                    msg = colored('Do you want to titleize this paragraph?')
+                    msg = colored('Do you want to titleize this paragraph?', 'red')
                     print(msg)
                     response = raw_input('(y)es/(n)o: ')
                 if response.lower() == 'y':
+                    #import ipdb; ipdb.set_trace()
                     response = None
-                    content_text = content.text
-                    first_period = content_text.find('.')
+                    content_text = etree.tostring(content)
+                    first_angle = content_text.find('>')
+                    close_content = content_text.find('</content>')
+                    remainder = content_text[first_angle + 1:close_content]
+                    first_period = remainder.find('.')
                     if first_period > -1:
-                        title_string = content_text[:first_period + 1]
+                        title_string = remainder[:first_period + 1]
                         new_title = '<title>' + title_string + '</title>'
-                        new_text = '<content>' + xml_node_text(content).replace(title_string, '').strip() + '</content>'
+                        elem = etree.fromstring(new_title)
+                        new_title = '<title>' + xml_node_text(elem) + '</title>'
+                        new_text = '<content>' + remainder.replace(title_string, '').strip() + '</content>'
                         paragraph.insert(0, etree.fromstring(new_title))
-
-                        #new_paragraph = '<interpParagraph label="{}" target="{}" marker="{}">\n'.format(label, target, marker)
-                        #new_paragraph += new_title + '\n'
-                        #new_paragraph += new_text + '\n</interpParagraph>'
-                        #print(colored(new_paragraph, 'green'))
-
+                        paragraph.replace(content, etree.fromstring(new_text))
+                        new_paragraph = '<interpParagraph label="{}" target="{}" marker="{}">\n'.format(label, target, marker)
+                        new_paragraph += new_title + '\n'
+                        new_paragraph += new_text + '\n</interpParagraph>'
+                        print(colored(new_paragraph, 'green'))
                         change_flag = True
                     else:
                         print(colored('Nothing to headerize!', 'red'))
+        if change_flag:
+            print(colored('The tree has been altered! Do you want to write the result to disk?', 'red'))
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('Save? y/n: ')
+            if answer == 'y':
+                with open(regulation_file, 'w') as f:
+                    f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
 
     def insert_interp_markers(self, tree, regulation_file):
         """ Add in the markers for interp paragraphs in situations where 
