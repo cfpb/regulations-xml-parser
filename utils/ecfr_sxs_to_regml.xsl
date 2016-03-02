@@ -37,12 +37,12 @@
     <xsl:template match="HD[@SOURCE='HD2']"></xsl:template>
     <xsl:template match="HD[@SOURCE='HD3']">
         <xsl:variable name="header" select="."/>
-        <analysisSection target="">
+        <analysisSection>
             <title><xsl:value-of select="."/></title>
             <!-- These are flat, but we need to infer some heirarchy.
                  Apply to all siblings who aren't also HD3s. We'll have 
                  to manually fix the heirarchy later. -->
-            <xsl:apply-templates select="following-sibling::P[preceding-sibling::HD[@SOURCE='HD3'] = $header]"/>
+            <xsl:apply-templates select="following-sibling::P[preceding-sibling::HD[@SOURCE='HD3'][1] = $header]"/>
         </analysisSection>
     </xsl:template>
 
