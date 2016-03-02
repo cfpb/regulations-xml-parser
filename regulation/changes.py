@@ -193,36 +193,50 @@ def process_changes(original_xml, notice_xml, dry=False):
                     raise ValueError("Tried to modify {}, but no "
                                      "replacement given".format(label))
 
-                # Look for whether a modified section label exists in a TOC and if so, update TOCs
-                # If the label exists as a tocSecEntry target, update the sectionSubject
-                # Note: This only checks for <section> tags that are in the TOC, not other children
-                sections = change.findall('{eregs}section')
+                # Look for whether a modified label exists in a TOC and if so, update TOCs
+                # If the label exists as a TOC entry target, update the number/letter and subject
 
-                logging.debug("Found {} sections in this operation".format(len(sections)))
-                
-                for item in sections:
+                do_nothing = False
+                item = change[0]
+                if item.tag == "{eregs}section":
+                    logging.debug("Found section")
+                    is_section = True
+                elif item.tag == "{eregs}appendix":
+                    logging.debug("Found appendix")
+                    is_section = False
+                else:
+                    logging.debug("Neither section nor appendix: '{}'".format(change[0].tag))
+                    do_nothing = True
+
+                if not do_nothing:
+                    # Double-check labels match
                     toc_label = item.get('label')
-                    toc_updates = multi_find_toc_entry(tocs, toc_label)
+                    if toc_label != label:
+                        logging.warning("Label mismatch: change label '{}' vs item label '{}'".format(label, toc_label))
+                    else:
+                        toc_updates = multi_find_toc_entry(tocs, label)
 
-                    # If label doesn't appear in any TOCs, move on
-                    if len(toc_updates) == 0:
-                        continue
+                        # If label doesn't appear in any TOCs, move on
+                        if len(toc_updates) != 0:
+                            if is_section:
+                                toc_des = item.get('sectionNum')
+                                toc_subject = item.find('{eregs}subject').text
+                            else:
+                                toc_des = item.get('appendixLetter')
+                                toc_subject = item.find('{eregs}appendixTitle').text
 
-                    toc_secnum = item.get('sectionNum')
-                    toc_subject = item.find('{eregs}subject').text
-
-                    logging.debug("Found {} TOC entries for item {} ('{}'): '{}'".format(len(toc_updates),
-                                                                                         toc_secnum,
-                                                                                         toc_label,
-                                                                                         toc_subject))
-
-                    if not dry:
-                        changed = 0
-                        for toc_entry in toc_updates:
-                            changed += update_toc_entry(toc_entry, toc_secnum, toc_subject)
-                        logging.info("Made {} updates to TOC entries for section {} ('{}')".format(changed,
-                                                                                            toc_secnum,
-                                                                                            toc_label))
+                            logging.debug("Found {} TOC entries for item {} ('{}'): '{}'".format(len(toc_updates),
+                                                                                                 toc_des,
+                                                                                                 label,
+                                                                                                 toc_subject))
+                            # Make applicable TOC changes
+                            if not dry:
+                                changed = 0
+                                for toc_entry in toc_updates:
+                                    changed += update_toc_entry(toc_entry, toc_des, toc_subject, is_section = is_section)
+                                logging.info("Made {} updates to TOC entries for item {} ('{}')".format(changed,
+                                                                                                        toc_des,
+                                                                                                        label))
 
                 if not dry:
                     new_elm = change.getchildren()[0]
@@ -232,7 +246,7 @@ def process_changes(original_xml, notice_xml, dry=False):
             if op == 'deleted':
                 
                 # Look for whether a deleted label exists in TOCs and if so, delete the TOC entry
-                toc_updates = multi_find_toc_entry(tocs, matching_elm)
+                toc_updates = multi_find_toc_entry(tocs, label)
 
                 if not dry:
                     # Remove the TOC entries that target this label
@@ -243,7 +257,7 @@ def process_changes(original_xml, notice_xml, dry=False):
                     
                     # Report how many deletions occurred
                     if changed > 0:
-                        logging.info("Made {} deletions of TOC entries for item '{}'".format(changed, toc_label))
+                        logging.info("Made {} deletions of TOC entries for item '{}'".format(changed, label))
 
                     # Remove the element itself
                     match_parent.remove(matching_elm)
