@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 from copy import deepcopy
 import itertools
 import logging
+from lxml import etree
 
 # Import regparser here with the eventual goal of breaking off the parts
 # we're using in the RegML parser into a library both can share.
@@ -192,30 +193,28 @@ def process_changes(original_xml, notice_xml, dry=False):
                     raise ValueError("Tried to modify {}, but no "
                                      "replacement given".format(label))
 
-                # Look for whether a modified label exists in a TOC and if so, update the TOC name
+                # Look for whether a modified section label exists in a TOC and if so, update TOCs
                 # If the label exists as a tocSecEntry target, update the sectionSubject
-
-                # In a modified <change>, the <section> tag has a label and a sectionNum
-                # - Check if the label exists as a tocSecEntry target
-                # - Replace the tocSecEntry's child <sectionNum> content with sectionNum specified
-                # - Replace the tocSecEntry's child <sectionSubject> content with changed <subject> content
-                # Note: This label may exist as a target in multiple TOCs - all need to be updated
-                # sections = [el for el in change.iterchildren() if el.tag == "{eregs}section"]
+                # Note: This only checks for <section> tags that are in the TOC, not other children
                 sections = change.findall('{eregs}section')
 
-                logging.debug("Found {} sections in this change".format(len(sections)))
+                logging.debug("Found {} sections in this operation".format(len(sections)))
                 
-                for section in sections:
-                    toc_label = section.get('label')
-                    toc_secnum = section.get('sectionNum')
-                    toc_subject = section.find('{eregs}subject').text
-
+                for item in sections:
+                    toc_label = item.get('label')
                     toc_updates = multi_find_toc_entry(tocs, toc_label)
 
-                    logging.debug("Found {} TOC entries for section {} ('{}'): '{}'".format(len(toc_updates),
-                                                                                            toc_secnum,
-                                                                                            toc_label,
-                                                                                            toc_subject))
+                    # If label doesn't appear in any TOCs, move on
+                    if len(toc_updates) == 0:
+                        continue
+
+                    toc_secnum = item.get('sectionNum')
+                    toc_subject = item.find('{eregs}subject').text
+
+                    logging.debug("Found {} TOC entries for item {} ('{}'): '{}'".format(len(toc_updates),
+                                                                                         toc_secnum,
+                                                                                         toc_label,
+                                                                                         toc_subject))
 
                     if not dry:
                         changed = 0
@@ -231,11 +230,22 @@ def process_changes(original_xml, notice_xml, dry=False):
 
             # For deleted labels, find the node and remove it.
             if op == 'deleted':
+                
                 # Look for whether a deleted label exists in TOCs and if so, delete the TOC entry
-                # If the label exists as a tocSecEntry target, delete the TOC entry and its children
-                # Note: This label may exist as a target in multiple TOCs - all need to be updated
+                toc_updates = multi_find_toc_entry(tocs, matching_elm)
 
                 if not dry:
+                    # Remove the TOC entries that target this label
+                    changed = 0
+                    for toc_entry in toc_updates:
+                        delete_toc_entry(toc_entry)
+                        changed += 1
+                    
+                    # Report how many deletions occurred
+                    if changed > 0:
+                        logging.info("Made {} deletions of TOC entries for item '{}'".format(changed, toc_label))
+
+                    # Remove the element itself
                     match_parent.remove(matching_elm)
 
     return new_xml
@@ -258,9 +268,11 @@ def find_tocs(source_xml):
     """
     return source_xml.findall('.//{eregs}tableOfContents')
 
+
 def get_toc_entries(toc_root):
     """
-    Retrieves a list of Table of Contents section entries (<tocSecEntry>) for the specified TOC
+    Retrieves a list of Table of Contents section entries (<tocSecEntry> or <tocAppEntry>)
+    for the specified TOC
     """
     # Get a list of toc section entries
     sec_entries = [el for el in toc_root.iterchildren()]
@@ -276,23 +288,23 @@ def find_toc_entry(toc_root, toc_target):
     """
     Finds a Table of Contents entry by target inside the given <tableOfContents> element.
 
-    Returns the found tocSecEntry node or returns None.
+    Returns the found entry's node or None.
     """
     # Get all secEntries
-    sec_entries = get_toc_entries(toc_root)
+    entries = get_toc_entries(toc_root)
 
     # Look for matching target inside
-    for sec in sec_entries:
-        if sec.get('target') == toc_target:
-            return sec
+    for entry in entries:
+        if entry.get('target') == toc_target:
+            return entry
 
-    # raise KeyError("Unable to find TOC entry with target '{}'.".format(toc_target))
+    # Return None if no matching target exists in the TOC
     return None
 
 
 def multi_find_toc_entry(tocs, toc_target):
     """
-    Finds a <tocSecEntry> by target in multiple TOCs. 
+    Finds a <tocSecEntry> by target in multiple TOCs from the list given. 
     Returns a list of all found entries or an empty list if no entries are found.
     """
     found_entries = []
@@ -305,33 +317,99 @@ def multi_find_toc_entry(tocs, toc_target):
     return found_entries
 
 
-def update_toc_entry(toc_entry, new_secnum, new_subject):
+def create_toc_entry(toc_parent, target_label, designator, subject, after_elm=None, is_section=True):
     """
-    Updates the specified tocSecEntry with the given section number and subject.
+    Inserts a new TOC entry in the toc_parent.
+    
+    If after_elm is specified, inserts this subelement after it; otherwise puts at the end.
+    If is_section is True, inserts a section; if False inserts as an Appendix reference
+
+    Returns the new element.
+    """
+    # Determine whether to insert a section or appendix reference
+    if is_section:
+        elm_type = "{eregs}tocSecEntry"
+        num_type = "{eregs}sectionNum"
+        sbj_type = "{eregs}sectionSubject"
+    else: # is appendix
+        elm_type = "{eregs}tocAppEntry"
+        num_type = "{eregs}appendixLetter"
+        sbj_type = "{eregs}appendixSubject"
+
+    # TODO: Check to see if this target_label already exists and if so just update it?
+
+    # Create the element and contents
+    if after_elm is not None:
+        new_index = toc_parent.index(after_elm) + 1
+        new_elm = etree.Element(elm_type, attrib={"target":target_label})
+        toc_parent.insert(new_index, new_elm)
+    else:
+        new_elm = etree.SubElement(toc_parent, elm_type, attrib={"target":target_label})
+
+    # Add sub-elements
+    num_elm = etree.SubElement(new_elm, num_type)
+    num_elm.text = designator
+    sbj_elm = etree.SubElement(new_elm, sbj_type)
+    sbj_elm.text = subject
+
+    logging.debug("Inserted new element:\n{}".format(etree.tostring(new_elm, pretty_print=True)))
+
+    return new_elm
+
+
+def update_toc_entry(toc_entry, designator, new_subject, is_section=True):
+    """
+    Updates the specified tocSecEntry with the given designator and subject.
+    If is_section is True, inserts a section; if False inserts as an Appendix reference
     Returns whether anything changed inside the toc_entry
     """
-
-    old_num = toc_entry.find('{eregs}sectionNum').text
-    old_subject = toc_entry.find('{eregs}sectionSubject').text
+    # Determine whether to insert a section or appendix reference
+    if is_section:
+        elm_type = "{eregs}tocSecEntry"
+        num_type = "{eregs}sectionNum"
+        sbj_type = "{eregs}sectionSubject"
+    else: # is appendix
+        elm_type = "{eregs}tocAppEntry"
+        num_type = "{eregs}appendixLetter"
+        sbj_type = "{eregs}appendixSubject"
 
     changed = False
 
-    # If num changes, update it
-    if int(old_num) != int(new_secnum):
-        changed = True
-        # TODO: Actually update this
-        toc_entry.find('{eregs}sectionNum').text = new_secnum
-        logging.debug("Updating TOC section number: {} -> {}".format(old_num, new_secnum))
+    # Get references to content nodes
+    num_elm = toc_entry.find(num_type)
+    sbj_elm = toc_entry.find(sbj_type)
 
-    # If subject changes, update it
-    if old_subject != new_subject:
+    # Check for whether the existing reference is well-formed
+    if num_elm is None:
+        logging.info("Found malformed {} with target '{}': Missing designator".format(elm_type, toc_entry.get('target')))
+        num_elm = etree.SubElement(new_elm, num_type)
+        num_elm.text = designator
         changed = True
-        # TODO: Actually update this
-        toc_entry.find('{eregs}sectionSubject').text = new_subject
-        logging.debug("Updating TOC contents:\nOld: '{}'\nNew: '{}'".format(old_subject, new_subject))
+    elif num_elm.text != designator:
+        logging.debug("Updating TOC entry number: {} -> {}".format(num_elm.text, designator))
+        num_elm.text = designator
+        changed = True
+    # else no updates required as contents already match
 
-    if not changed:
-        logging.debug("No TOC updates needed")
-    
+    if sbj_elm is None:
+        logging.warning("Found malformed {} with target '{}': Missing subject".format(elm_type, toc_entry.get('target')))
+        sbj_elm = etree.SubElement(new_elm, sbj_type)
+        sbj_elm.text = subject
+        changed = True
+    elif sbj_elm.text != new_subject:
+        logging.debug("Updating TOC entry contents:\nOld: '{}'\nNew: '{}'".format(sbj_elm.text, new_subject))
+        sbj_elm.text = new_subject
+        changed = True
+    # else no updates required as contents already match
+
     return changed
+
+
+def delete_toc_entry(toc_entry):
+    """
+    Deletes the specified tocSecEntry and all of its children
+    """
+    toc_entry.getparent().remove(toc_entry)
+    
+    return
 
