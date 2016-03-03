@@ -18,6 +18,25 @@ from regulation.tree import build_reg_tree
 
 logger = logging.getLogger(__name__)
 
+# Information for working with Table of Contents updates
+TOC_TYPES = {"{eregs}section":{"element": "{eregs}tocSecEntry",
+                        "designator":"{eregs}sectionNum",
+                        "subject":"{eregs}sectionSubject",
+                        "title_elm": "{eregs}subject"},
+             "{eregs}appendix":{"element": "{eregs}tocAppEntry",
+                        "designator":"{eregs}appendixLetter",
+                        "subject":"{eregs}appendixSubject",
+                        "title_elm": "{eregs}appendixTitle"},
+             "{eregs}subpart":{"element": "{eregs}tocSubpartEntry",
+                        "des":"{eregs}subpartLetter",
+                        "subject":"{eregs}subpartTitle",
+                        "title_elm": "{eregs}title"},
+             "{eregs}interp":{"element": "{eregs}tocInterpEntry",
+                        "designator":"",
+                        "subject":"{eregs}interpTitle",
+                        "title_elm": "{eregs}title"},
+            }
+
 
 def get_parent_label(label_parts):
     """ Determine the parent label for the given label part list. """
@@ -198,32 +217,25 @@ def process_changes(original_xml, notice_xml, dry=False):
 
                 do_nothing = False
                 item = change[0]
-                if item.tag == "{eregs}section":
-                    logging.debug("Found section")
-                    is_section = True
-                elif item.tag == "{eregs}appendix":
-                    logging.debug("Found appendix")
-                    is_section = False
-                else:
-                    logging.debug("Neither section nor appendix: '{}'".format(change[0].tag))
-                    do_nothing = True
 
-                if not do_nothing:
+                if item.tag in TOC_TYPES:
+                    logging.debug("Found {}-type modification".format(item.tag))
                     # Double-check labels match
                     toc_label = item.get('label')
                     if toc_label != label:
-                        logging.warning("Label mismatch: change label '{}' vs item label '{}'".format(label, toc_label))
+                        logging.warning("Label mismatch: change label '{}' does not match item label '{}'".format(label, toc_label))
                     else:
                         toc_updates = multi_find_toc_entry(tocs, label)
 
                         # If label doesn't appear in any TOCs, move on
                         if len(toc_updates) != 0:
-                            if is_section:
-                                toc_des = item.get('sectionNum')
-                                toc_subject = item.find('{eregs}subject').text
+                            des_tag, subj_tag = get_toc_change_keywords(item.tag)
+
+                            if len(des_tag) > 0:
+                                toc_des = item.get(des_tag)
                             else:
-                                toc_des = item.get('appendixLetter')
-                                toc_subject = item.find('{eregs}appendixTitle').text
+                                toc_des = ""
+                            toc_subject = item.find(subj_tag).text
 
                             logging.debug("Found {} TOC entries for item {} ('{}'): '{}'".format(len(toc_updates),
                                                                                                  toc_des,
@@ -233,10 +245,12 @@ def process_changes(original_xml, notice_xml, dry=False):
                             if not dry:
                                 changed = 0
                                 for toc_entry in toc_updates:
-                                    changed += update_toc_entry(toc_entry, toc_des, toc_subject, is_section = is_section)
+                                    changed += update_toc_entry(toc_entry, toc_des, toc_subject, entry_type=item.tag)
                                 logging.info("Made {} updates to TOC entries for item {} ('{}')".format(changed,
                                                                                                         toc_des,
                                                                                                         label))
+                else:
+                    logging.debug("Modification of tag '{}' not a TOC-type".format(item.tag))
 
                 if not dry:
                     new_elm = change.getchildren()[0]
@@ -331,7 +345,7 @@ def multi_find_toc_entry(tocs, toc_target):
     return found_entries
 
 
-def create_toc_entry(toc_parent, target_label, designator, subject, after_elm=None, is_section=True):
+def create_toc_entry(toc_parent, target_label, designator, subject, after_elm=None, entry_type="section"):
     """
     Inserts a new TOC entry in the toc_parent.
     
@@ -340,15 +354,8 @@ def create_toc_entry(toc_parent, target_label, designator, subject, after_elm=No
 
     Returns the new element.
     """
-    # Determine whether to insert a section or appendix reference
-    if is_section:
-        elm_type = "{eregs}tocSecEntry"
-        num_type = "{eregs}sectionNum"
-        sbj_type = "{eregs}sectionSubject"
-    else: # is appendix
-        elm_type = "{eregs}tocAppEntry"
-        num_type = "{eregs}appendixLetter"
-        sbj_type = "{eregs}appendixSubject"
+    # Retrieve tag names for this type of entry
+    elm_type, des_type, subj_type = get_toc_entry_keywords(entry_type)
 
     # TODO: Check to see if this target_label already exists and if so just update it?
 
@@ -360,9 +367,10 @@ def create_toc_entry(toc_parent, target_label, designator, subject, after_elm=No
     else:
         new_elm = etree.SubElement(toc_parent, elm_type, attrib={"target":target_label})
 
-    # Add sub-elements
-    num_elm = etree.SubElement(new_elm, num_type)
-    num_elm.text = designator
+    # Add sub-elements for designator and subject/title
+    if len(des_type) > 0:
+        num_elm = etree.SubElement(new_elm, des_type)
+        num_elm.text = designator
     sbj_elm = etree.SubElement(new_elm, sbj_type)
     sbj_elm.text = subject
 
@@ -371,50 +379,46 @@ def create_toc_entry(toc_parent, target_label, designator, subject, after_elm=No
     return new_elm
 
 
-def update_toc_entry(toc_entry, designator, new_subject, is_section=True):
+def update_toc_entry(toc_entry, designator, new_subject, entry_type="section"):
     """
-    Updates the specified tocSecEntry with the given designator and subject.
+    Updates the specified TOC entry with the given designator and subject.
     If is_section is True, inserts a section; if False inserts as an Appendix reference
     Returns whether anything changed inside the toc_entry
     """
-    # Determine whether to insert a section or appendix reference
-    if is_section:
-        elm_type = "{eregs}tocSecEntry"
-        num_type = "{eregs}sectionNum"
-        sbj_type = "{eregs}sectionSubject"
-    else: # is appendix
-        elm_type = "{eregs}tocAppEntry"
-        num_type = "{eregs}appendixLetter"
-        sbj_type = "{eregs}appendixSubject"
+    # Retrieve tag names for this type of entry
+    elm_type, des_type, subj_type = get_toc_entry_keywords(entry_type)
 
     changed = False
 
     # Get references to content nodes
-    num_elm = toc_entry.find(num_type)
-    sbj_elm = toc_entry.find(sbj_type)
+    if len(des_type) > 0:
+        num_elm = toc_entry.find(des_type)
 
-    # Check for whether the existing reference is well-formed
-    if num_elm is None:
-        logging.info("Found malformed {} with target '{}': Missing designator".format(elm_type, toc_entry.get('target')))
-        num_elm = etree.SubElement(new_elm, num_type)
-        num_elm.text = designator
-        changed = True
-    elif num_elm.text != designator:
-        logging.debug("Updating TOC entry number: {} -> {}".format(num_elm.text, designator))
-        num_elm.text = designator
-        changed = True
-    # else no updates required as contents already match
+        # Check for whether the existing reference is well-formed
+        if num_elm is None:
+            logging.info("Found malformed {} with target '{}': Missing designator '{}'".format(elm_type, toc_entry.get('target'), des_type))
+            num_elm = etree.SubElement(toc_entry, des_type)
+            num_elm.text = designator
+            changed = True
+        elif num_elm.text != designator:
+            logging.debug("Updating TOC entry number: {} -> {}".format(num_elm.text, designator))
+            num_elm.text = designator
+            changed = True
+        # else no updates required as contents already match
 
+    sbj_elm = toc_entry.find(subj_type)
     if sbj_elm is None:
-        logging.warning("Found malformed {} with target '{}': Missing subject".format(elm_type, toc_entry.get('target')))
-        sbj_elm = etree.SubElement(new_elm, sbj_type)
-        sbj_elm.text = subject
+        logging.warning("Found malformed {} with target '{}': Missing subject '{}'".format(elm_type, toc_entry.get('target'), subj_type))
+        sbj_elm = etree.SubElement(toc_entry, subj_type)
+        sbj_elm.text = new_subject
         changed = True
     elif sbj_elm.text != new_subject:
         logging.debug("Updating TOC entry contents:\nOld: '{}'\nNew: '{}'".format(sbj_elm.text, new_subject))
         sbj_elm.text = new_subject
         changed = True
     # else no updates required as contents already match
+
+    logging.debug("Updated TOC Entry now:\n{}".format(etree.tostring(toc_entry, pretty_print=True)))
 
     return changed
 
@@ -426,4 +430,23 @@ def delete_toc_entry(toc_entry):
     toc_entry.getparent().remove(toc_entry)
     
     return
+
+
+def get_toc_entry_keywords(entry_type):
+    """
+    Determines the keywords for the specific type of entry in the TOC 
+    and returns as a tuple of element tag, designator tag, and subject tag
+    """
+
+    return TOC_TYPES[entry_type]["element"], TOC_TYPES[entry_type]["designator"], TOC_TYPES[entry_type]["subject"]
+
+
+def get_toc_change_keywords(entry_type):
+    """
+    Determines the keywords to extract information from the change entry for TOC changes
+    and returns as a tuple of stripped designator attribute and title tag
+    """
+
+    return TOC_TYPES[entry_type]["designator"].replace("{eregs}",""), TOC_TYPES[entry_type]["title_elm"]
+
 
