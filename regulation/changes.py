@@ -183,15 +183,40 @@ def process_changes(original_xml, notice_xml, dry=False):
 
                 # Figure out where we're inserting this element
                 new_index = parent_elm.index(sibling_elm) + 1
+
+                # Perform TOC updates if needed
+                # - Determine whether the sibling's label appears in TOC(s)
+                # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
+                # - Insert the new tocSecEntry after the sibling's tocSecEntry
+                for toc in tocs:
+                    sib_in_toc = find_toc_entry(tocs, sibling_label)
+
+                    # If sibling is not in the TOC, don't add this label
+                    if sib_in_toc is None:
+                        continue
+
+                    # Determine what type of change element this is
+                    item = change[0]
+                    if item.tag in TOC_TYPES:
+                        des_tag, subj_tag = get_toc_change_keywords(item.tag)
+
+                        if len(des_tag) > 0:
+                            toc_des = item.get(des_tag)
+                        else:
+                            toc_des = ""
+                        toc_subject = item.find(subj_tag).text
+
+                        if not dry:
+                            create_toc_entry(toc, label, toc_des, toc_subject, 
+                                             after_elm=sib_in_toc, entry_type=item.tag)
+
             else:
                 # If the sibling label is none, just append it to the
                 # end of the parent.
                 new_index = len(parent_elm.getchildren())
 
-            # TODO: Perform TOC updates if needed
-            # - Determine whether the sibling's label appears in TOC(s)
-            # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
-            # - Insert the new tocSecEntry after the sibling's tocSecEntry
+                # TODO: Uncovered case: adding a first element to a parent will not
+                # have a sibling but maybe also needs to add to the TOC
 
             # Insert the new xml!
             if not dry:
@@ -214,8 +239,6 @@ def process_changes(original_xml, notice_xml, dry=False):
 
                 # Look for whether a modified label exists in a TOC and if so, update TOCs
                 # If the label exists as a TOC entry target, update the number/letter and subject
-
-                do_nothing = False
                 item = change[0]
 
                 if item.tag in TOC_TYPES:
