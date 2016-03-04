@@ -191,7 +191,7 @@ def process_changes(original_xml, notice_xml, dry=False):
                 # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
                 # - Insert the new tocSecEntry after the sibling's tocSecEntry
                 for toc in tocs:
-                    sib_in_toc = find_toc_entry(tocs, sibling_label)
+                    sib_in_toc = find_toc_entry(toc, sibling_label)
 
                     # If sibling is not in the TOC, don't add this label
                     if sib_in_toc is None:
@@ -409,7 +409,7 @@ def create_toc_entry(toc_parent, target_label, designator, subject, after_elm=No
     if len(des_type) > 0:
         num_elm = etree.SubElement(new_elm, des_type)
         num_elm.text = designator
-    sbj_elm = etree.SubElement(new_elm, sbj_type)
+    sbj_elm = etree.SubElement(new_elm, subj_type)
     sbj_elm.text = subject
 
     logging.debug("Inserted new element:\n{}".format(etree.tostring(new_elm, pretty_print=True)))
