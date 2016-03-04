@@ -48,8 +48,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'regulations-xml-parser'
-copyright = u'2016, Will Barton, Adam Scott, Hilary Jeffrey, Jerry Vinokurov'
-author = u'Will Barton, Adam Scott, Hilary Jeffrey, Jerry Vinokurov'
+copyright = u'2016, Will Barton, Adam Scott, Hillary Jeffrey, Jerry Vinokurov'
+author = u'Will Barton, Adam Scott, Hillary Jeffrey, Jerry Vinokurov'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -224,7 +224,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'regulations-xml-parser.tex', u'regulations-xml-parser Documentation',
-     u'Will Barton, Adam Scott, Hilary Jeffrey, Jerry Vinokurov', 'manual'),
+     u'Will Barton, Adam Scott, Hillary Jeffrey, Jerry Vinokurov', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of

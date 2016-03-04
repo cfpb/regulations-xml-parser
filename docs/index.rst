@@ -17,7 +17,7 @@ Contents:
    intro
    regulation.tree
    regulation.node
-
+   regulation.validation
 
 Indices and tables
 ==================

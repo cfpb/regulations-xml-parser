@@ -20,17 +20,17 @@ def build_reg_tree(root, parent=None, depth=0):
     This function builds the basic JSON regulation tree recursively from the supplied
     root element of the XML.
 
-    Args:
-        root (:class:`etree.Element`) The XML root. If this function is called from the outside, the root
-            should be the very top of the tree, i.e. the ``<regulation>`` element.
+    :param root: The XML root. If this function is called from the outside, the root
+        should be the very top of the tree, i.e. the ``<regulation>`` element.
+    :type root: :class:`etree.Element`
+    :param parent: The parent of the current element. None if the root is the
+        ``<regulation>`` element.
+    :type parent: :class:`etree.Element`
+    :param depth: The depth at which the current element resides.
+    :type depth: :class:`int`
 
-        parent (:class:`etree.Element`): The parent of the current element. None if the root is the
-            ``<regulation>`` element.
-
-        depth (int): The depth at which the current element resides.
-
-    Returns:
-        :class:`regulation.node.RegNode`: The top node of the resulting tree.
+    :return: The top node of the resulting tree.
+    :rtype: :class:`regulation.node.RegNode`
     """
 
     ns_prefix = '{eregs}'
@@ -231,12 +231,12 @@ def build_paragraph_marker_layer(root):
     """
     Build the paragraph marker layer from the provided root of the XML tree.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the locations of markers, suitable for direct
+    :return: An OrderedDict containing the locations of markers, suitable for direct
         transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
     parapgraphs = root.findall('.//{eregs}paragraph') # + root.findall('.//{eregs}interpParagraph')
     paragraph_dict = OrderedDict()
@@ -257,12 +257,12 @@ def build_internal_citations_layer(root):
     """
     Build the internal citations layer from the provided root of the XML tree.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the locations of internal citations,
-        suitable for direct transformation into JSON for use with the eRegs frontend.
+    :return: An OrderedDict containing the locations of internal citations, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
 
     paragraphs = root.findall('.//{eregs}paragraph') + root.findall('.//{eregs}interpParagraph')
@@ -308,9 +308,6 @@ def build_internal_citations_layer(root):
         cites = content.findall('{eregs}ref[@reftype="internal"]')
         citation_list = []
         for cite in cites:
-            # import pdb
-            # pdb.set_trace()
-
             target = cite.get('target').split('-')
             text = cite.text
 
@@ -346,12 +343,12 @@ def build_external_citations_layer(root):
     """
     Build the external citations layer from the provided root of the XML tree.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the locations of external citations, suitable
-        for direct transformation into JSON for use with the eRegs frontend.
+    :return: An OrderedDict containing the locations of external citations, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
 
     paragraphs = root.findall('.//{eregs}paragraph')
@@ -390,12 +387,12 @@ def build_graphics_layer(root):
     """
     Build the graphics layer from the provided root of the XML tree.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the locations of graphics, suitable for direct
+    :return: An OrderedDict containing the locations of markers, suitable for direct
         transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
 
     layer_dict = OrderedDict()
@@ -429,12 +426,12 @@ def build_formatting_layer(root):
     Build the formatting layer from the provided root of the XML tree. Formatting elements include
     things like callouts, tables, lines indicating spaces on a form, and so on.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the locations of formatting elements,
-        suitable for direct transformation into JSON for use with the eRegs frontend.
+    :return: An OrderedDict containing the locations of formatting elements, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
 
     layer_dict = OrderedDict()
@@ -552,12 +549,11 @@ def apply_formatting(content_elm):
     Applies special inline formatting to variables and callouts, as expected by
     the frontend formatting layer.
 
-    Args:
-        content_elm (:class:`etree.Element`): The element containing the content to which the formatting
-        is to be applied
+    :param content_elm: The ``<content>`` element to which the inline formatting is to be applied.
+    :type content_elm: :class:`etree.Element`
 
-    Returns:
-        :class:`etree.Element`: An element with the formatting content applied.
+    :return: the element with the inline formatting applied.
+    :rtype: :class:`etree.Element`:
     """
 
     working_content = deepcopy(content_elm)
@@ -615,12 +611,12 @@ def build_terms_layer(root):
     """
     Build the terms layer from the provided root of the XML tree.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the locations of terms, suitable for direct
+    :return: An OrderedDict containing the locations of terms, suitable for direct
         transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
 
     definitions_dict = OrderedDict()
@@ -737,12 +733,12 @@ def build_toc_layer(root):
     """
     Build the paragraph table-of-contents layer from the provided root of the XML tree.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the table of contents, suitable for direct
+    :return: An OrderedDict containing the table of contents, suitable for direct
         transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
 
     toc_dict = OrderedDict()
@@ -816,12 +812,12 @@ def build_keyterm_layer(root):
     """
     Build the keyterm layer from the provided root of the XML tree.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the locations of keyterms, suitable for direct
+    :return: An OrderedDict containing the locations of keyterms, suitable for direct
         transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
 
     keyterm_dict = OrderedDict()
@@ -851,12 +847,12 @@ def build_meta_layer(root):
     """
     Build the meta layer from the provided root of the XML tree.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the regulation metadata, suitable for direct
+    :return: An OrderedDict containing the regulation metadata, suitable for direct
         transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
 
     meta_dict = OrderedDict()
@@ -900,12 +896,12 @@ def build_interp_layer(root):
     """
     Build the interpretations layer from the provided root of the XML tree.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the interpretations, suitable for direct
+    :return: An OrderedDict containing the locations of interpretations, suitable for direct
         transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
 
     layer_dict = OrderedDict()
@@ -936,12 +932,12 @@ def build_analysis(root):
     """Build the analysis layer from the provided root of the XML tree. Only builds the references
     to the analysis layer; the actual contents of the layer are created in `build_notice`.
 
-    Parameters:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: A dictionary specifying the locations of analyses, suitable for direct
+    :return: A dictionary specifying the locations of analyses, suitable for direct
         transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
 
     analysis_dict = OrderedDict()
@@ -974,12 +970,12 @@ def build_notice(root):
     """
     Build the notice dictionary from the provided root of the XML tree.
 
-    Args:
-        root (:class:`etree.Element`): The root element of the XML tree.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
 
-    Returns:
-        :class:`collections.OrderedDict`: An OrderedDict containing the notice, suitable for direct
+    :return: An OrderedDict containing the notice, suitable for direct
         transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
     # Get the root label
     label = root.find('.//{eregs}part').attrib['label']

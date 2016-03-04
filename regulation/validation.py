@@ -17,7 +17,9 @@ import regulation.settings as settings
 
 
 class Severity(Enum):
-
+    """
+    An Enum representing the severity of the event encountered upon parsing the regulation.
+    """
     OK = 0
     INFO = 1
     WARNING = 2
@@ -61,6 +63,11 @@ class EregsValidationEvent(Exception):
 
 
 class EregsValidator:
+    """
+    A class encapsulating various validation strategies for ensuring correct output.
+    It's mostly used for managing a small amount of state that doesn't change between
+    functions, and also to keep track of events encountered during validation.
+    """
 
     def __init__(self, xsd_file, ignore_errors=False):
         self.events = []
@@ -69,6 +76,12 @@ class EregsValidator:
         self.ignore_errors = ignore_errors
 
     def load_schema(self):
+        """
+        Load the XSD file used to validate the reg.
+
+        :param: None.
+        :return: :class:`etree.XMLSchema`: the schema object used to validate the reg.
+        """
         try:
             schema = etree.XMLSchema(file=self.xsd_file)
 
@@ -80,6 +93,14 @@ class EregsValidator:
         return schema
 
     def validate_reg(self, tree):
+        """
+        Validate the XML tree according to ``self.schema``. After validation, ``self.events``
+        contains all significant events encountered.
+
+        :param tree: the root of the XML tree.
+        :type tree: :class:`etree.Element`
+        :return: None
+        """
         if self.schema is not None:
             try:
                 self.schema.assertValid(tree)
@@ -100,7 +121,12 @@ class EregsValidator:
     def validate_keyterms(self, tree):
         """
         Make sure that keyterm titles aren't repeated in the content of
-        the paragraph they belong to.
+        the paragraph they belong to. After validation, ``self.events``
+        contains all significant events encountered.
+
+        :param tree: the root of the XML tree.
+        :type tree: :class:`etree.Element`
+        :returns: None.
         """
         problem_flag = False
         keyterms = tree.findall('.//*[@type="keyterm"]')
@@ -117,8 +143,8 @@ class EregsValidator:
             keyterm_text = keyterm.text
             if len(keyterm) > 0:
                 # Note: We don't want to modify the tree
-                keyterm = deepcopy(keyterm)
-                keyterm_text = etree.strip_tags(keyterm_elm, '{*}*')
+                keyterm = copy.deepcopy(keyterm)
+                keyterm_text = etree.strip_tags(keyterm, '{*}*')
 
             # Strip the usual trailing period, just to be sure.
             keyterm_text = re.sub(r'[\.]', '', keyterm_text)
@@ -171,11 +197,14 @@ class EregsValidator:
     def validate_terms(self, tree, terms_layer):
         """
         Validate the tree to make sure that all terms referenced in the
-        terms layer are defined somewhere in the tree.
+        terms layer are defined somewhere in the tree. After validation, ``self.events``
+        contains all significant events encountered.
 
-        :param tree: the xml tree of the regulation
+        :param tree: the root of the XML tree of the regulation.
+        :type tree: :class:`etree.Element`
         :param terms_layer: the dictionary of terms
-        :return: true/false
+        :type terms_layer: :class:`collections.OrderedDict`
+        :return: None.
         """
 
         inf = inflect.engine()
@@ -237,9 +266,20 @@ class EregsValidator:
 
     def validate_term_references(self, tree, terms_layer,
             regulation_file, label=None, term=None):
-        """ Validate term references. If label is given, only validate
-            term references within that label. If term is given, only
-            validate references to that term. """
+        """
+        Validate term references. If label is given, only validate
+        term references within that label. If term is given, only
+        validate references to that term. Prompts to overwrite
+        original file.
+
+        :param tree: the root of the XML tree.
+        :type tree: :class:`etree.Element`
+        :param terms_layer: the layer dictionary produced by :func:`regulation.tree.build_term_layer`.
+        :type terms_layer: :class:`collections.OrderedDict`
+        :param regulation_file: path to the regulation file to which to save changes.
+        :type regulation_file: :class:`str`
+        :return: None
+        """
 
         problem_flag = False
         inf = inflect.engine()
@@ -340,10 +380,15 @@ class EregsValidator:
     def validate_internal_cites(self, tree, internal_cites_layer):
         """
         Validate the tree to make sure that all internal cites refer to
-        an existing label.
-        :param tree: xml tree of the reg
-        :param internal_cites_layer: the dictionary of internal cites
-        :return: true/false
+        an existing label. After validation, ``self.events``
+        contains all significant events encountered.
+
+        :param tree: the root of the XML tree of the reg.
+        :type tree: :class:`etree.Element`
+        :param internal_cites_layer: the dictionary of internal cites.
+        :type internal_cites_layer: :class:`collections.OrderedDict`
+        :return: None
+
         """
         problem_flag = False
 
@@ -389,9 +434,13 @@ class EregsValidator:
     def fix_omitted_cites(self, tree, regulation_file):
         """
         Try a simple fix to pick up internal citations that have been missed by regparser.
-        There's no complicated grammar parsing going on here, just stupid regexing.
-        :param tree: the xml tree
-        :return:
+        There's no complicated grammar parsing going on here, just stupid regexing. Prompts to overwrite original file.
+
+        :param tree: the root of the XML tree.
+        :type tree: :class:`etree.Element`
+        :param regulation_file: path to the regulation file to which to save changes.
+        :type regulation_file: :class:`str`
+        :return: None
         """
         paragraphs = tree.findall('.//{eregs}paragraph') + tree.findall('.//{eregs}interpParagraph')
         pattern = re.compile('([0-9]{4}\.([0-9]+)(\(([a-zA-Z]|[0-9])+\))+)')
@@ -413,9 +462,6 @@ class EregsValidator:
             matches = set([match[0] for match in pattern.findall(par_text)])
             label = paragraph.get('label')
             offsets_and_values = []
-
-            # if matches != set([]):
-            #     import ipdb; ipdb.set_trace()
 
             for match in matches:
                 locations = set(find_all_occurrences(par_text, match))
@@ -467,6 +513,15 @@ class EregsValidator:
                     f.write(etree.tostring(tree, pretty_print=True))
 
     def headerize_interps(self, tree, regulation_file):
+        """
+        Interactively headerize interps that are missing titles. Prompts to overwrite original file.
+
+        :param tree: the root of the XML tree.
+        :type tree: :class:`etree.Element`
+        :param regulation_file: path to the regulation file to which to save changes.
+        :type regulation_file: :class:`str`
+        :return: None
+        """
         paragraphs = tree.findall('.//{eregs}interpParagraph')
         change_flag = False
 
@@ -518,8 +573,16 @@ class EregsValidator:
                     f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
 
     def insert_interp_markers(self, tree, regulation_file):
-        """ Add in the markers for interp paragraphs in situations where 
-            they're missing. """
+        """
+        Add in the markers for interp paragraphs in situations where
+        they're missing. Overwrites original file.
+
+        :param tree: the root of the XML tree.
+        :type tree: :class:`etree.Element`
+        :param regulation_file: path to the regulation file to which to save changes.
+        :type regulation_file: :class:`str`
+        :return: None
+        """
         paragraphs = tree.findall('.//{eregs}interpParagraph')
         for paragraph in paragraphs:
             label = paragraph.get('label')
@@ -541,72 +604,20 @@ class EregsValidator:
         return True
 
     def validate_interp_targets(self, tree, regulation_file, label=None):
-        """ Validate interpretation targets within a given label with
-            the option to write corrected targets out to the
-            regulation_file. """
-            
-        problem_flag = False
+        """
+        Validate interpretation targets within a given label with
+        the option to write corrected targets out to the
+        regulation_file. Prompts to overwrite original file.
 
-        # Pick out our working section of the tree. If no label was
-        # given, we're working on the interpretations node in the tree.
-        if label is not None:
-            working_section = tree.find(
-                    './/*[@label="{}"]'.format(label))
-            if working_section.tag not in (
-                    '{eregs}interpretations',
-                    '{eregs}interpSection', 
-                    '{eregs}interpParagraph'):
-                print("{} is not a part of an interpretation".format(
-                    label))
-                return 
-        else:
-            working_section = tree.find('.//{eregs}interpretations')
-
-        # Find all paragraphs with a target attribute
-        paragraphs = working_section.findall(
-                './/{eregs}interpParagraph[@target]')
-
-        for paragraph in paragraphs:
-            target = paragraph.get('target')
-            label = paragraph.get('label')
-            
-            # If the label doesn't end with '-Interp' it shouldn't have
-            # a target.
-            if not label.endswith('-Interp') and target is not None:
-                problem_flag = True
-                print(colored('Removing bad target {} in {}'.format(
-                        target, label), 'yellow'))
-                del paragraph.attrib['target']
-                continue
-
-            # Break down the label and figure out the paragraph the
-            # paragraph should be assigned to. If it doesn't match the
-            # target, it's a bad target.
-            label_target = label[:label.find('-Interp')]
-            if label_target != target:
-                problem_flag = True
-                print(colored('Fixing bad target {} in {}'.format(
-                        target, label), 'yellow'))
-                paragraph.set('target', label_target)
-                continue
-
-            print(colored('Leaving good target {} in {}'.format(
-                    target, label), 'green'))
-
-        if problem_flag:
-            print(colored('The tree has been altered! Do you want to' 
-                'write the result to disk?', 'red'))
-            answer = None
-            while answer not in ['y', 'n']:
-                answer = raw_input('Save? y/n: ')
-            if answer == 'y':
-                with open(regulation_file, 'w') as f:
-                    f.write(etree.tostring(tree, pretty_print=True))
-
-    def validate_interp_targets(self, tree, regulation_file, label=None):
-        """ Validate interpretation targets within a given label with
-            the option to write corrected targets out to the
-            regulation_file. """
+        :param tree: the root of the XML tree.
+        :type tree: :class:`etree.Element`
+        :param regulation_file: path to the regulation file to which to save changes.
+        :type regulation_file: :class:`str`
+        :param label: the string of the label whose internal interps to validate.
+         Defaults to the ``<interpretations>`` tag.
+        :type label: :class:`str`
+        :return: None
+        """
             
         problem_flag = False
 
