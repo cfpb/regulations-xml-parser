@@ -19,22 +19,24 @@ from regulation.tree import build_reg_tree
 logger = logging.getLogger(__name__)
 
 # Information for working with Table of Contents updates
-TOC_TYPES = {"{eregs}section":{"element": "{eregs}tocSecEntry",
-                        "designator":"{eregs}sectionNum",
-                        "subject":"{eregs}sectionSubject",
-                        "title_elm": "{eregs}subject"},
-             "{eregs}appendix":{"element": "{eregs}tocAppEntry",
-                        "designator":"{eregs}appendixLetter",
-                        "subject":"{eregs}appendixSubject",
-                        "title_elm": "{eregs}appendixTitle"},
-             "{eregs}subpart":{"element": "{eregs}tocSubpartEntry",
-                        "des":"{eregs}subpartLetter",
-                        "subject":"{eregs}subpartTitle",
-                        "title_elm": "{eregs}title"},
-             "{eregs}interp":{"element": "{eregs}tocInterpEntry",
-                        "designator":"",
-                        "subject":"{eregs}interpTitle",
-                        "title_elm": "{eregs}title"},
+# Note: Multiple types of "Interp" tags are possible in the top level of
+# <change> tags, so use get_toc_type to get the entry keyword from tags
+TOC_TYPES = {"section":{"element": "{eregs}tocSecEntry",
+                 "designator":"{eregs}sectionNum",
+                 "subject":"{eregs}sectionSubject",
+                 "title_elm": "{eregs}subject"},
+             "appendix":{"element": "{eregs}tocAppEntry",
+                 "designator":"{eregs}appendixLetter",
+                 "subject":"{eregs}appendixSubject",
+                 "title_elm": "{eregs}appendixTitle"},
+             "subpart":{"element": "{eregs}tocSubpartEntry",
+                 "des":"{eregs}subpartLetter",
+                 "subject":"{eregs}subpartTitle",
+                 "title_elm": "{eregs}title"},
+             "interp":{"element": "{eregs}tocInterpEntry",
+                 "designator":"",
+                 "subject":"{eregs}interpTitle",
+                 "title_elm": "{eregs}title"},
             }
 
 
@@ -195,10 +197,13 @@ def process_changes(original_xml, notice_xml, dry=False):
                     if sib_in_toc is None:
                         continue
 
-                    # Determine what type of change element this is
+                    # Determine element type
                     item = change[0]
-                    if item.tag in TOC_TYPES:
-                        des_tag, subj_tag = get_toc_change_keywords(item.tag)
+                    item_toc = get_toc_type(item.tag)
+
+                    # If element type is a TOC type, add it after its sibling
+                    if item_toc is not None:
+                        des_tag, subj_tag = get_toc_change_keywords(item_toc)
 
                         if len(des_tag) > 0:
                             toc_des = item.get(des_tag)
@@ -208,7 +213,7 @@ def process_changes(original_xml, notice_xml, dry=False):
 
                         if not dry:
                             create_toc_entry(toc, label, toc_des, toc_subject, 
-                                             after_elm=sib_in_toc, entry_type=item.tag)
+                                             after_elm=sib_in_toc, entry_type=item_toc)
 
             else:
                 # If the sibling label is none, just append it to the
@@ -240,9 +245,10 @@ def process_changes(original_xml, notice_xml, dry=False):
                 # Look for whether a modified label exists in a TOC and if so, update TOCs
                 # If the label exists as a TOC entry target, update the number/letter and subject
                 item = change[0]
+                toc_tag = get_toc_type(item.tag)
 
-                if item.tag in TOC_TYPES:
-                    logging.debug("Found {}-type modification".format(item.tag))
+                if toc_tag is not None:
+                    logging.debug("Found {}-type modification".format(toc_tag))
                     # Double-check labels match
                     toc_label = item.get('label')
                     if toc_label != label:
@@ -252,7 +258,7 @@ def process_changes(original_xml, notice_xml, dry=False):
 
                         # If label doesn't appear in any TOCs, move on
                         if len(toc_updates) != 0:
-                            des_tag, subj_tag = get_toc_change_keywords(item.tag)
+                            des_tag, subj_tag = get_toc_change_keywords(toc_tag)
 
                             if len(des_tag) > 0:
                                 toc_des = item.get(des_tag)
@@ -268,12 +274,12 @@ def process_changes(original_xml, notice_xml, dry=False):
                             if not dry:
                                 changed = 0
                                 for toc_entry in toc_updates:
-                                    changed += update_toc_entry(toc_entry, toc_des, toc_subject, entry_type=item.tag)
+                                    changed += update_toc_entry(toc_entry, toc_des, toc_subject, entry_type=toc_tag)
                                 logging.info("Made {} updates to TOC entries for item {} ('{}')".format(changed,
                                                                                                         toc_des,
                                                                                                         label))
                 else:
-                    logging.debug("Modification of tag '{}' not a TOC-type".format(item.tag))
+                    logging.debug("Modification of tag '{}' not a TOC-type".format(toc_tag))
 
                 if not dry:
                     new_elm = change.getchildren()[0]
@@ -311,6 +317,11 @@ def generate_diff(left_xml, right_xml):
     diff = dict(changes_between(FrozenNode.from_node(left_tree),
                                 FrozenNode.from_node(right_tree)))
     return diff
+
+
+def strip_namespace(item):
+    """Strips the {eregs} namespace off of a string and returns the stripped string"""
+    return item.replace("{eregs}", "")
 
 
 def find_tocs(source_xml):
@@ -380,7 +391,11 @@ def create_toc_entry(toc_parent, target_label, designator, subject, after_elm=No
     # Retrieve tag names for this type of entry
     elm_type, des_type, subj_type = get_toc_entry_keywords(entry_type)
 
-    # TODO: Check to see if this target_label already exists and if so just update it?
+    # Check to see if this target_label already exists and if so just update it
+    existing_elm = find_toc_entry(toc_parent, target_label)
+    if existing_elm is not None:
+        logging.info("TOC entry for '{}' requested creation but already exists as a target".format(target_label))
+        update_toc_entry(existing_elm, designator, subject, entry_type=entry_type)
 
     # Create the element and contents
     if after_elm is not None:
@@ -460,8 +475,11 @@ def get_toc_entry_keywords(entry_type):
     Determines the keywords for the specific type of entry in the TOC 
     and returns as a tuple of element tag, designator tag, and subject tag
     """
-
-    return TOC_TYPES[entry_type]["element"], TOC_TYPES[entry_type]["designator"], TOC_TYPES[entry_type]["subject"]
+    if entry_type not in TOC_TYPES:
+        toc_type = get_toc_type(entry_type)
+        return TOC_TYPES[toc_type]["element"], TOC_TYPES[toc_type]["designator"], TOC_TYPES[toc_type]["subject"]
+    else:
+        return TOC_TYPES[entry_type]["element"], TOC_TYPES[entry_type]["designator"], TOC_TYPES[entry_type]["subject"]
 
 
 def get_toc_change_keywords(entry_type):
@@ -469,7 +487,24 @@ def get_toc_change_keywords(entry_type):
     Determines the keywords to extract information from the change entry for TOC changes
     and returns as a tuple of stripped designator attribute and title tag
     """
+    if entry_type not in TOC_TYPES:
+        toc_type = get_toc_type(entry_type)
+        return strip_namespace(TOC_TYPES[toc_type]["designator"]), TOC_TYPES[toc_type]["title_elm"]
+    else:
+        return strip_namespace(TOC_TYPES[entry_type]["designator"]), TOC_TYPES[entry_type]["title_elm"]
 
-    return TOC_TYPES[entry_type]["designator"].replace("{eregs}",""), TOC_TYPES[entry_type]["title_elm"]
 
+def get_toc_type(tag):
+    """
+    Interps can have multiple <change> tag types, top-level. Returns the TOC type keyword for further
+    lookup.
+    """
+
+    short = strip_namespace(tag)
+
+    for key in TOC_TYPES:
+        if short.startswith(key):
+            return key
+
+    return None
 
