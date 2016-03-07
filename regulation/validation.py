@@ -717,8 +717,8 @@ class EregsValidator:
 
                 # Don't automatically remove "modified" or "moved"
                 # operations. Let the user resolve those. 
-                if parent_op not in ("modified", "moved") and \
-                        op not in ("modified", "moved"):
+                if op not in ("modified", "moved") and \
+                        op == parent_op:
                     print('{change} will be changed by parent '
                           '{parent_change} change. Do you want to '
                           'remove {change}?'.format(
