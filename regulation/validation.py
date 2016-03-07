@@ -741,6 +741,6 @@ class EregsValidator:
 
         if len(unresolved_dups) > 0:
             print(colored(str(len(unresolved_dups)), 'red'), 
-                  'changes remain unresolved:')
+                  'potentially duplicate changes remain unresolved:')
             for change, parent in unresolved_dups:
                 print(change, '/', parent)
