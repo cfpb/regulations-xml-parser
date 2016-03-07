@@ -243,10 +243,7 @@ def process_changes(original_xml, notice_xml, dry=False):
                 else:
                     new_index = len(parent_elm.getchildren())
 
-                    # TODO: Uncovered case: adding a first element to a parent will not
-                    # have a sibling but maybe also needs to add to the TOC
-
-            if sibling_label is not None:
+             if sibling_label is not None:
                 # Perform TOC updates if needed
                 # - Determine whether the sibling's label appears in TOC(s)
                 # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
@@ -552,7 +549,7 @@ def update_toc_entry(toc_entry, designator, new_subject, entry_type="section"):
 
 def delete_toc_entry(toc_entry):
     """
-    Deletes the specified tocSecEntry and all of its children
+    Deletes the specified TOC entry and all of its children
     """
     toc_entry.getparent().remove(toc_entry)
     

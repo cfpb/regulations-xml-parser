@@ -33,6 +33,11 @@ class ChangesTests(TestCase):
         self.assertEqual(['1234', ],
                          get_parent_label(label_parts))
         
+    def test_get_parent_label_part_subpart(self):
+        label_parts = ['1234', 'Subpart', 'A']
+        self.assertEqual(['1234', ],
+                         get_parent_label(label_parts))
+        
     def test_get_sibling_label_alpha(self):
         label_parts = ['1234', '1', 'g']
         self.assertEqual(['1234', '1', 'f'],
