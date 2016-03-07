@@ -164,6 +164,9 @@ def process_changes(original_xml, notice_xml, dry=False):
         # For added labels, we need to break up the label and find its
         # parent and its preceding sibling to know where to add it.
         if op == 'added':
+            before_label = change.get('before')
+            after_label = change.get('after')
+        
             label_parts = label.split('-')
             new_elm = change.getchildren()[0]
             new_index = 0
@@ -179,16 +182,38 @@ def process_changes(original_xml, notice_xml, dry=False):
             parent_label = '-'.join(get_parent_label(label_parts))
             parent_elm = new_xml.find('.//*[@label="{}"]'.format(parent_label))
 
-            # Get the sibling of the added label
-            sibling_label_parts = get_sibling_label(label_parts)
-            if sibling_label_parts is not None:
-                sibling_label = '-'.join(sibling_label_parts)
-                sibling_elm = new_xml.find(
-                    './/*[@label="{}"]'.format(sibling_label))
-
-                # Figure out where we're inserting this element
+            # Figure out where we're putting the new element 
+            # If we're given a before or after label, look
+            # for the corresponding elements.
+            sibling_label = None
+            sibling_elm = None
+            if before_label is not None:
+                sibling_label = before_label
+                sibling_elm = new_xml.find('.//*[@label="{}"]'.format(
+                    before_label))
+                new_index = parent_elm.index(sibling_elm)
+            elif after_label is not None:
+                sibling_label = after_label
+                sibling_elm = new_xml.find('.//*[@label="{}"]'.format(
+                    after_label))
                 new_index = parent_elm.index(sibling_elm) + 1
+            else:
+                # Guess the sibling label
+                sibling_label_parts = get_sibling_label(label_parts)
+                if sibling_label_parts is not None:
+                    sibling_label = '-'.join(sibling_label_parts)
+                    sibling_elm = new_xml.find(
+                        './/*[@label="{}"]'.format(sibling_label))
+                
+                    new_index = parent_elm.index(sibling_elm) + 1
+                else:
+                    # Otherwise, just append it to the end of the parent.
+                    new_index = len(parent_elm.getchildren())
 
+                    # TODO: Uncovered case: adding a first element to a parent will not
+                    # have a sibling but maybe also needs to add to the TOC
+
+            if sibling_label is not None:
                 # Perform TOC updates if needed
                 # - Determine whether the sibling's label appears in TOC(s)
                 # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
@@ -217,14 +242,6 @@ def process_changes(original_xml, notice_xml, dry=False):
                         if not dry:
                             create_toc_entry(toc, label, toc_des, toc_subject, 
                                              after_elm=sib_in_toc, entry_type=item_toc)
-
-            else:
-                # If the sibling label is none, just append it to the
-                # end of the parent.
-                new_index = len(parent_elm.getchildren())
-
-                # TODO: Uncovered case: adding a first element to a parent will not
-                # have a sibling but maybe also needs to add to the TOC
 
             # Insert the new xml!
             if not dry:

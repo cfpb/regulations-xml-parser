@@ -175,6 +175,51 @@ class ChangesTests(TestCase):
         self.assertNotEqual(new_interp, None)
         self.assertEqual(new_interp.getparent().index(new_interp), 2)
 
+    def test_process_changes_added_before(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="added" label="1234-1" before="1234-2">
+                  <paragraph label="1234-1">An added paragraph</paragraph>
+                </change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <paragraph label="1234-2">An existing paragraph</paragraph>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        new_para = new_xml.find('.//{eregs}paragraph[@label="1234-1"]')
+        self.assertEqual(new_para.getparent().index(new_para), 0)
+
+    def test_process_changes_added_after(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="added" label="1234-2" after="1234-3">
+                  <paragraph label="1234-2">An added paragraph</paragraph>
+                </change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <paragraph label="1234-1">An existing paragraph</paragraph>
+                <paragraph label="1234-3">Another existing paragraph</paragraph>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        new_para = new_xml.find('.//{eregs}paragraph[@label="1234-2"]')
+        self.assertEqual(new_para.getparent().index(new_para), 2)
+
     def test_process_changes_modified(self):
         notice_xml = etree.fromstring("""
             <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
