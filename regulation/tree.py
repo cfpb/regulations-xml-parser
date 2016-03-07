@@ -16,6 +16,22 @@ from lxml import etree
 
 
 def build_reg_tree(root, parent=None, depth=0):
+    """
+    This function builds the basic JSON regulation tree recursively from the supplied
+    root element of the XML.
+
+    :param root: The XML root. If this function is called from the outside, the root
+        should be the very top of the tree, i.e. the ``<regulation>`` element.
+    :type root: :class:`etree.Element`
+    :param parent: The parent of the current element. None if the root is the
+        ``<regulation>`` element.
+    :type parent: :class:`etree.Element`
+    :param depth: The depth at which the current element resides.
+    :type depth: :class:`int`
+
+    :return: The top node of the resulting tree.
+    :rtype: :class:`regulation.node.RegNode`
+    """
 
     ns_prefix = '{eregs}'
     tag = root.tag.replace(ns_prefix, '')
@@ -134,6 +150,20 @@ def build_reg_tree(root, parent=None, depth=0):
 
         children = root.findall('{eregs}paragraph')
 
+        # Check to see if the first child is an unmarked intro
+        # paragraph. Reg-site expects those to be be the 'text' of this
+        # node rather than child nodes in their own right.
+        if len(children) > 0:
+            first_child = children[0]
+            # if it doesn't have a title, doesn't have a marker, and
+            # doesn't have children, it is an intro paragraph.
+            if first_child.find('{eregs}title') is None and \
+                    first_child.get('marker') == '' and \
+                    len(first_child.findall('{eregs}paragraph')) == 0:
+                content = xml_node_text(first_child.find('{eregs}content'))
+                node.text = content.strip()
+                del children[0]
+
     elif tag == 'interpretations':
 
         title = root.find('{eregs}title')
@@ -198,7 +228,16 @@ def build_reg_tree(root, parent=None, depth=0):
 
 
 def build_paragraph_marker_layer(root):
+    """
+    Build the paragraph marker layer from the provided root of the XML tree.
 
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the locations of markers, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
+    """
     parapgraphs = root.findall('.//{eregs}paragraph') # + root.findall('.//{eregs}interpParagraph')
     paragraph_dict = OrderedDict()
 
@@ -215,6 +254,16 @@ def build_paragraph_marker_layer(root):
 
 
 def build_internal_citations_layer(root):
+    """
+    Build the internal citations layer from the provided root of the XML tree.
+
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the locations of internal citations, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
+    """
 
     paragraphs = root.findall('.//{eregs}paragraph') + root.findall('.//{eregs}interpParagraph')
     layer_dict = OrderedDict()
@@ -259,9 +308,6 @@ def build_internal_citations_layer(root):
         cites = content.findall('{eregs}ref[@reftype="internal"]')
         citation_list = []
         for cite in cites:
-            # import pdb
-            # pdb.set_trace()
-
             target = cite.get('target').split('-')
             text = cite.text
 
@@ -294,6 +340,16 @@ def build_internal_citations_layer(root):
 
 
 def build_external_citations_layer(root):
+    """
+    Build the external citations layer from the provided root of the XML tree.
+
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the locations of external citations, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
+    """
 
     paragraphs = root.findall('.//{eregs}paragraph')
     layer_dict = OrderedDict()
@@ -328,6 +384,16 @@ def build_external_citations_layer(root):
 
 
 def build_graphics_layer(root):
+    """
+    Build the graphics layer from the provided root of the XML tree.
+
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the locations of markers, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
+    """
 
     layer_dict = OrderedDict()
     paragraphs = root.findall('.//{eregs}paragraph')
@@ -356,6 +422,17 @@ def build_graphics_layer(root):
 
 
 def build_formatting_layer(root):
+    """
+    Build the formatting layer from the provided root of the XML tree. Formatting elements include
+    things like callouts, tables, lines indicating spaces on a form, and so on.
+
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the locations of formatting elements, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
+    """
 
     layer_dict = OrderedDict()
     paragraphs = root.findall('.//{eregs}paragraph') + \
@@ -468,9 +545,17 @@ def build_formatting_layer(root):
 
 
 def apply_formatting(content_elm):
-    """ Certain formatting is expected of variables and callouts when
-        the formatting layer is applied. This function applies that
-        formatting to the content element of a paragraph. """
+    """
+    Applies special inline formatting to variables and callouts, as expected by
+    the frontend formatting layer.
+
+    :param content_elm: The ``<content>`` element to which the inline formatting is to be applied.
+    :type content_elm: :class:`etree.Element`
+
+    :return: the element with the inline formatting applied.
+    :rtype: :class:`etree.Element`:
+    """
+
     working_content = deepcopy(content_elm)
 
     # Before building the content text, replace any variable 
@@ -523,6 +608,16 @@ def apply_formatting(content_elm):
 
 
 def build_terms_layer(root):
+    """
+    Build the terms layer from the provided root of the XML tree.
+
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the locations of terms, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
+    """
 
     definitions_dict = OrderedDict()
     terms_dict = OrderedDict()
@@ -532,9 +627,6 @@ def build_terms_layer(root):
 
     paragraphs = root.findall('.//{eregs}paragraph') + \
         root.findall('.//{eregs}interpParagraph')
-
-    #TODO: redo this part; do the defs outside the paragraph scan and
-    #TODO: then create the layer keys by referencing the definitions dict
 
     definitions = root.findall('.//{eregs}def')
 
@@ -556,12 +648,10 @@ def build_terms_layer(root):
                     ':' + label
             else:
                 key = defined_term.lower() + ':' + label
-            # key = inf_engine.singular_noun(defined_term.lower()) + ':' +label
+
             def_text = defn.text
             positions = find_all_occurrences(par_text, def_text)
             def_dict = OrderedDict()
-            # def_dict['offsets'] = []
-            # for pos in positions:
             pos = positions[0]
             def_dict['position'] = [pos, pos + len(def_text)]
             def_dict['reference'] = label
@@ -640,6 +730,16 @@ def build_terms_layer(root):
 
 
 def build_toc_layer(root):
+    """
+    Build the paragraph table-of-contents layer from the provided root of the XML tree.
+
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the table of contents, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
+    """
 
     toc_dict = OrderedDict()
 
@@ -709,6 +809,16 @@ def build_toc_layer(root):
 
 
 def build_keyterm_layer(root):
+    """
+    Build the keyterm layer from the provided root of the XML tree.
+
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the locations of keyterms, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
+    """
 
     keyterm_dict = OrderedDict()
 
@@ -734,6 +844,16 @@ def build_keyterm_layer(root):
 
 
 def build_meta_layer(root):
+    """
+    Build the meta layer from the provided root of the XML tree.
+
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the regulation metadata, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
+    """
 
     meta_dict = OrderedDict()
 
@@ -773,6 +893,16 @@ def build_meta_layer(root):
 
 
 def build_interp_layer(root):
+    """
+    Build the interpretations layer from the provided root of the XML tree.
+
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the locations of interpretations, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
+    """
 
     layer_dict = OrderedDict()
     interpretations = root.find('.//{eregs}interpretations')
@@ -799,13 +929,17 @@ def build_interp_layer(root):
 
 
 def build_analysis(root):
-    """
-    Build the analysis layer from the given root node. This looks for
-    all `analysis` elements and creates references to them.
+    """Build the analysis layer from the provided root of the XML tree. Only builds the references
+    to the analysis layer; the actual contents of the layer are created in `build_notice`.
 
-    The actual analysis is captured in the `build_notice` function
-    below.
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: A dictionary specifying the locations of analyses, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
+
     analysis_dict = OrderedDict()
 
     # Find all analysis elements within the regulation
@@ -834,9 +968,14 @@ def build_analysis(root):
 
 def build_notice(root):
     """
-    Build the notice dictioanry from the given root node.
+    Build the notice dictionary from the provided root of the XML tree.
 
-    Notices currently contain analysis and footnotes
+    :param root: The root element of the XML tree.
+    :type root: :class:`etree.Element`
+
+    :return: An OrderedDict containing the notice, suitable for direct
+        transformation into JSON for use with the eRegs frontend.
+    :rtype: :class:`collections.OrderedDict`:
     """
     # Get the root label
     label = root.find('.//{eregs}part').attrib['label']
@@ -889,7 +1028,7 @@ def build_notice(root):
                         'paragraph': len(paragraphs),
                         'reference': p_child_elm.attrib['ref']
                     })
-                # TODO: for the moment we are reduced to inlining analysis
+                # TODO: for the moment we are reduced to inlining analysis graphics
                 # TODO: as <img> elements. In our bold new future where layers
                 # TODO: are abolished, this should be fixed to properly embed
                 # TODO: graphics in analysis

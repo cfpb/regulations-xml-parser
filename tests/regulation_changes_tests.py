@@ -219,6 +219,90 @@ class ChangesTests(TestCase):
         del_paras = new_xml.findall('.//{eregs}paragraph[@label="1234-1"]')
         self.assertEqual(len(del_paras), 0)
 
+    def test_process_changes_moved(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="moved" label="1234-1" parent="1234-Subpart-B"></change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <subpart label="1234-Subpart-A">
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </subpart>
+                <subpart label="1234-Subpart-B">
+                  <paragraph label="1234-2">Another existing paragraph</paragraph>
+                </subpart>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        moved_para = new_xml.find('.//{eregs}paragraph[@label="1234-1"]')
+        self.assertEqual(moved_para.getparent().get('label'),
+                         '1234-Subpart-B')
+        self.assertEqual(moved_para.getparent().index(moved_para), 1)
+        old_parent = new_xml.find('.//{eregs}subpart[@label="1234-Subpart-A"]')
+        self.assertEqual(len(old_parent.getchildren()), 0)
+
+    def test_process_changes_moved_before(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="moved" label="1234-1" parent="1234-Subpart-B" before="1234-2"></change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <subpart label="1234-Subpart-A">
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </subpart>
+                <subpart label="1234-Subpart-B">
+                  <paragraph label="1234-2">Another existing paragraph</paragraph>
+                </subpart>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        moved_para = new_xml.find('.//{eregs}paragraph[@label="1234-1"]')
+        self.assertEqual(moved_para.getparent().get('label'),
+                         '1234-Subpart-B')
+        self.assertEqual(moved_para.getparent().index(moved_para), 0)
+
+    def test_process_changes_moved_after(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="moved" label="1234-1" parent="1234-Subpart-B" after="1234-2"></change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <subpart label="1234-Subpart-A">
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </subpart>
+                <subpart label="1234-Subpart-B">
+                  <paragraph label="1234-2">Another existing paragraph</paragraph>
+                  <paragraph label="1234-3">One more existing paragraph</paragraph>
+                </subpart>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        moved_para = new_xml.find('.//{eregs}paragraph[@label="1234-1"]')
+        self.assertEqual(moved_para.getparent().get('label'),
+                         '1234-Subpart-B')
+        self.assertEqual(moved_para.getparent().index(moved_para), 1)
+
     def test_generate_diff_added(self):
         left_xml = etree.fromstring("""
             <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
@@ -384,3 +468,141 @@ class ChangesTests(TestCase):
         self.assertEqual(len(diff.keys()), 1)
         self.assertTrue('1234-1-a' in diff)
         self.assertEqual(diff['1234-1-a']['op'], 'deleted')
+
+
+    def test_process_changes_toc_added(self):
+        # Note: Does not currently test Subpart adding
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="added" label="1234-2">
+                  <section label="1234-2" sectionNum="2">
+                    <subject>1234.2 New Title</subject>
+                  </section>
+                </change>
+                <change operation="added" label="1234-Interp">
+                  <interpretations label="1234-Interp">
+                    <interpTitle>Supplement I to Part 1234</interpTitle>
+                  </interpretations>
+                </change>
+                <change operation="added" label="1234-B">
+                  <appendix appendixLetter="B" label="1024-B">
+                    <appendixTitle>Appendix B to Part 1234—Title parts</appendixTitle>
+                  </appendix>
+                </change>                
+             </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <tableOfContents>
+                  <tocSecEntry target="1234-1">
+                    <sectionNum>1</sectionNum>
+                    <sectionSubject>§ 1234.1 Designation.</sectionSubject>
+                  </tocSecEntry>
+                <tocAppEntry target="1234-A">
+                    <appendixLetter>A</appendixLetter>
+                    <appendixSubject>Appendix A - [Reserved]</appendixSubject>
+                  </tocAppEntry>
+                </tableOfContents>
+                <subpart></subpart>
+                <section label="1234-1"></section>
+                <appendix label="1234-A"></appendix>
+              </part>
+            </regulation>""")
+        # Code for testing - on addition update, the TOC should get filled out with additional information
+        # and have 4 elements instead of 2 - the added Interp has no sibling so does not get added to the TOC
+        new_xml = process_changes(original_xml, notice_xml)
+        toc_root = new_xml.find('.//{eregs}tableOfContents')
+        num_children = len([el for el in toc_root.iterchildren()])
+        self.assertEqual(num_children, 4)
+
+
+    def test_process_changes_toc_modified(self):
+        # Note: Does not currently test Subpart modification
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="modified" label="1234-1">
+                  <section label="1234-1" sectionNum="1">
+                    <subject>1234.1 New Title</subject>
+                  </section>
+                </change>
+                <change operation="modified" label="1234-Interp">
+                  <interpretations label="1234-Interp">
+                    <title>Supplement I to Part 1234</title>
+                  </interpretations>
+                </change>
+                <change operation="modified" label="1234-A">
+                  <appendix appendixLetter="A" label="1234-A">
+                    <appendixTitle>Appendix A to Part 1234—Title parts that are new</appendixTitle>
+                  </appendix>
+                </change>                
+             </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <tableOfContents>
+                  <tocSecEntry target="1234-1">
+                  </tocSecEntry>
+                  <tocInterpEntry target="1234-Interp">
+                  </tocInterpEntry>
+                  <tocAppEntry target="1234-A">
+                    <appendixLetter>A</appendixLetter>
+                    <appendixSubject>Appendix A - [Reserved]</appendixSubject>
+                  </tocAppEntry>
+                </tableOfContents>
+                <subpart></subpart>
+                <section label="1234-1"></section>
+                <interpretations label="1234-Interp"></interpretations>
+                <appendix label="1234-A"></appendix>
+              </part>
+            </regulation>""")
+        # Code for testing - on modification update, the TOC should get filled out with additional information
+        # and have 5 leaf-elements instead of 2
+        new_xml = process_changes(original_xml, notice_xml)
+        toc_root = new_xml.find('.//{eregs}tableOfContents')
+        num_children = sum([len(el) for el in toc_root.iterchildren()])
+        self.assertEqual(num_children, 5)
+
+
+    def test_process_changes_toc_deletion(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="deleted" label="1234-1"></change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <tableOfContents>
+                  <tocSecEntry target="1234-1">
+                    <sectionNum>1</sectionNum>
+                    <sectionSubject>§ 1234.1 Designation.</sectionSubject>
+                  </tocSecEntry>
+                <tocAppEntry target="1234-A">
+                    <appendixLetter>A</appendixLetter>
+                    <appendixSubject>Appendix A - [Reserved]</appendixSubject>
+                  </tocAppEntry>
+                </tableOfContents>
+                <subpart></subpart>
+                <section label="1234-1"></section>
+                <appendix label="1234-A"></appendix>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        del_sec = new_xml.findall('.//{eregs}section[@label="1234-1"]')
+        del_app = new_xml.findall('.//{eregs}appendix[@label="1234-A"]')
+        self.assertEqual(len(del_sec), 0)
+        self.assertEqual(len(del_app), 1)
