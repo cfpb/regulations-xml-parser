@@ -9,9 +9,31 @@ import re
 import json
 import hashlib
 
-class RegNode:
+"""
+Created on Jan 1, 2016
+@author: Jerry Vinokurov, Will Barton
+"""
 
+
+class RegNode:
+    """
+    The RegNode class represents a regular text node in a regulation.
+    It provides for some convenience functions for manipulating the
+    tree hierarchy if necessary.
+
+    Keyword arguments:
+        `include_children` (**bool**): whether or not to include children when generating JSON
+    """
     def __init__(self, **kwargs):
+        """
+        The initializer for the RegNode class.
+
+        Args:
+            \*\*kwargs: keyword arguments
+
+        Keyword arguments:
+            include_children (bool): whether or not to include children when generating JSON
+        """
         self.label = []
         self.marker = None
         self.children = []
@@ -33,6 +55,13 @@ class RegNode:
             self.include_children = False
 
     def to_json(self):
+        """
+        Convert yourself, and possibly all your children, into JSON.
+
+        Returns:
+            :class:`collections.OrderedDict`: A dict representing the node, suitable for
+            direct use wherever JSON is expected.
+        """
         node_dict = OrderedDict()
 
         if self.include_children:
@@ -73,7 +102,17 @@ class RegNode:
 
     @staticmethod
     def merkle_hash(node):
-        # Merkle hash implementation
+        """
+        An implementation of Merkle hashes for determining whether a node has changed.
+        Currently unused.
+
+        :param node: the node to hash.
+        :type node: :class:`regulation.node.RegNode`
+
+        :return: an integer representing the hash of the node.
+        :rtype: :class:`int`
+        """
+
         if node.children == []:
             #return hash('-'.join(node.label) + node.node_type + node.text + node.source_xml)
             return hash(node.node_type + node.text + node.source_xml)
@@ -91,18 +130,38 @@ class RegNode:
 
     @property
     def interior_hash(self):
+        """
+        An interior hash that only takes into account the node type, its text, and the XML it is based on.
+
+        :param: None
+
+        :return: an integer representing the hash of the node's fields.
+        :rtype: :class:`int`
+        """
         return hash(self.node_type + self.text + self.source_xml)
 
     @property
     def string_label(self):
+        """
+        The label of the node as a single string.
+
+        :param: None
+
+        :return: a string representing the node label.
+        :rtype: :class:`str`
+        """
         return '-'.join(self.label)
 
     def find_node(self, func):
         """
         Find all nodes in the subtree of self that match the specified predicate.
-        :param function: predicate to match
-        :return: a flat list of the nodes matching that predicate
-        """
+
+        :param func: predicate to match.
+        :type func: :class:`function`
+
+        :return: a flat list of the RegNodes matching that predicate
+        :rtype: :class:`list` of :class:`regulation.node.RegNode`
+         """
         matches = [child for child in self.children if func(child)]
 
         submatches = []
@@ -112,15 +171,15 @@ class RegNode:
 
         return matches
 
-
     def flatten(self):
         """
         Return this node and all its children in a flat list
-        :return:
-        """
 
-        #import pdb
-        #pdb.set_trace()
+        :param: None
+
+        :return: a flat list of RegNodes.
+        :rtype: :class:`list` of :class:`regulation.node.RegNode`:
+        """
 
         if self.children == []:
             new_node = RegNode()
@@ -145,11 +204,12 @@ class RegNode:
     def labels(self):
         """
         Return the list of all labels used in the tree
-        :return:
-        """
 
-        import pdb
-        #pdb.set_trace()
+        :param: None
+
+        :return: a list of strings that are labels used in the tree.
+        :rtype: :class:`list` of :class:`str`
+        """
 
         if self.children == []:
             return [self.string_label]
@@ -161,8 +221,11 @@ class RegNode:
 
     def height(self):
         """
-        Calculate the height of the tree starting from the root and down to the lowest leaf/
-        :return: The tree height
+        Calculate the height of the tree starting from the root and down to the lowest leaf.
+
+        :param: None.
+        :return: the tree height.
+        :rtype: :class:`int`
         """
         if len(self.children) == 0:
             return 1
@@ -171,6 +234,17 @@ class RegNode:
 
 
 def xml_node_text(node, include_children=True):
+    """
+    Extract the raw text from an XML element.
+
+    :param node: the XML element, usually ``<content>``.
+    :type node: :class:`etree.Element`
+    :param include_children: whether or not to get the text of the children as well.
+    :type include_children: :class:`bool` - optional, default = True
+
+    :return: a string of the text of the node without any markup.
+    :rtype: :class:`str`
+    """
 
     if node.text:
         node_text = node.text
@@ -241,8 +315,19 @@ def xml_node_equality(node1, node2):
     else:
         return False
 
-def find_all_occurrences(source, target):
 
+def find_all_occurrences(source, target):
+    """
+    Find all occurrences of `target` in `source`
+
+    :param source: the source string to search within.
+    :type source: :class:`str`
+    :param target: the target string to search for.
+    :type target: :class:`str`:
+
+    :return: list of positions at which `source` occurs in `target`.
+    :rtype: :class:`list` of :class:`int`
+    """
     positions = []
     remainder = source
     start = 0
@@ -260,6 +345,22 @@ def find_all_occurrences(source, target):
 
 
 def interpolate_string(text, offsets, values, colorize=False):
+    """
+    Interpolate the `values` into the `text` at a given `offset`.
+
+
+    :param text: the text string into which to interpolate the `values`.
+    :type text: :class:`str`
+    :param offsets: a list of 2-tuples of integers representing the start and end of the interpolated text.
+    :type offsets: :class:`tuple` of :class:`int`
+    :param values: the list of values to be interpolated into the text.
+    :type values: :class:`list` of :class:`str`
+    :param colorize: flag to return a "colorized" version of the text, useful for highlighting.
+    :type colorize: :class:`bool`- optional, default = False
+
+    :return: the `text` with each `value` interpolated at the specified `offsets`.
+    :rtype: :class:`str`
+    """
     result = ''
     current_pos = 0
     for i, offset in enumerate(offsets):
@@ -282,6 +383,27 @@ def interpolate_string(text, offsets, values, colorize=False):
 
 
 def enclosed_in_tag(source_text, tag, loc):
+    """
+    Determine whether within the `source_text`, the element present at `loc` is enclosed within the XML `tag`.
+
+    :param source_text: a string that possibly contains some XML markup.
+    :type source_text: :class:`str`
+    :param tag: a string specifying an XML tag.
+    :type tag: :class:`str`
+    :param loc: the location to test for enclosure.
+    :type loc: :class:`int`
+
+    :return: a boolean indicating whether `loc` is enclosed in the specified `tag`.
+    :rtype: :class:`bool`
+
+    Example:
+    ::
+        source_text = '<foo>bar</foo>'
+        tag = 'foo'
+        loc = 6
+        enclosed_in_tag(source_text, tag, loc)
+        True
+    """
     trailing_text = source_text[loc:]
     close_tag = '</{}>'.format(tag)
     first_open_tag = re.search('<[^\/].*?>', trailing_text)
