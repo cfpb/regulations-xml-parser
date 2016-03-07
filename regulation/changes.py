@@ -61,6 +61,11 @@ def get_parent_label(label_parts):
         parent_label = get_parent_label(parent_label)
         parent_label.append('Interp')
 
+    # Subparts are also special and their parent should be the label 
+    # until the "Subpart" portion
+    if "Subpart" in label_parts:
+        parent_label = label_parts[:label_parts.index("Subpart")]
+
     return parent_label
 
 
