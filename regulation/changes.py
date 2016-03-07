@@ -192,7 +192,10 @@ def process_changes(original_xml, notice_xml, dry=False):
                     './/*[@label="{}"]'.format(sibling_label))
 
                 # Figure out where we're inserting this element
-                new_index = parent_elm.index(sibling_elm) + 1
+                if sibling_elm is not None:
+                    new_index = parent_elm.index(sibling_elm) + 1
+                else:
+                    new_index = 0
 
                 # Perform TOC updates if needed
                 # - Determine whether the sibling's label appears in TOC(s)
@@ -507,7 +510,7 @@ def update_toc_entry(toc_entry, designator, new_subject, entry_type="section"):
 
 def delete_toc_entry(toc_entry):
     """
-    Deletes the specified tocSecEntry and all of its children
+    Deletes the specified TOC entry and all of its children
     """
     toc_entry.getparent().remove(toc_entry)
     
