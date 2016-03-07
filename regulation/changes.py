@@ -166,6 +166,7 @@ def process_changes(original_xml, notice_xml, dry=False):
         if op == 'added':
             before_label = change.get('before')
             after_label = change.get('after')
+            parent_label = change.get('parent')
         
             label_parts = label.split('-')
             new_elm = change.getchildren()[0]
@@ -179,9 +180,10 @@ def process_changes(original_xml, notice_xml, dry=False):
                                "change?".format(label))
 
             # Get the parent of the added label
-            parent_label = '-'.join(get_parent_label(label_parts))
+            if parent_label is None:
+                parent_label = '-'.join(get_parent_label(label_parts))
             parent_elm = new_xml.find('.//*[@label="{}"]'.format(parent_label))
-
+ 
             # Figure out where we're putting the new element 
             # If we're given a before or after label, look
             # for the corresponding elements.
@@ -199,6 +201,10 @@ def process_changes(original_xml, notice_xml, dry=False):
                 sibling_elm = new_xml.find('.//*[@label="{}"]'.format(
                     after_label))
                 new_index = parent_elm.index(sibling_elm) + 1
+            # If there's an explicit parent but no siblings, insert at
+            # the beginning of the parent.
+            elif change.get('parent') is not None:
+                new_index = 0
             else:
                 # Guess the preceding sibling
                 sibling_label_parts = get_sibling_label(label_parts)
