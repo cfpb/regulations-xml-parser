@@ -187,18 +187,20 @@ def process_changes(original_xml, notice_xml, dry=False):
             # for the corresponding elements.
             sibling_label = None
             sibling_elm = None
+            # An explicit following-sibling was given
             if before_label is not None:
                 sibling_label = before_label
                 sibling_elm = new_xml.find('.//*[@label="{}"]'.format(
                     before_label))
                 new_index = parent_elm.index(sibling_elm)
+            # An explicit preceding-sibling was given
             elif after_label is not None:
                 sibling_label = after_label
                 sibling_elm = new_xml.find('.//*[@label="{}"]'.format(
                     after_label))
                 new_index = parent_elm.index(sibling_elm) + 1
             else:
-                # Guess the sibling label
+                # Guess the preceding sibling
                 sibling_label_parts = get_sibling_label(label_parts)
                 if sibling_label_parts is not None:
                     sibling_label = '-'.join(sibling_label_parts)
@@ -206,8 +208,9 @@ def process_changes(original_xml, notice_xml, dry=False):
                         './/*[@label="{}"]'.format(sibling_label))
                 
                     new_index = parent_elm.index(sibling_elm) + 1
+                # Give up on a particular location and append to the end
+                # of the parent.
                 else:
-                    # Otherwise, just append it to the end of the parent.
                     new_index = len(parent_elm.getchildren())
 
                     # TODO: Uncovered case: adding a first element to a parent will not
