@@ -61,6 +61,11 @@ def get_parent_label(label_parts):
         parent_label = get_parent_label(parent_label)
         parent_label.append('Interp')
 
+    # Subparts are also special and their parent should be the label 
+    # until the "Subpart" portion
+    if "Subpart" in label_parts:
+        parent_label = label_parts[:label_parts.index("Subpart")]
+
     return parent_label
 
 
@@ -106,6 +111,30 @@ def get_sibling_label(label_parts):
     return sibling_label
 
 
+def label_compare(left, right):
+    """ Compare two labels. This sorts labels based on:
+            Subpart
+            Numerical
+            Alphabetical
+
+        "Interp" will be stripped for comparison purposes.
+        """
+    # Note: Interp labels are special. For comparison purposes, we just
+    # remove the '-Interp' from the label. Otherwse we would end up with
+    # something like '1234-Interp' being sorted after '1234-1-Interp'.
+    if 'Interp' in left:
+        left = left.replace('-Interp', '')
+    if 'Interp' in right:
+        right = right.replace('-Interp', '')
+
+    if 'Subpart' in left and 'Subpart' not in right:
+        return -1
+    if 'Subpart' in right and 'Subpart' not in left:
+        return 1
+
+    return cmp(left, right)
+    
+
 def process_changes(original_xml, notice_xml, dry=False):
     """ Process changes given in the notice_xml to modify the
         original_xml. The 'dry' param controls whether this is a
@@ -142,17 +171,12 @@ def process_changes(original_xml, notice_xml, dry=False):
     tocs = find_tocs(new_xml)
     logging.debug("Found {} TOCs in document".format(len(tocs)))
 
-    # Sort them appropriately by label
-    # Note: Interp labels are special. For comparison purposes, we just
-    # remove the '-Interp' from the label. Otherwse we would end up with
-    # something like '1234-Interp' being sorted after '1234-1-Interp'.
-    get_label = lambda c: c.get('label') \
-                          if 'Interp' not in c.get('label') \
-                          else c.get('label').replace('-Interp', '')
-    deletions = list(reversed(sorted(deletions, key=get_label)))
-    modifications = list(reversed(sorted(modifications, key=get_label)))
-    additions = list(sorted(additions, key=get_label))
-    movements = list(sorted(movements, key=get_label))
+    # Sort them appropriately by label using our custom comparison
+    get_label = lambda c: c.get('label')
+    deletions = list(reversed(sorted(deletions, key=get_label, cmp=label_compare)))
+    modifications = list(reversed(sorted(modifications, key=get_label, cmp=label_compare)))
+    additions = list(sorted(additions, key=get_label, cmp=label_compare))
+    movements = list(sorted(movements, key=get_label, cmp=label_compare))
 
     changes = itertools.chain(additions, movements, modifications, deletions)
     for change in changes:
