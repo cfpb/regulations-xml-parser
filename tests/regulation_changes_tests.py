@@ -219,6 +219,90 @@ class ChangesTests(TestCase):
         del_paras = new_xml.findall('.//{eregs}paragraph[@label="1234-1"]')
         self.assertEqual(len(del_paras), 0)
 
+    def test_process_changes_moved(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="moved" label="1234-1" parent="1234-Subpart-B"></change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <subpart label="1234-Subpart-A">
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </subpart>
+                <subpart label="1234-Subpart-B">
+                  <paragraph label="1234-2">Another existing paragraph</paragraph>
+                </subpart>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        moved_para = new_xml.find('.//{eregs}paragraph[@label="1234-1"]')
+        self.assertEqual(moved_para.getparent().get('label'),
+                         '1234-Subpart-B')
+        self.assertEqual(moved_para.getparent().index(moved_para), 1)
+        old_parent = new_xml.find('.//{eregs}subpart[@label="1234-Subpart-A"]')
+        self.assertEqual(len(old_parent.getchildren()), 0)
+
+    def test_process_changes_moved_before(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="moved" label="1234-1" parent="1234-Subpart-B" before="1234-2"></change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <subpart label="1234-Subpart-A">
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </subpart>
+                <subpart label="1234-Subpart-B">
+                  <paragraph label="1234-2">Another existing paragraph</paragraph>
+                </subpart>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        moved_para = new_xml.find('.//{eregs}paragraph[@label="1234-1"]')
+        self.assertEqual(moved_para.getparent().get('label'),
+                         '1234-Subpart-B')
+        self.assertEqual(moved_para.getparent().index(moved_para), 0)
+
+    def test_process_changes_moved_after(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="moved" label="1234-1" parent="1234-Subpart-B" after="1234-2"></change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <subpart label="1234-Subpart-A">
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </subpart>
+                <subpart label="1234-Subpart-B">
+                  <paragraph label="1234-2">Another existing paragraph</paragraph>
+                  <paragraph label="1234-3">One more existing paragraph</paragraph>
+                </subpart>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        moved_para = new_xml.find('.//{eregs}paragraph[@label="1234-1"]')
+        self.assertEqual(moved_para.getparent().get('label'),
+                         '1234-Subpart-B')
+        self.assertEqual(moved_para.getparent().index(moved_para), 1)
+
     def test_generate_diff_added(self):
         left_xml = etree.fromstring("""
             <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">

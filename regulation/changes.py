@@ -133,6 +133,8 @@ def process_changes(original_xml, notice_xml, dry=False):
         './/{eregs}change[@operation="modified"]')
     additions = notice_xml.findall(
         './/{eregs}change[@operation="added"]')
+    movements = notice_xml.findall(
+        './/{eregs}change[@operation="moved"]')
 
     # Find the tables of contents in the original xml
     # for handy reference later when updating TOC entries
@@ -150,8 +152,9 @@ def process_changes(original_xml, notice_xml, dry=False):
     deletions = list(reversed(sorted(deletions, key=get_label)))
     modifications = list(reversed(sorted(modifications, key=get_label)))
     additions = list(sorted(additions, key=get_label))
+    movements = list(sorted(movements, key=get_label))
 
-    changes = itertools.chain(deletions, modifications, additions)
+    changes = itertools.chain(additions, movements, modifications, deletions)
     for change in changes:
         label = change.get('label')
         op = change.get('operation')
@@ -227,7 +230,9 @@ def process_changes(original_xml, notice_xml, dry=False):
             if not dry:
                 parent_elm.insert(new_index, new_elm)
 
-        if op in ('modified', 'deleted'):
+
+        # Handle existing elements
+        if op in ('moved', 'modified', 'deleted'):
             # Find a match to the given label
             matching_elm = new_xml.find('.//*[@label="{}"]'.format(label))
             if matching_elm is None:
@@ -235,6 +240,40 @@ def process_changes(original_xml, notice_xml, dry=False):
                                "notice.".format(label, op))
 
             match_parent = matching_elm.getparent()
+
+            # For moved labels, we need to find the new parent label
+            if op == 'moved':
+                parent_label = change.get('parent')
+                before_label = change.get('before')
+                after_label = change.get('after')
+
+                # Find the parent element
+                parent_elm = new_xml.find('.//*[@label="{}"]'.format(
+                    parent_label))
+                if parent_elm is None:
+                    raise ValueError("'parent' attribute is required "
+                                     "for 'moved' operation on "
+                                     "{}".format(label))
+
+                # Figure out where we're putting the element when we
+                # move it. If we're given a before or after label, look
+                # for the corresponding elements.
+                new_index = 0
+                before_elm = new_xml.find('.//*[@label="{}"]'.format(
+                    before_label))
+                after_elm = new_xml.find('.//*[@label="{}"]'.format(
+                    after_label))
+                if before_elm is not None:
+                    new_index = parent_elm.index(before_elm)
+                elif after_elm is not None:
+                    new_index = parent_elm.index(after_elm) + 1
+                else:
+                    # Otherwise, just append it to the end of the parent.
+                    new_index = len(parent_elm.getchildren())
+
+                # Move it!
+                if not dry:
+                    parent_elm.insert(new_index, matching_elm)
 
             # For modified labels, just find the node and replace it.
             if op == 'modified':
