@@ -729,7 +729,7 @@ class EregsValidator:
                               parent_change=parent_string))
                     change.getparent().remove(change)
                     dups_flag = True
-                else:
+                elif op != "moved":
                     unresolved_dups.append((change_string, parent_string))
 
         if dups_flag:
