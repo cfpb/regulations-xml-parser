@@ -101,7 +101,9 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
-                <paragraph label="1234-1">An existing paragraph</paragraph>
+                <content>
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </content>
               </part>
             </regulation>""")
         new_xml = process_changes(original_xml, notice_xml)
@@ -125,6 +127,7 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
+                <content/>
               </part>
             </regulation>""")
         new_xml = process_changes(original_xml, notice_xml)
@@ -147,8 +150,10 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
-                <paragraph label="1234-1">An existing paragraph</paragraph>
-                <paragraph label="1234-2">Another existing paragraph</paragraph>
+                <content>
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                  <paragraph label="1234-2">Another existing paragraph</paragraph>
+                </content>
               </part>
             </regulation>""")
         with self.assertRaises(KeyError):
@@ -171,8 +176,10 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
-                <subpart></subpart>
-                <appendix label="1234-A"></appendix>
+                <content>
+                  <subpart><content/></subpart>
+                  <appendix label="1234-A"></appendix>
+                </content>
               </part>
             </regulation>""")
         new_xml = process_changes(original_xml, notice_xml)
@@ -195,7 +202,9 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
-                <paragraph label="1234-2">An existing paragraph</paragraph>
+                <content>
+                  <paragraph label="1234-2">An existing paragraph</paragraph>
+                </content>
               </part>
             </regulation>""")
         new_xml = process_changes(original_xml, notice_xml)
@@ -217,8 +226,10 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
-                <paragraph label="1234-1">An existing paragraph</paragraph>
-                <paragraph label="1234-3">Another existing paragraph</paragraph>
+                <content>
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                  <paragraph label="1234-3">Another existing paragraph</paragraph>
+                </content>
               </part>
             </regulation>""")
         new_xml = process_changes(original_xml, notice_xml)
@@ -240,7 +251,9 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
-                <paragraph label="1234-1">An existing paragraph</paragraph>
+                <content>
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </content>
               </part>
             </regulation>""")
         new_xml = process_changes(original_xml, notice_xml)
@@ -262,7 +275,9 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
-                <paragraph label="1234-1">An existing paragraph</paragraph>
+                <content>
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </content>
               </part>
             </regulation>""")
         new_xml = process_changes(original_xml, notice_xml)
@@ -282,20 +297,26 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
-                <subpart label="1234-Subpart-A">
-                  <paragraph label="1234-1">An existing paragraph</paragraph>
-                </subpart>
-                <subpart label="1234-Subpart-B">
-                  <paragraph label="1234-2">Another existing paragraph</paragraph>
-                </subpart>
+                <content>
+                  <subpart label="1234-Subpart-A">
+                    <content>
+                      <paragraph label="1234-1">An existing paragraph</paragraph>
+                    </content>
+                  </subpart>
+                  <subpart label="1234-Subpart-B">
+                    <content>
+                      <paragraph label="1234-2">Another existing paragraph</paragraph>
+                    </content>
+                  </subpart>
+                </content>
               </part>
             </regulation>""")
         new_xml = process_changes(original_xml, notice_xml)
         moved_para = new_xml.find('.//{eregs}paragraph[@label="1234-1"]')
-        self.assertEqual(moved_para.getparent().get('label'),
+        self.assertEqual(moved_para.getparent().getparent().get('label'),
                          '1234-Subpart-B')
         self.assertEqual(moved_para.getparent().index(moved_para), 1)
-        old_parent = new_xml.find('.//{eregs}subpart[@label="1234-Subpart-A"]')
+        old_parent = new_xml.find('.//{eregs}subpart[@label="1234-Subpart-A"]/{eregs}content')
         self.assertEqual(len(old_parent.getchildren()), 0)
 
     def test_process_changes_moved_before(self):
@@ -311,17 +332,23 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
-                <subpart label="1234-Subpart-A">
-                  <paragraph label="1234-1">An existing paragraph</paragraph>
-                </subpart>
-                <subpart label="1234-Subpart-B">
-                  <paragraph label="1234-2">Another existing paragraph</paragraph>
-                </subpart>
+                <content>
+                  <subpart label="1234-Subpart-A">
+                    <content>
+                      <paragraph label="1234-1">An existing paragraph</paragraph>
+                    </content>
+                  </subpart>
+                  <subpart label="1234-Subpart-B">
+                    <content>
+                      <paragraph label="1234-2">Another existing paragraph</paragraph>
+                    </content>
+                  </subpart>
+                </content>
               </part>
             </regulation>""")
         new_xml = process_changes(original_xml, notice_xml)
         moved_para = new_xml.find('.//{eregs}paragraph[@label="1234-1"]')
-        self.assertEqual(moved_para.getparent().get('label'),
+        self.assertEqual(moved_para.getparent().getparent().get('label'),
                          '1234-Subpart-B')
         self.assertEqual(moved_para.getparent().index(moved_para), 0)
 
@@ -338,18 +365,24 @@ class ChangesTests(TestCase):
               <fdsys></fdsys>
               <preamble></preamble>
               <part label="1234">
-                <subpart label="1234-Subpart-A">
-                  <paragraph label="1234-1">An existing paragraph</paragraph>
-                </subpart>
-                <subpart label="1234-Subpart-B">
-                  <paragraph label="1234-2">Another existing paragraph</paragraph>
-                  <paragraph label="1234-3">One more existing paragraph</paragraph>
-                </subpart>
+                <content>
+                  <subpart label="1234-Subpart-A">
+                    <content>
+                      <paragraph label="1234-1">An existing paragraph</paragraph>
+                    </content>
+                  </subpart>
+                  <subpart label="1234-Subpart-B">
+                    <content>
+                      <paragraph label="1234-2">Another existing paragraph</paragraph>
+                      <paragraph label="1234-3">One more existing paragraph</paragraph>
+                    </content>
+                  </subpart>
+                </content>
               </part>
             </regulation>""")
         new_xml = process_changes(original_xml, notice_xml)
         moved_para = new_xml.find('.//{eregs}paragraph[@label="1234-1"]')
-        self.assertEqual(moved_para.getparent().get('label'),
+        self.assertEqual(moved_para.getparent().getparent().get('label'),
                          '1234-Subpart-B')
         self.assertEqual(moved_para.getparent().index(moved_para), 1)
 
@@ -558,9 +591,11 @@ class ChangesTests(TestCase):
                     <appendixSubject>Appendix A - [Reserved]</appendixSubject>
                   </tocAppEntry>
                 </tableOfContents>
-                <subpart></subpart>
-                <section label="1234-1"></section>
-                <appendix label="1234-A"></appendix>
+                <content>
+                  <subpart></subpart>
+                  <section label="1234-1"></section>
+                  <appendix label="1234-A"></appendix>
+                </content>
               </part>
             </regulation>""")
         # Code for testing - on addition update, the TOC should get filled out with additional information

@@ -207,6 +207,11 @@ def process_changes(original_xml, notice_xml, dry=False):
             if parent_label is None:
                 parent_label = '-'.join(get_parent_label(label_parts))
             parent_elm = new_xml.find('.//*[@label="{}"]'.format(parent_label))
+
+            # If the parent is a part or subpart, we need to add to the
+            # content element.
+            if parent_elm.tag in ("{eregs}part", "{eregs}subpart"):
+                parent_elm = parent_elm.find('./{eregs}content')
  
             # Figure out where we're putting the new element 
             # If we're given a before or after label, look
@@ -236,14 +241,17 @@ def process_changes(original_xml, notice_xml, dry=False):
                     sibling_label = '-'.join(sibling_label_parts)
                     sibling_elm = new_xml.find(
                         './/*[@label="{}"]'.format(sibling_label))
-                
-                    new_index = parent_elm.index(sibling_elm) + 1
+
+                    try:
+                        new_index = parent_elm.index(sibling_elm) + 1
+                    except ValueError:
+                        new_index = len(parent_elm.getchildren())
                 # Give up on a particular location and append to the end
                 # of the parent.
                 else:
                     new_index = len(parent_elm.getchildren())
 
-             if sibling_label is not None:
+            if sibling_label is not None:
                 # Perform TOC updates if needed
                 # - Determine whether the sibling's label appears in TOC(s)
                 # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
@@ -283,8 +291,8 @@ def process_changes(original_xml, notice_xml, dry=False):
             # Find a match to the given label
             matching_elm = new_xml.find('.//*[@label="{}"]'.format(label))
             if matching_elm is None:
-                raise KeyError("Unable to find label {} {} in "
-                               "notice.".format(label, op))
+                raise KeyError("Unable to find label {} to be "
+                               "{}".format(label, op))
 
             match_parent = matching_elm.getparent()
 
@@ -301,6 +309,11 @@ def process_changes(original_xml, notice_xml, dry=False):
                     raise ValueError("'parent' attribute is required "
                                      "for 'moved' operation on "
                                      "{}".format(label))
+
+                # If the parent is a part or subpart, we need to add to the
+                # content element.
+                if parent_elm.tag in ("{eregs}part", "{eregs}subpart"):
+                    parent_elm = parent_elm.find('./{eregs}content')
 
                 # Figure out where we're putting the element when we
                 # move it. If we're given a before or after label, look
