@@ -706,7 +706,10 @@ class EregsValidator:
         for label, change in sorted(changes.items(),
                 key=operator.itemgetter(0)):
             op = change.get('operation')
-            parent = '-'.join(get_parent_label(label.split('-')))
+
+            parent = change.get('parent')
+            if parent is None:
+                parent = '-'.join(get_parent_label(label.split('-')))
 
             if parent in changes.keys():
                 parent_op = changes[parent].get('operation')
