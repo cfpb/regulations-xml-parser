@@ -111,6 +111,30 @@ def get_sibling_label(label_parts):
     return sibling_label
 
 
+def label_compare(left, right):
+    """ Compare two labels. This sorts labels based on:
+            Subpart
+            Numerical
+            Alphabetical
+
+        "Interp" will be stripped for comparison purposes.
+        """
+    # Note: Interp labels are special. For comparison purposes, we just
+    # remove the '-Interp' from the label. Otherwse we would end up with
+    # something like '1234-Interp' being sorted after '1234-1-Interp'.
+    if 'Interp' in left:
+        left = left.replace('-Interp', '')
+    if 'Interp' in right:
+        right = right.replace('-Interp', '')
+
+    if 'Subpart' in left and 'Subpart' not in right:
+        return -1
+    if 'Subpart' in right and 'Subpart' not in left:
+        return 1
+
+    return cmp(left, right)
+    
+
 def process_changes(original_xml, notice_xml, dry=False):
     """ Process changes given in the notice_xml to modify the
         original_xml. The 'dry' param controls whether this is a
@@ -147,17 +171,12 @@ def process_changes(original_xml, notice_xml, dry=False):
     tocs = find_tocs(new_xml)
     logging.debug("Found {} TOCs in document".format(len(tocs)))
 
-    # Sort them appropriately by label
-    # Note: Interp labels are special. For comparison purposes, we just
-    # remove the '-Interp' from the label. Otherwse we would end up with
-    # something like '1234-Interp' being sorted after '1234-1-Interp'.
-    get_label = lambda c: c.get('label') \
-                          if 'Interp' not in c.get('label') \
-                          else c.get('label').replace('-Interp', '')
-    deletions = list(reversed(sorted(deletions, key=get_label)))
-    modifications = list(reversed(sorted(modifications, key=get_label)))
-    additions = list(sorted(additions, key=get_label))
-    movements = list(sorted(movements, key=get_label))
+    # Sort them appropriately by label using our custom comparison
+    get_label = lambda c: c.get('label')
+    deletions = list(reversed(sorted(deletions, key=get_label, cmp=label_compare)))
+    modifications = list(reversed(sorted(modifications, key=get_label, cmp=label_compare)))
+    additions = list(sorted(additions, key=get_label, cmp=label_compare))
+    movements = list(sorted(movements, key=get_label, cmp=label_compare))
 
     changes = itertools.chain(additions, movements, modifications, deletions)
     for change in changes:
@@ -171,6 +190,7 @@ def process_changes(original_xml, notice_xml, dry=False):
         if op == 'added':
             before_label = change.get('before')
             after_label = change.get('after')
+            parent_label = change.get('parent')
         
             label_parts = label.split('-')
             new_elm = change.getchildren()[0]
@@ -184,9 +204,15 @@ def process_changes(original_xml, notice_xml, dry=False):
                                "change?".format(label))
 
             # Get the parent of the added label
-            parent_label = '-'.join(get_parent_label(label_parts))
+            if parent_label is None:
+                parent_label = '-'.join(get_parent_label(label_parts))
             parent_elm = new_xml.find('.//*[@label="{}"]'.format(parent_label))
 
+            # If the parent is a part or subpart, we need to add to the
+            # content element.
+            if parent_elm.tag in ("{eregs}part", "{eregs}subpart"):
+                parent_elm = parent_elm.find('./{eregs}content')
+ 
             # Figure out where we're putting the new element 
             # If we're given a before or after label, look
             # for the corresponding elements.
@@ -204,6 +230,10 @@ def process_changes(original_xml, notice_xml, dry=False):
                 sibling_elm = new_xml.find('.//*[@label="{}"]'.format(
                     after_label))
                 new_index = parent_elm.index(sibling_elm) + 1
+            # If there's an explicit parent but no siblings, insert at
+            # the beginning of the parent.
+            elif change.get('parent') is not None:
+                new_index = 0
             else:
                 # Guess the preceding sibling
                 sibling_label_parts = get_sibling_label(label_parts)
@@ -211,8 +241,11 @@ def process_changes(original_xml, notice_xml, dry=False):
                     sibling_label = '-'.join(sibling_label_parts)
                     sibling_elm = new_xml.find(
                         './/*[@label="{}"]'.format(sibling_label))
-                
-                    new_index = parent_elm.index(sibling_elm) + 1
+
+                    try:
+                        new_index = parent_elm.index(sibling_elm) + 1
+                    except ValueError:
+                        new_index = len(parent_elm.getchildren())
                 # Give up on a particular location and append to the end
                 # of the parent.
                 else:
@@ -258,8 +291,8 @@ def process_changes(original_xml, notice_xml, dry=False):
             # Find a match to the given label
             matching_elm = new_xml.find('.//*[@label="{}"]'.format(label))
             if matching_elm is None:
-                raise KeyError("Unable to find label {} {} in "
-                               "notice.".format(label, op))
+                raise KeyError("Unable to find label {} to be "
+                               "{}".format(label, op))
 
             match_parent = matching_elm.getparent()
 
@@ -276,6 +309,11 @@ def process_changes(original_xml, notice_xml, dry=False):
                     raise ValueError("'parent' attribute is required "
                                      "for 'moved' operation on "
                                      "{}".format(label))
+
+                # If the parent is a part or subpart, we need to add to the
+                # content element.
+                if parent_elm.tag in ("{eregs}part", "{eregs}subpart"):
+                    parent_elm = parent_elm.find('./{eregs}content')
 
                 # Figure out where we're putting the element when we
                 # move it. If we're given a before or after label, look

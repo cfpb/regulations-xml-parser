@@ -4,11 +4,13 @@ from __future__ import unicode_literals
 
 import copy
 from enum import Enum
+import operator
 import re
 
 from termcolor import colored, cprint
 from lxml import etree
 from .node import xml_node_text, find_all_occurrences, interpolate_string, enclosed_in_tag
+from .changes import get_parent_label
 
 import inflect
 import re
@@ -676,3 +678,72 @@ class EregsValidator:
             if answer == 'y':
                 with open(regulation_file, 'w') as f:
                     f.write(etree.tostring(tree, pretty_print=True))
+
+    def remove_duplicate_changes(self, tree, notice_file, label=None):
+        """
+        Look through notice change elements and find children that have
+        the same operation as their parent (in which case the change to
+        the child is included in the parent) and eliminate the duplicate
+        child change.
+        """
+        # Map change operations to colors
+        OP_COLORS = {'added': 'green',
+                     'modified': 'yellow',
+                     'moved': 'yellow',
+                     'deleted': 'red'}
+
+        dups_flag = False
+
+        # Get the changes by label
+        change_elms = tree.findall('.//{eregs}change')
+        changes = {c.get('label'): c for c in change_elms}
+
+        if label is not None:
+            changes = {c.get('label'): c for c in change_elms 
+                       if c.get('label') == label}
+
+        unresolved_dups = []
+        for label, change in sorted(changes.items(),
+                key=operator.itemgetter(0)):
+            op = change.get('operation')
+
+            parent = change.get('parent')
+            if parent is None:
+                parent = '-'.join(get_parent_label(label.split('-')))
+
+            if parent in changes.keys():
+                parent_op = changes[parent].get('operation')
+                change_string = colored('{}({})'.format(label, op),
+                        OP_COLORS[op])
+                parent_string = colored('{}({})'.format(parent,
+                    parent_op), OP_COLORS[parent_op])
+
+                # Don't automatically remove "modified" or "moved"
+                # operations. Let the user resolve those. 
+                if op not in ("modified", "moved") and \
+                        op == parent_op:
+                    print('{change} will be changed by parent '
+                          '{parent_change} change. Do you want to '
+                          'remove {change}?'.format(
+                              change=change_string,
+                              parent_change=parent_string))
+                    change.getparent().remove(change)
+                    dups_flag = True
+                elif op != "moved":
+                    unresolved_dups.append((change_string, parent_string))
+
+        if dups_flag:
+            print(colored('The changes have been altered! Do you want '
+                          'to write the result to disk?', 'red'))
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('Save? y/n: ')
+            if answer == 'y':
+                with open(notice_file, 'w') as f:
+                    f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
+
+        if len(unresolved_dups) > 0:
+            print(colored(str(len(unresolved_dups)), 'red'), 
+                  'potentially duplicate changes remain unresolved:')
+            for change, parent in unresolved_dups:
+                print(change, '/', parent)
