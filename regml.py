@@ -269,6 +269,25 @@ def check_interp_targets(file, label=None):
     validator.validate_interp_targets(xml_tree, file, label=label)
     
 
+@cli.command('check-changes')
+@click.argument('file')
+@click.option('--label')
+def check_changes(file, label=None):
+    """ Check for duplicate changes in a notice RegML file """
+    file = find_file(file, is_notice=True)
+    with open(file, 'r') as f:
+        reg_xml = f.read()
+    xml_tree = etree.fromstring(reg_xml)
+
+    if xml_tree.tag != '{eregs}notice':
+        print("Can only check changes in notice files")
+        sys.exit(1)
+
+    # Validate the file relative to schema
+    validator = get_validator(xml_tree)
+    validator.remove_duplicate_changes(xml_tree, file, label=label)
+    
+
 # Validate the given regulation file (or files) and generate the JSON
 # output expected by regulations-core and regulations-site if the RegML
 # validates.
