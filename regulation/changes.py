@@ -218,7 +218,7 @@ def process_changes(original_xml, notice_xml, dry=False):
                 else:
                     new_index = len(parent_elm.getchildren())
 
-             if sibling_label is not None:
+            if sibling_label is not None:
                 # Perform TOC updates if needed
                 # - Determine whether the sibling's label appears in TOC(s)
                 # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
