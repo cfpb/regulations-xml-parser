@@ -14,6 +14,12 @@ import settings
 
 from lxml import etree
 
+# This array contains tag types that can exist in a paragraph
+# that are not part of paragraph text. 
+# E.g. tags like <ref> are part of the paragraph text.
+NON_PARA_SUBELEMENT = ['{eregs}paragraph',
+                       '{eregs}callout',
+                       '{eregs}table']
 
 def build_reg_tree(root, parent=None, depth=0):
     """
@@ -84,14 +90,22 @@ def build_reg_tree(root, parent=None, depth=0):
         # node rather than child nodes in their own right.
         if len(children) > 0:
             first_child = children[0]
-            # if it doesn't have a title, doesn't have a marker, and
-            # doesn't have children, it is an intro paragraph.
-            if first_child.find('{eregs}title') is None and \
-                    first_child.get('marker') == '' and \
-                    len(first_child.findall('{eregs}paragraph')) == 0:
-                content = xml_node_text(first_child.find('{eregs}content'))
-                node.text = content.strip()
-                del children[0]
+            # if first_child doesn't have a title and doesn't have a marker
+            # it may be an intro paragraph
+            if first_child.find('{eregs}title') is None and first_child.get('marker') == '':
+                is_intro_para = True
+                # Determine whether this content has any top-level-type tags within
+                if len(first_child) > 0:
+                    for child in first_child[0]:
+                        if child.tag in NON_PARA_SUBELEMENT:
+                            is_intro_para = False
+                
+                # Reg-site expects intro paragraphs to be be the 'text' of this
+                # node rather than child nodes in their own right.
+                if is_intro_para:
+                    content = xml_node_text(first_child.find('{eregs}content'))
+                    node.text = content.strip()
+                    del children[0]
 
     elif tag == 'paragraph':
         title = root.find('{eregs}title')
@@ -126,8 +140,6 @@ def build_reg_tree(root, parent=None, depth=0):
 
         children = root.findall('{eregs}paragraph')
 
-        # If the title, 
-
     elif tag == 'appendix':
 
         title = root.find('{eregs}appendixTitle')
@@ -155,14 +167,22 @@ def build_reg_tree(root, parent=None, depth=0):
         # node rather than child nodes in their own right.
         if len(children) > 0:
             first_child = children[0]
-            # if it doesn't have a title, doesn't have a marker, and
-            # doesn't have children, it is an intro paragraph.
-            if first_child.find('{eregs}title') is None and \
-                    first_child.get('marker') == '' and \
-                    len(first_child.findall('{eregs}paragraph')) == 0:
-                content = xml_node_text(first_child.find('{eregs}content'))
-                node.text = content.strip()
-                del children[0]
+            # if first_child doesn't have a title and doesn't have a marker
+            # it may be an intro paragraph
+            if first_child.find('{eregs}title') is None and first_child.get('marker') == '':
+                is_intro_para = True
+                # Determine whether this content has any top-level-type tags within
+                if len(first_child) > 0:
+                    for child in first_child[0]:
+                        if child.tag in NON_PARA_SUBELEMENT:
+                            is_intro_para = False
+                
+                # Reg-site expects intro paragraphs to be be the 'text' of this
+                # node rather than child nodes in their own right.
+                if is_intro_para:
+                    content = xml_node_text(first_child.find('{eregs}content'))
+                    node.text = content.strip()
+                    del children[0]
 
     elif tag == 'interpretations':
 
