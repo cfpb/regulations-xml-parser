@@ -93,16 +93,9 @@ def build_reg_tree(root, parent=None, depth=0):
             # if first_child doesn't have a title and doesn't have a marker
             # it may be an intro paragraph
             if first_child.find('{eregs}title') is None and first_child.get('marker') == '':
-                is_intro_para = True
-                # Determine whether this content has any top-level-type tags within
-                if len(first_child) > 0:
-                    for child in first_child[0]:
-                        if child.tag in NON_PARA_SUBELEMENT:
-                            is_intro_para = False
-                
                 # Reg-site expects intro paragraphs to be be the 'text' of this
                 # node rather than child nodes in their own right.
-                if is_intro_para:
+                if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT, first_child[0].getchildren())) == 0:
                     content = xml_node_text(first_child.find('{eregs}content'))
                     node.text = content.strip()
                     del children[0]
@@ -170,16 +163,9 @@ def build_reg_tree(root, parent=None, depth=0):
             # if first_child doesn't have a title and doesn't have a marker
             # it may be an intro paragraph
             if first_child.find('{eregs}title') is None and first_child.get('marker') == '':
-                is_intro_para = True
-                # Determine whether this content has any top-level-type tags within
-                if len(first_child) > 0:
-                    for child in first_child[0]:
-                        if child.tag in NON_PARA_SUBELEMENT:
-                            is_intro_para = False
-                
                 # Reg-site expects intro paragraphs to be be the 'text' of this
                 # node rather than child nodes in their own right.
-                if is_intro_para:
+                if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT, first_child[0].getchildren())) == 0:
                     content = xml_node_text(first_child.find('{eregs}content'))
                     node.text = content.strip()
                     del children[0]
