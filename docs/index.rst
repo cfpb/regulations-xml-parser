@@ -15,6 +15,7 @@ Contents:
    :maxdepth: 2
 
    intro
+   regml
    regulation.tree
    regulation.node
    regulation.validation

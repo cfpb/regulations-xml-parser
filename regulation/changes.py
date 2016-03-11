@@ -251,35 +251,35 @@ def process_changes(original_xml, notice_xml, dry=False):
                 else:
                     new_index = len(parent_elm.getchildren())
 
-            if sibling_label is not None:
-                # Perform TOC updates if needed
-                # - Determine whether the sibling's label appears in TOC(s)
-                # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
-                # - Insert the new tocSecEntry after the sibling's tocSecEntry
-                for toc in tocs:
-                    sib_in_toc = find_toc_entry(toc, sibling_label)
-
-                    # If sibling is not in the TOC, don't add this label
-                    if sib_in_toc is None:
-                        continue
-
-                    # Determine element type
-                    item = change[0]
-                    item_toc = get_toc_type(item.tag)
-
-                    # If element type is a TOC type, add it after its sibling
-                    if item_toc is not None:
-                        des_tag, subj_tag = get_toc_change_keywords(item_toc)
-
-                        if len(des_tag) > 0:
-                            toc_des = item.get(des_tag)
-                        else:
-                            toc_des = ""
-                        toc_subject = item.find(subj_tag).text
-
-                        if not dry:
-                            create_toc_entry(toc, label, toc_des, toc_subject, 
-                                             after_elm=sib_in_toc, entry_type=item_toc)
+#            if sibling_label is not None:
+#                # Perform TOC updates if needed
+#                # - Determine whether the sibling's label appears in TOC(s)
+#                # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
+#                # - Insert the new tocSecEntry after the sibling's tocSecEntry
+#                for toc in tocs:
+#                    sib_in_toc = find_toc_entry(toc, sibling_label)
+#
+#                    # If sibling is not in the TOC, don't add this label
+#                    if sib_in_toc is None:
+#                        continue
+#
+#                    # Determine element type
+#                    item = change[0]
+#                    item_toc = get_toc_type(item.tag)
+#
+#                    # If element type is a TOC type, add it after its sibling
+#                    if item_toc is not None:
+#                        des_tag, subj_tag = get_toc_change_keywords(item_toc)
+#
+#                        if len(des_tag) > 0:
+#                            toc_des = item.get(des_tag)
+#                        else:
+#                            toc_des = ""
+#                        toc_subject = item.find(subj_tag).text
+#
+#                        if not dry:
+#                            create_toc_entry(toc, label, toc_des, toc_subject, 
+#                                             after_elm=sib_in_toc, entry_type=item_toc)
 
             # Insert the new xml!
             if not dry:
@@ -341,44 +341,44 @@ def process_changes(original_xml, notice_xml, dry=False):
                     raise ValueError("Tried to modify {}, but no "
                                      "replacement given".format(label))
 
-                # Look for whether a modified label exists in a TOC and if so, update TOCs
-                # If the label exists as a TOC entry target, update the number/letter and subject
-                item = change[0]
-                toc_tag = get_toc_type(item.tag)
-
-                if toc_tag is not None:
-                    logging.debug("Found {}-type modification".format(toc_tag))
-                    # Double-check labels match
-                    toc_label = item.get('label')
-                    if toc_label != label:
-                        logging.warning("Label mismatch: change label '{}' does not match item label '{}'".format(label, toc_label))
-                    else:
-                        toc_updates = multi_find_toc_entry(tocs, label)
-
-                        # If label doesn't appear in any TOCs, move on
-                        if len(toc_updates) != 0:
-                            des_tag, subj_tag = get_toc_change_keywords(toc_tag)
-
-                            if len(des_tag) > 0:
-                                toc_des = item.get(des_tag)
-                            else:
-                                toc_des = ""
-                            toc_subject = item.find(subj_tag).text
-
-                            logging.debug("Found {} TOC entries for item {} ('{}'): '{}'".format(len(toc_updates),
-                                                                                                 toc_des,
-                                                                                                 label,
-                                                                                                 toc_subject))
-                            # Make applicable TOC changes
-                            if not dry:
-                                changed = 0
-                                for toc_entry in toc_updates:
-                                    changed += update_toc_entry(toc_entry, toc_des, toc_subject, entry_type=toc_tag)
-                                logging.info("Made {} updates to TOC entries for item {} ('{}')".format(changed,
-                                                                                                        toc_des,
-                                                                                                        label))
-                else:
-                    logging.debug("Modification of tag '{}' not a TOC-type".format(toc_tag))
+#                # Look for whether a modified label exists in a TOC and if so, update TOCs
+#                # If the label exists as a TOC entry target, update the number/letter and subject
+#                item = change[0]
+#                toc_tag = get_toc_type(item.tag)
+#
+#                if toc_tag is not None:
+#                    logging.debug("Found {}-type modification".format(toc_tag))
+#                    # Double-check labels match
+#                    toc_label = item.get('label')
+#                    if toc_label != label:
+#                        logging.warning("Label mismatch: change label '{}' does not match item label '{}'".format(label, toc_label))
+#                    else:
+#                        toc_updates = multi_find_toc_entry(tocs, label)
+#
+#                        # If label doesn't appear in any TOCs, move on
+#                        if len(toc_updates) != 0:
+#                            des_tag, subj_tag = get_toc_change_keywords(toc_tag)
+#
+#                            if len(des_tag) > 0:
+#                                toc_des = item.get(des_tag)
+#                            else:
+#                                toc_des = ""
+#                            toc_subject = item.find(subj_tag).text
+#
+#                            logging.debug("Found {} TOC entries for item {} ('{}'): '{}'".format(len(toc_updates),
+#                                                                                                 toc_des,
+#                                                                                                 label,
+#                                                                                                 toc_subject))
+#                            # Make applicable TOC changes
+#                            if not dry:
+#                                changed = 0
+#                                for toc_entry in toc_updates:
+#                                    changed += update_toc_entry(toc_entry, toc_des, toc_subject, entry_type=toc_tag)
+#                                logging.info("Made {} updates to TOC entries for item {} ('{}')".format(changed,
+#                                                                                                        toc_des,
+#                                                                                                        label))
+#                else:
+#                    logging.debug("Modification of tag '{}' not a TOC-type".format(toc_tag))
 
                 if not dry:
                     new_elm = change.getchildren()[0]
@@ -391,15 +391,15 @@ def process_changes(original_xml, notice_xml, dry=False):
                 toc_updates = multi_find_toc_entry(tocs, label)
 
                 if not dry:
-                    # Remove the TOC entries that target this label
-                    changed = 0
-                    for toc_entry in toc_updates:
-                        delete_toc_entry(toc_entry)
-                        changed += 1
-                    
-                    # Report how many deletions occurred
-                    if changed > 0:
-                        logging.info("Made {} deletions of TOC entries for item '{}'".format(changed, label))
+#                    # Remove the TOC entries that target this label
+#                    changed = 0
+#                    for toc_entry in toc_updates:
+#                        delete_toc_entry(toc_entry)
+#                        changed += 1
+#                    
+#                    # Report how many deletions occurred
+#                    if changed > 0:
+#                        logging.info("Made {} deletions of TOC entries for item '{}'".format(changed, label))
 
                     # Remove the element itself
                     match_parent.remove(matching_elm)

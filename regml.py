@@ -45,16 +45,16 @@ if (sys.version_info < (3, 0)):
 
 def find_file(file, is_notice=False, ecfr=False):
     """
-        Find the given file in sources available in configured
-        locations and read it.
+    Find the given file in sources available in configured
+    locations and read it.
 
-        For example, if we're looking for a RegML file for version
-        2222-33333 with the default arguments,
-        settings.XML_ROOT/regulation will be searched for a matching
-        document.
+    For example, if we're looking for a RegML file for version
+    2222-33333 with the default arguments,
+    settings.XML_ROOT/regulation will be searched for a matching
+    document.
 
-        With ecfr=True and regml=False, eCFR fr-notices
-        (settings.LOCAL_XML_PATHS) will be searched.
+    With ecfr=True and regml=False, eCFR fr-notices
+    (settings.LOCAL_XML_PATHS) will be searched.
     """
     # See if we need to find this file somewhere
     if not os.path.exists(file):
