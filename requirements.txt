@@ -3,5 +3,5 @@ enum34==1.1.2
 inflect==0.2.5
 lxml==3.5.0
 termcolor==1.1.0
--e git+https://github.com/willbarton/regulations-configs.git#egg=regulations_configs
--e git+https://github.com/willbarton/regulations-parser@xml-writer-devel#egg=regulations_parser
+-e git+https://github.com/cfpb/regulations-configs.git#egg=regulations_configs
+-e git+https://github.com/cfpb/regulations-parser@xml-writer-devel#egg=regulations_parser
