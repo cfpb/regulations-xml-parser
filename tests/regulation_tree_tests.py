@@ -54,9 +54,9 @@ class TreeTestCase(TestCase):
     def test_build_interp_layer(self):
         interp_dict = build_interp_layer(self.root)
         expected_result = {
-                '1234': [{u'reference': '1234-Interp'}], 
-                '1234-1': [{u'reference': '1234-1-Interp'}], 
-                '1234-1-A': [{u'reference': '1234-1-A-Interp'}], 
+                '1234': [{u'reference': '1234-Interp'}],
+                '1234-1': [{u'reference': '1234-1-Interp'}],
+                '1234-1-A': [{u'reference': '1234-1-A-Interp'}],
         }
         self.assertEqual(expected_result, interp_dict)
 
@@ -197,11 +197,11 @@ class TreeTestCase(TestCase):
         """)
         expected_result = {
             'foo': [{
-                'locations': [0], 
+                'locations': [0],
                 'subscript_data': {
-                    'subscript': 'n', 
+                    'subscript': 'n',
                     'variable': 'Val'
-                }, 
+                },
                 'text': 'Val_{n}'
             }]
         }
@@ -239,14 +239,14 @@ class TreeTestCase(TestCase):
             'foo': [{
                 'fence_data': {
                     'lines': [
-                        'Note:', 
+                        'Note:',
                         'Some notes'
-                    ], 
+                    ],
                     'type': 'note'
-                }, 
+                },
                 'locations': [
                     0
-                ], 
+                ],
                 'text': 'Note:Some notes',
             }]
         }
@@ -287,21 +287,21 @@ class TreeTestCase(TestCase):
         expected_result = {
             'children': [
                 {
-                    'children': [], 
+                    'children': [],
                     'label': [
-                        'foo', 
+                        'foo',
                         'a'
-                    ], 
-                    'node_type': 'regtext', 
-                    'text': 'a A marked paragraph', 
+                    ],
+                    'node_type': 'regtext',
+                    'text': 'a A marked paragraph',
                     'marker': 'a'
                 }
-            ], 
+            ],
             'label': [
                 'foo'
-            ], 
-            'node_type': 'regtext', 
-            'text': 'An unmarked intro paragraph.', 
+            ],
+            'node_type': 'regtext',
+            'text': 'An unmarked intro paragraph.',
             'title': 'Some Subject'
         }
         result = build_reg_tree(tree)
@@ -325,24 +325,24 @@ class TreeTestCase(TestCase):
         expected_result = {
             "children": [
                 {
-                    "children": [], 
+                    "children": [],
                     "label": [
-                        "1024", 
-                        "A", 
-                        "h6", 
+                        "1024",
+                        "A",
+                        "h6",
                         "p92"
-                    ], 
-                    "node_type": "appendix", 
+                    ],
+                    "node_type": "appendix",
                     "text": "Note:\n                The HUD-1A is an optional form that may be used for refinancing and subordinate-lien federally related mortgage loans, as well as for any other one-party transaction that does not involve the transfer of title to residential real property. The HUD-1 form may also be used for such transactions, by utilizing the borrower's side of the HUD-1 and following the relevant parts of the instructions as set forth above. The use of either the HUD-1 or HUD-1A is not mandatory for open-end lines of credit (home-equity plans), as long as the provisions of Regulation Z are followed."
                 }
-            ], 
+            ],
             "label": [
-                "1024", 
-                "A", 
+                "1024",
+                "A",
                 "h6"
-            ], 
-            "node_type": "appendix", 
-            "text": "", 
+            ],
+            "node_type": "appendix",
+            "text": "",
             "title": "Instructions for Completing HUD-1A"
         }
 
@@ -365,21 +365,50 @@ class TreeTestCase(TestCase):
           </section>""")
         result = build_reg_tree(reg_xml)
 
-        expected_result = OrderedDict([(u'children', 
-                                      [OrderedDict([(u'children', []), 
-                                                    (u'label', [u'1024', u'3', u'p1']), 
-                                                    (u'node_type', u'regtext'), 
-                                                    (u'text', u'Note:\n                  This is a test callout.')])]), 
-                                       (u'label', 
-                                        [u'1024', u'3']), 
-                                       (u'node_type', u'regtext'), 
-                                       (u'text', u''), 
+        expected_result = OrderedDict([(u'children',
+                                      [OrderedDict([(u'children', []),
+                                                    (u'label', [u'1024', u'3', u'p1']),
+                                                    (u'node_type', u'regtext'),
+                                                    (u'text', u'Note:\n                  This is a test callout.')])]),
+                                       (u'label',
+                                        [u'1024', u'3']),
+                                       (u'node_type', u'regtext'),
+                                       (u'text', u''),
                                        (u'title', u'\xa7 1024.3 Questions or suggestions from public and copies of public guidance documents.')
                                       ]
                                      )
 
 
         # This callout should correctly get identified as NOT an intro paragraph, and its content should stay in
+        # an element with the paragraph's label and not smushed into the section's label
+        self.assertEqual(expected_result, result.to_json())
+
+    def test_appendix_graphic(self):
+        reg_xml = etree.fromstring("""
+          <appendixSection appendixSecNum="1" label="1013-A-1" xmlns="eregs">
+              <subject>A-1—Model Open-End or Finance Vehicle Lease Disclosures</subject>
+              <paragraph label="1013-A-1-p1" marker="">
+                <content>
+                  <graphic>
+                    <altText></altText>
+                    <text>![](ER19DE11.010)</text>
+                    <url>https://s3.amazonaws.com/images.federalregister.gov/ER19DE11.010/original.gif</url>
+                  </graphic>
+                </content>
+              </paragraph>
+          </appendixSection>""")
+        result = build_reg_tree(reg_xml)
+
+        expected_result = expected_result = OrderedDict([(u'children',
+                                                [OrderedDict([(u'children', []),
+                                                            (u'label', [u'1013', u'A', u'1', u'p1']),
+                                                            (u'node_type', u'appendix'),
+                                                            (u'text', '![](ER19DE11.010)')])]),
+                                                    (u'label', [u'1013', u'A', u'1']), (u'node_type', u'appendix'),
+                                                    (u'text', u''),
+                                                    (u'title', u'A-1\u2014Model Open-End or Finance Vehicle Lease Disclosures')])
+
+        # This graphic should correctly get identified as NOT an intro paragraph, and its content should stay in
         # an element with the paragraph's label and not smushed into the section's label
         self.assertEqual(expected_result, result.to_json())
 
