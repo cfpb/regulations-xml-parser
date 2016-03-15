@@ -399,14 +399,14 @@ class TreeTestCase(TestCase):
           </appendixSection>""")
         result = build_reg_tree(reg_xml)
 
-        expected_result = expected_result = OrderedDict([(u'children',
-                                                [OrderedDict([(u'children', []),
-                                                            (u'label', [u'1013', u'A', u'1', u'p1']),
-                                                            (u'node_type', u'appendix'),
-                                                            (u'text', '![](ER19DE11.010)')])]),
-                                                    (u'label', [u'1013', u'A', u'1']), (u'node_type', u'appendix'),
-                                                    (u'text', u''),
-                                                    (u'title', u'A-1\u2014Model Open-End or Finance Vehicle Lease Disclosures')])
+        expected_result = OrderedDict([(u'children',
+                              [OrderedDict([(u'children', []),
+                                          (u'label', [u'1013', u'A', u'1', u'p1']),
+                                          (u'node_type', u'appendix'),
+                                          (u'text', '![](ER19DE11.010)')])]),
+                                  (u'label', [u'1013', u'A', u'1']), (u'node_type', u'appendix'),
+                                  (u'text', u''),
+                                  (u'title', u'A-1\u2014Model Open-End or Finance Vehicle Lease Disclosures')])
 
         # This graphic should correctly get identified as NOT an intro paragraph, and its content should stay in
         # an element with the paragraph's label and not smushed into the section's label
@@ -417,14 +417,44 @@ class TreeTestCase(TestCase):
         <appendixSection appendixSecNum="1" label="1024-B-s1" xmlns="eregs">
           <subject/>
           <paragraph label="1024-B-p1-0" marker="">
-            <content>The following illustrations provide additional guidance on the meaning and coverage of the provisions of <ref target="1024-2-b-RESPA" reftype="term">RESPA</ref>. Other provisions of Federal or state law may also be applicable to the practices and payments discussed in the following illustrations.</content>
+            <content>The following illustrations provide provisions of <ref target="1024-defs" reftype="term">RESPA</ref>.
+            </content>
+          </paragraph>
+          <paragraph label="1024-B-p1-1" marker="">
+            <content>Refer to the <ref target="1024-defs" reftype="term">Bureau</ref>'s regulations for <ref target="1024-defs" reftype="term">HUD-1</ref>.
+            </content>
+          </paragraph>
+          <paragraph label="1024-defs" marker="">
+            <content>This paragraph contains terms <def term="bureau">Bureau</def>, <def term="respa">RESPA</def>, and <def term="hud-1">HUD-1</def>.
+            </content>
           </paragraph>
         </appendixSection>""")
         result = build_terms_layer(reg_xml)
 
-        # This paragraph is an intro paragraph, so for reg-site the content gets pushed into the appendixSection's text area
-        # Therefore, the terms layer should have the reference for the appendixSection's label, not the paragraph's label
-        expected_result = OrderedDict([('1024-B-s1', []), (u'referenced', OrderedDict())])
+        # This paragraph is an intro paragraph, so for reg-site the content gets pushed into the appendixSection text
+        # Therefore, the terms layer should have the reference for the appendixSection's label, not the paragraph label
+        # This also checks that only the first paragraph becomes an intro paragraph.
+        expected_result = OrderedDict([('1024-B-s1', 
+                                [OrderedDict([(u'offsets', [[50, 55]]), 
+                                              (u'ref', u'bureau:1024-defs')])]),
+                               ('1024-B-p1-1', 
+                                [OrderedDict([(u'offsets', [[13, 19]]),
+                                              (u'ref', u'bureau:1024-defs')]), 
+                                 OrderedDict([(u'offsets', [[38, 43]]),
+                                              (u'ref', u'bureau:1024-defs')])]),
+                               (u'referenced', OrderedDict([
+                                                    (u'bureau:1024-defs', 
+                                                     OrderedDict([(u'position', [30, 36]),
+                                                                  (u'reference', '1024-defs'),
+                                                                  (u'term', 'bureau')])),
+                                                    (u'respa:1024-defs', 
+                                                     OrderedDict([(u'position', [38, 43]),
+                                                                  (u'reference', '1024-defs'),
+                                                                  (u'term', 'respa')])),
+                                                    (u'hud-1:1024-defs',
+                                                     OrderedDict([(u'position', [49, 54]),
+                                                                  (u'reference', '1024-defs'),
+                                                                  (u'term', 'hud-1')]))]))])
 
         self.assertEqual(expected_result, result)
 
@@ -433,13 +463,25 @@ class TreeTestCase(TestCase):
         <section label="1024-3" sectionNum="3" xmlns="eregs">
             <subject>§ 1024.3 Questions or suggestions from public and copies of public guidance documents.</subject>
             <paragraph label="1024-3-p1" marker="">
-              <content>Any questions or suggestions from the public regarding <ref target="1024-2-b-RESPA" reftype="term">RESPA</ref>, or requests for copies of <ref target="1024-2-b-PublicGuidanceDocuments" reftype="term">Public Guidance Documents</ref>, should be directed to the Associate Director, Research, Markets, and Regulations, Bureau of Consumer Financial Protection, 1700 G Street NW., Washington, DC 20006. Legal questions concerning the interpretation of this part may be directed to the same address.</content>
+              <content>Any questions regarding <ref target="1024-defs" reftype="term">RESPA</ref>.
+              </content>
+            </paragraph>
+            <paragraph label="1024-defs" marker="">
+              <content>This paragraph contains references for the term <def term="respa">RESPA</def>.
+              </content>
             </paragraph>
           </section>""")
         result = build_terms_layer(reg_xml)
 
         # This paragraph is an intro paragraph, so for reg-site the content gets pushed into the section's text area
         # Therefore, the terms layer should have the reference for the section's label, not the paragraph's label
-        expected_result = OrderedDict([('1024-3', []), (u'referenced', OrderedDict())])
+        expected_result = OrderedDict([('1024-3', 
+                                        [OrderedDict([(u'offsets', [[24, 29]]),
+                                                      (u'ref', u'respa:1024-defs')])]),
+                                       (u'referenced', 
+                                        OrderedDict([(u'respa:1024-defs', 
+                                        OrderedDict([(u'position', [48, 53]),
+                                                     (u'reference', '1024-defs'),
+                                                     (u'term', 'respa')]))]))])
 
         self.assertEqual(expected_result, result)
