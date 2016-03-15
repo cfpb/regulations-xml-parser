@@ -14,6 +14,7 @@ import settings
 
 from lxml import etree
 
+
 # This array contains tag types that can exist in a paragraph
 # that are not part of paragraph text.
 # E.g. tags like <ref> are part of the paragraph text.
@@ -24,6 +25,7 @@ NON_PARA_SUBELEMENT = ['{eregs}paragraph',
 
 TAGS_WITH_INTRO_PARAS = ['{eregs}section',
                          '{eregs}appendixSection']
+
 
 def build_reg_tree(root, parent=None, depth=0):
     """
@@ -282,7 +284,7 @@ def build_internal_citations_layer(root):
         par_label = paragraph.get('label')
         if wants_intro_text(paragraph.getparent()) and is_intro_text(paragraph):
             # This intro paragraph will get attached to its parent node by
-            # build_reg_text
+            # build_reg_tree
             par_label = paragraph.getparent().get('label')
 
         if marker != '' and paragraph.tag != '{eregs}interpParagraph':
@@ -665,9 +667,12 @@ def build_terms_layer(root):
         marker = paragraph.get('marker') or ''
 
         label = paragraph.get('label')
+        # If this is a subparagraph of a type that wants an intro paragraph
+        # and this paragraph is intro text, set the paragraph's label to reference
+        # the parent's
         if wants_intro_text(paragraph.getparent()) and is_intro_text(paragraph):
             # This intro paragraph will get attached to its parent node by
-            # build_reg_text
+            # build_reg_tree
             label = paragraph.getparent().get('label')
 
         if len(terms) > 0:
@@ -1089,6 +1094,10 @@ def is_intro_text(item):
     :rtype: boolean
     """
     if item.find('{eregs}title') is None and item.get('marker') == '':
+        # Only the first child may be an intro text item
+        child_num = item.getparent().index(item)
+        if child_num > 1:
+            return False
         # Note: item[0] is always a <content> tag - check that element's children
         if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT, item[0].getchildren())) == 0:
             return True
