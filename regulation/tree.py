@@ -753,7 +753,7 @@ def build_toc_layer(root):
     """
     Build the paragraph table-of-contents layer from the provided root of the XML tree.
 
-    :param root: The root element of the XML tree.
+    :param root: A root element containing tableOfContents elements.
     :type root: :class:`etree.Element`
 
     :return: An OrderedDict containing the table of contents, suitable for direct
@@ -763,67 +763,30 @@ def build_toc_layer(root):
 
     toc_dict = OrderedDict()
 
-    part = root.find('{eregs}part')
-    part_toc = part.find('{eregs}tableOfContents')
-    part_number = part.get('label')
-    toc_dict[part_number] = []
-    appendix_letters = []
+    # Look for all tables of contents in the given element and add them
+    # to the layer.
+    tables_of_contents = root.findall('.//{eregs}tableOfContents')
+    for toc in tables_of_contents:
+        parent = toc.getparent()
+        if parent.tag == '{eregs}content':
+            parent = parent.getparent()
 
-    for section in part_toc.findall('{eregs}tocSecEntry'):
-        target = section.get('target').split('-')
-        subject = section.find('{eregs}sectionSubject').text
-        toc_entry = {'index': target, 'title': subject}
-        toc_dict[part_number].append(toc_entry)
+        label = parent.get('label')
+        toc_dict[label] = []
 
-    for appendix_section in part_toc.findall('{eregs}tocAppEntry'):
-        target = appendix_section.get('target').split('-')
-        subject = appendix_section.find('{eregs}appendixSubject').text
-        toc_entry = {'index': target, 'title': subject}
-        toc_dict[part_number].append(toc_entry)
-
-    subparts = part.find('{eregs}content').findall('{eregs}subpart')
-    for subpart in subparts:
-        subpart_letter = subpart.get('subpartLetter')
-        if subpart_letter is not None:
-            subpart_key = part_number + '-Subpart-' + subpart_letter
-        else:
-            subpart_key = part_number + '-Subpart'
-        toc_dict[subpart_key] = []
-
-        subpart_toc = subpart.find('{eregs}tableOfContents')
-        for section in subpart_toc.findall('{eregs}tocSecEntry'):
+        # Build sections
+        for section in toc.findall('{eregs}tocSecEntry'):
             target = section.get('target').split('-')
             subject = section.find('{eregs}sectionSubject').text
             toc_entry = {'index': target, 'title': subject}
-            toc_dict[subpart_key].append(toc_entry)
+            toc_dict[label].append(toc_entry)
 
-    appendices = part.find('{eregs}content').findall('{eregs}appendix')
-    for appendix in appendices:
-        appendix_letter = appendix.get('appendixLetter')
-        appendix_letters.append(appendix_letter)
-        appendix_key = part_number + '-' + appendix_letter
-        toc_dict[appendix_key] = []
-
-        appendix_toc = appendix.find('{eregs}tableOfContents')
-
-        if appendix_toc is not None:
-            for section in appendix_toc.findall('{eregs}tocAppEntry'):
-                target = section.get('target').split('-')
-                subject = section.find('{eregs}appendixSubject').text
-                toc_entry = {'index': target, 'title': subject}
-                toc_dict[appendix_key].append(toc_entry)
-
-    interpretations = part.find('.//{eregs}interpretations')
-
-    if interpretations is not None:
-        interps = interpretations.findall('{eregs}interpSection')
-        interp_key = part_number + '-Interp'
-        for interp in interps:
-            title = interp.find('{eregs}title').text
-            target = interp.get('label').split('-')
-            if target[-1] not in appendix_letters:
-                toc_entry = {'index': target, 'title': title}
-                toc_dict.setdefault(interp_key, []).append(toc_entry)
+        # Build appendix sections 
+        for appendix_section in toc.findall('{eregs}tocAppEntry'):
+            target = appendix_section.get('target').split('-')
+            subject = appendix_section.find('{eregs}appendixSubject').text
+            toc_entry = {'index': target, 'title': subject}
+            toc_dict[label].append(toc_entry)
 
     return toc_dict
 
