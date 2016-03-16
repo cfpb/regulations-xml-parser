@@ -296,7 +296,7 @@ class TreeTestCase(TestCase):
 
     def test_apply_formatting_dash(self):
         content = etree.fromstring("""
-        <content>
+        <content xmlns="eregs">
           <dash>Date</dash>
         </content>
         """, parser=etree.XMLParser(remove_blank_text=True))
