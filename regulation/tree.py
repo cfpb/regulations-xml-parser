@@ -454,9 +454,9 @@ def build_formatting_layer(root):
                 dash_text = dash.text
                 if dash_text is None:
                     dash_text = ''
-                dash_dict['text'] = dash_text
                 dash_dict['dash_data'] = {'text': dash_text}
                 dash_dict['locations'] = [0]
+                dash_dict['text'] = dash_text + '_____'
                 layer_dict[label].append(dash_dict)
 
         if len(variables) > 0:
@@ -604,6 +604,25 @@ def apply_formatting(content_elm):
             working_content.text = '```\n' + \
                         '\n'.join([l.text for l in lines]) + \
                         '```'
+
+    # Do the same for dashes.
+    dashes = working_content.findall('.//{eregs}dash')
+    for dash in dashes:
+        # Dashes have to end a line, so we ignore the dash's tail
+        dash_text = dash.text
+        if dash_text is None:
+            dash_text = ''
+
+        dash_text = dash_text + '_____'
+
+        # Append the dash_text to either parent or previous sibling to
+        # replace the dash element.
+        previous = dash.getprevious()
+        if previous is not None:
+            previous.tail = (previous.tail or '') + dash_text
+        else:
+            working_content.text = (working_content.text or '') + dash_text
+        working_content.remove(dash)
 
     return working_content
 

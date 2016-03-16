@@ -270,6 +270,44 @@ class TreeTestCase(TestCase):
         result = apply_formatting(content)
         self.assertEqual(expected_result.text.strip(), result.text)
 
+    def test_build_formatting_layer_dash(self):
+        tree = etree.fromstring("""
+        <section xmlns="eregs">
+          <paragraph label="foo">
+            <content>
+              <dash>Date</dash>
+            </content>
+          </paragraph>
+        </section>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        expected_result = {
+            'foo': [{
+                'dash_data': {
+                    'text': 'Date'
+                }, 
+                'locations': [
+                    0
+                ], 
+                'text': 'Date_____',
+            }]
+        }
+        result = build_formatting_layer(tree)
+        self.assertEqual(expected_result, result)
+
+    def test_apply_formatting_dash(self):
+        content = etree.fromstring("""
+        <content xmlns="eregs">
+          <dash>Date</dash>
+        </content>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        expected_result = etree.fromstring("""
+        <content xmlns="eregs">
+          Date_____
+        </content>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        result = apply_formatting(content)
+        self.assertEqual(expected_result.text.strip(), result.text)
+
     def test_build_reg_tree_intro_para(self):
         tree = etree.fromstring("""
         <section label="foo" xmlns="eregs">
