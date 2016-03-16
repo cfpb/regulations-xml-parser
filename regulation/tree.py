@@ -14,15 +14,18 @@ import settings
 
 from lxml import etree
 
+
 # This array contains tag types that can exist in a paragraph
-# that are not part of paragraph text. 
+# that are not part of paragraph text.
 # E.g. tags like <ref> are part of the paragraph text.
 NON_PARA_SUBELEMENT = ['{eregs}paragraph',
                        '{eregs}callout',
-                       '{eregs}table']
+                       '{eregs}table',
+                       '{eregs}graphic']
 
 TAGS_WITH_INTRO_PARAS = ['{eregs}section',
                          '{eregs}appendixSection']
+
 
 def build_reg_tree(root, parent=None, depth=0):
     """
@@ -281,7 +284,7 @@ def build_internal_citations_layer(root):
         par_label = paragraph.get('label')
         if wants_intro_text(paragraph.getparent()) and is_intro_text(paragraph):
             # This intro paragraph will get attached to its parent node by
-            # build_reg_text
+            # build_reg_tree
             par_label = paragraph.getparent().get('label')
 
         if marker != '' and paragraph.tag != '{eregs}interpParagraph':
@@ -556,8 +559,8 @@ def apply_formatting(content_elm):
 
     working_content = deepcopy(content_elm)
 
-    # Before building the content text, replace any variable 
-    # elements with Var_{sub} so that reg-site will know what to 
+    # Before building the content text, replace any variable
+    # elements with Var_{sub} so that reg-site will know what to
     # do with them.
     variables = working_content.findall('{eregs}variable') or []
     for variable in variables:
@@ -683,9 +686,12 @@ def build_terms_layer(root):
         marker = paragraph.get('marker') or ''
 
         label = paragraph.get('label')
+        # If this is a subparagraph of a type that wants an intro paragraph
+        # and this paragraph is intro text, set the paragraph's label to reference
+        # the parent's
         if wants_intro_text(paragraph.getparent()) and is_intro_text(paragraph):
             # This intro paragraph will get attached to its parent node by
-            # build_reg_text
+            # build_reg_tree
             label = paragraph.getparent().get('label')
 
         if len(terms) > 0:
@@ -930,7 +936,7 @@ def build_interp_layer(root):
             './/{eregs}interpSection')
         interp_paragraphs = interpretations.findall(
             './/{eregs}interpParagraph')
-        targetted_interps = [i for i in 
+        targetted_interps = [i for i in
             interp_sections + interp_paragraphs
             if i.get('target') is not None]
 
@@ -1107,6 +1113,10 @@ def is_intro_text(item):
     :rtype: boolean
     """
     if item.find('{eregs}title') is None and item.get('marker') == '':
+        # Only the first child may be an intro text item
+        child_num = item.getparent().index(item)
+        if child_num > 1:
+            return False
         # Note: item[0] is always a <content> tag - check that element's children
         if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT, item[0].getchildren())) == 0:
             return True
@@ -1116,7 +1126,7 @@ def is_intro_text(item):
 def wants_intro_text(element):
     """
     Determines whether an element is a type of element that wants
-    an intro paragraph because reg-site expects text in the parent node 
+    an intro paragraph because reg-site expects text in the parent node
     rather than in a subelement.
 
     :param element: The element to check for wanting an intro
@@ -1130,4 +1140,3 @@ def wants_intro_text(element):
         return True
     else:
         return False
-
