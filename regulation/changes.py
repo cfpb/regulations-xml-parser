@@ -19,26 +19,6 @@ from regulation.tree import build_reg_tree
 
 logger = logging.getLogger(__name__)
 
-# Information for working with Table of Contents updates
-# Note: Multiple types of "Interp" tags are possible in the top level of
-# <change> tags, so use get_toc_type to get the entry keyword from tags
-TOC_TYPES = {"section":{"element": "{eregs}tocSecEntry",
-                 "designator":"{eregs}sectionNum",
-                 "subject":"{eregs}sectionSubject",
-                 "title_elm": "{eregs}subject"},
-             "appendix":{"element": "{eregs}tocAppEntry",
-                 "designator":"{eregs}appendixLetter",
-                 "subject":"{eregs}appendixSubject",
-                 "title_elm": "{eregs}appendixTitle"},
-             "subpart":{"element": "{eregs}tocSubpartEntry",
-                 "des":"{eregs}subpartLetter",
-                 "subject":"{eregs}subpartTitle",
-                 "title_elm": "{eregs}title"},
-             "interp":{"element": "{eregs}tocInterpEntry",
-                 "designator":"",
-                 "subject":"{eregs}interpTitle",
-                 "title_elm": "{eregs}title"},
-            }
 
 
 def get_parent_label(label_parts):
@@ -166,12 +146,6 @@ def process_changes(original_xml, notice_xml, dry=False):
     movements = notice_xml.findall(
         './/{eregs}change[@operation="moved"]')
 
-    # Find the tables of contents in the original xml
-    # for handy reference later when updating TOC entries
-    # tocs = new_xml.findall('.//{eregs}tableOfContents')
-    tocs = find_tocs(new_xml)
-    logging.debug("Found {} TOCs in document".format(len(tocs)))
-
     # Sort them appropriately by label using our custom comparison
     get_label = lambda c: c.get('label')
     deletions = list(reversed(sorted(deletions, key=get_label, cmp=label_compare)))
@@ -234,7 +208,7 @@ def process_changes(original_xml, notice_xml, dry=False):
             # If there's an explicit parent but no siblings, insert at
             # the beginning of the parent.
             elif change.get('parent') is not None:
-                new_index = 0
+                new_index = len(parent_elm.getchildren())
             else:
                 # Guess the preceding sibling
                 sibling_label_parts = get_sibling_label(label_parts)
@@ -244,42 +218,13 @@ def process_changes(original_xml, notice_xml, dry=False):
                         './/*[@label="{}"]'.format(sibling_label))
                     try:
                         new_index = parent_elm.index(sibling_elm) + 1
-                    except ValueError:
+                    except TypeError:
                         new_index = len(parent_elm.getchildren())
+
                 # Give up on a particular location and append to the end
                 # of the parent.
                 else:
                     new_index = len(parent_elm.getchildren())
-
-#            if sibling_label is not None:
-#                # Perform TOC updates if needed
-#                # - Determine whether the sibling's label appears in TOC(s)
-#                # - If so, after the sibling's tocSecEntry, create a tocSecEntry for the new addition
-#                # - Insert the new tocSecEntry after the sibling's tocSecEntry
-#                for toc in tocs:
-#                    sib_in_toc = find_toc_entry(toc, sibling_label)
-#
-#                    # If sibling is not in the TOC, don't add this label
-#                    if sib_in_toc is None:
-#                        continue
-#
-#                    # Determine element type
-#                    item = change[0]
-#                    item_toc = get_toc_type(item.tag)
-#
-#                    # If element type is a TOC type, add it after its sibling
-#                    if item_toc is not None:
-#                        des_tag, subj_tag = get_toc_change_keywords(item_toc)
-#
-#                        if len(des_tag) > 0:
-#                            toc_des = item.get(des_tag)
-#                        else:
-#                            toc_des = ""
-#                        toc_subject = item.find(subj_tag).text
-#
-#                        if not dry:
-#                            create_toc_entry(toc, label, toc_des, toc_subject, 
-#                                             after_elm=sib_in_toc, entry_type=item_toc)
 
             # Insert the new xml!
             if not dry:
@@ -341,45 +286,6 @@ def process_changes(original_xml, notice_xml, dry=False):
                     raise ValueError("Tried to modify {}, but no "
                                      "replacement given".format(label))
 
-#                # Look for whether a modified label exists in a TOC and if so, update TOCs
-#                # If the label exists as a TOC entry target, update the number/letter and subject
-#                item = change[0]
-#                toc_tag = get_toc_type(item.tag)
-#
-#                if toc_tag is not None:
-#                    logging.debug("Found {}-type modification".format(toc_tag))
-#                    # Double-check labels match
-#                    toc_label = item.get('label')
-#                    if toc_label != label:
-#                        logging.warning("Label mismatch: change label '{}' does not match item label '{}'".format(label, toc_label))
-#                    else:
-#                        toc_updates = multi_find_toc_entry(tocs, label)
-#
-#                        # If label doesn't appear in any TOCs, move on
-#                        if len(toc_updates) != 0:
-#                            des_tag, subj_tag = get_toc_change_keywords(toc_tag)
-#
-#                            if len(des_tag) > 0:
-#                                toc_des = item.get(des_tag)
-#                            else:
-#                                toc_des = ""
-#                            toc_subject = item.find(subj_tag).text
-#
-#                            logging.debug("Found {} TOC entries for item {} ('{}'): '{}'".format(len(toc_updates),
-#                                                                                                 toc_des,
-#                                                                                                 label,
-#                                                                                                 toc_subject))
-#                            # Make applicable TOC changes
-#                            if not dry:
-#                                changed = 0
-#                                for toc_entry in toc_updates:
-#                                    changed += update_toc_entry(toc_entry, toc_des, toc_subject, entry_type=toc_tag)
-#                                logging.info("Made {} updates to TOC entries for item {} ('{}')".format(changed,
-#                                                                                                        toc_des,
-#                                                                                                        label))
-#                else:
-#                    logging.debug("Modification of tag '{}' not a TOC-type".format(toc_tag))
-
                 if not dry:
                     new_elm = change.getchildren()[0]
                     match_parent.replace(matching_elm, new_elm)
@@ -387,19 +293,7 @@ def process_changes(original_xml, notice_xml, dry=False):
             # For deleted labels, find the node and remove it.
             if op == 'deleted':
                 
-                # Look for whether a deleted label exists in TOCs and if so, delete the TOC entry
-                toc_updates = multi_find_toc_entry(tocs, label)
-
                 if not dry:
-#                    # Remove the TOC entries that target this label
-#                    changed = 0
-#                    for toc_entry in toc_updates:
-#                        delete_toc_entry(toc_entry)
-#                        changed += 1
-#                    
-#                    # Report how many deletions occurred
-#                    if changed > 0:
-#                        logging.info("Made {} deletions of TOC entries for item '{}'".format(changed, label))
 
                     # Remove the element itself
                     match_parent.remove(matching_elm)
@@ -417,193 +311,4 @@ def generate_diff(left_xml, right_xml):
                                 FrozenNode.from_node(right_tree)))
     return diff
 
-
-def strip_namespace(item):
-    """Strips the {eregs} namespace off of a string and returns the stripped string"""
-    return item.replace("{eregs}", "")
-
-
-def find_tocs(source_xml):
-    """
-    Finds <tableOfContents> nodes inside the source_xml and returns a list of them
-    """
-    return source_xml.findall('.//{eregs}tableOfContents')
-
-
-def get_toc_entries(toc_root):
-    """
-    Retrieves a list of Table of Contents section entries (<tocSecEntry> or <tocAppEntry>)
-    for the specified TOC
-    """
-    # Get a list of toc section entries
-    sec_entries = [el for el in toc_root.iterchildren()]
-
-    # Sort list by toc section targets - should already be sorted by target but just to be sure
-    get_target = lambda c: c.get('target')
-    sec_entries = list(reversed(sorted(sec_entries, key=get_target)))
-
-    return sec_entries
-
-
-def find_toc_entry(toc_root, toc_target):
-    """
-    Finds a Table of Contents entry by target inside the given <tableOfContents> element.
-
-    Returns the found entry's node or None.
-    """
-    # Get all secEntries
-    entries = get_toc_entries(toc_root)
-
-    # Look for matching target inside
-    for entry in entries:
-        if entry.get('target') == toc_target:
-            return entry
-
-    # Return None if no matching target exists in the TOC
-    return None
-
-
-def multi_find_toc_entry(tocs, toc_target):
-    """
-    Finds a <tocSecEntry> by target in multiple TOCs from the list given. 
-    Returns a list of all found entries or an empty list if no entries are found.
-    """
-    found_entries = []
-
-    for toc in tocs:
-        found = find_toc_entry(toc, toc_target)
-        if found is not None:
-            found_entries.append(found)
-
-    return found_entries
-
-
-def create_toc_entry(toc_parent, target_label, designator, subject, after_elm=None, entry_type="section"):
-    """
-    Inserts a new TOC entry in the toc_parent.
-    
-    If after_elm is specified, inserts this subelement after it; otherwise puts at the end.
-    If is_section is True, inserts a section; if False inserts as an Appendix reference
-
-    Returns the new element.
-    """
-    # Retrieve tag names for this type of entry
-    elm_type, des_type, subj_type = get_toc_entry_keywords(entry_type)
-
-    # Check to see if this target_label already exists and if so just update it
-    existing_elm = find_toc_entry(toc_parent, target_label)
-    if existing_elm is not None:
-        logging.info("TOC entry for '{}' requested creation but already exists as a target".format(target_label))
-        update_toc_entry(existing_elm, designator, subject, entry_type=entry_type)
-
-    # Create the element and contents
-    if after_elm is not None:
-        new_index = toc_parent.index(after_elm) + 1
-        new_elm = etree.Element(elm_type, attrib={"target":target_label})
-        toc_parent.insert(new_index, new_elm)
-    else:
-        new_elm = etree.SubElement(toc_parent, elm_type, attrib={"target":target_label})
-
-    # Add sub-elements for designator and subject/title
-    if len(des_type) > 0:
-        num_elm = etree.SubElement(new_elm, des_type)
-        num_elm.text = designator
-    sbj_elm = etree.SubElement(new_elm, subj_type)
-    sbj_elm.text = subject
-
-    logging.debug("Inserted new element:\n{}".format(etree.tostring(new_elm, pretty_print=True)))
-
-    return new_elm
-
-
-def update_toc_entry(toc_entry, designator, new_subject, entry_type="section"):
-    """
-    Updates the specified TOC entry with the given designator and subject.
-    If is_section is True, inserts a section; if False inserts as an Appendix reference
-    Returns whether anything changed inside the toc_entry
-    """
-    # Retrieve tag names for this type of entry
-    elm_type, des_type, subj_type = get_toc_entry_keywords(entry_type)
-
-    changed = False
-
-    # Get references to content nodes
-    if len(des_type) > 0:
-        num_elm = toc_entry.find(des_type)
-
-        # Check for whether the existing reference is well-formed
-        if num_elm is None:
-            logging.info("Found malformed {} with target '{}': Missing designator '{}'".format(elm_type, toc_entry.get('target'), des_type))
-            num_elm = etree.SubElement(toc_entry, des_type)
-            num_elm.text = designator
-            changed = True
-        elif num_elm.text != designator:
-            logging.debug("Updating TOC entry number: {} -> {}".format(num_elm.text, designator))
-            num_elm.text = designator
-            changed = True
-        # else no updates required as contents already match
-
-    sbj_elm = toc_entry.find(subj_type)
-    if sbj_elm is None:
-        logging.warning("Found malformed {} with target '{}': Missing subject '{}'".format(elm_type, toc_entry.get('target'), subj_type))
-        sbj_elm = etree.SubElement(toc_entry, subj_type)
-        sbj_elm.text = new_subject
-        changed = True
-    elif sbj_elm.text != new_subject:
-        logging.debug("Updating TOC entry contents:\nOld: '{}'\nNew: '{}'".format(sbj_elm.text, new_subject))
-        sbj_elm.text = new_subject
-        changed = True
-    # else no updates required as contents already match
-
-    logging.debug("Updated TOC Entry now:\n{}".format(etree.tostring(toc_entry, pretty_print=True)))
-
-    return changed
-
-
-def delete_toc_entry(toc_entry):
-    """
-    Deletes the specified TOC entry and all of its children
-    """
-    toc_entry.getparent().remove(toc_entry)
-    
-    return
-
-
-def get_toc_entry_keywords(entry_type):
-    """
-    Determines the keywords for the specific type of entry in the TOC 
-    and returns as a tuple of element tag, designator tag, and subject tag
-    """
-    if entry_type not in TOC_TYPES:
-        toc_type = get_toc_type(entry_type)
-        return TOC_TYPES[toc_type]["element"], TOC_TYPES[toc_type]["designator"], TOC_TYPES[toc_type]["subject"]
-    else:
-        return TOC_TYPES[entry_type]["element"], TOC_TYPES[entry_type]["designator"], TOC_TYPES[entry_type]["subject"]
-
-
-def get_toc_change_keywords(entry_type):
-    """
-    Determines the keywords to extract information from the change entry for TOC changes
-    and returns as a tuple of stripped designator attribute and title tag
-    """
-    if entry_type not in TOC_TYPES:
-        toc_type = get_toc_type(entry_type)
-        return strip_namespace(TOC_TYPES[toc_type]["designator"]), TOC_TYPES[toc_type]["title_elm"]
-    else:
-        return strip_namespace(TOC_TYPES[entry_type]["designator"]), TOC_TYPES[entry_type]["title_elm"]
-
-
-def get_toc_type(tag):
-    """
-    Interps can have multiple <change> tag types, top-level. Returns the TOC type keyword for further
-    lookup.
-    """
-
-    short = strip_namespace(tag)
-
-    for key in TOC_TYPES:
-        if short.startswith(key):
-            return key
-
-    return None
 

@@ -2,12 +2,14 @@
 from __future__ import print_function
 
 from unittest import TestCase
+from collections import OrderedDict
 
 import lxml.etree as etree
 
 from common import test_xml
 from regulation.tree import (build_reg_tree,
                              build_paragraph_marker_layer,
+                             build_terms_layer,
                              build_interp_layer,
                              build_analysis,
                              build_notice,
@@ -52,9 +54,9 @@ class TreeTestCase(TestCase):
     def test_build_interp_layer(self):
         interp_dict = build_interp_layer(self.root)
         expected_result = {
-                '1234': [{u'reference': '1234-Interp'}], 
-                '1234-1': [{u'reference': '1234-1-Interp'}], 
-                '1234-1-A': [{u'reference': '1234-1-A-Interp'}], 
+                '1234': [{u'reference': '1234-Interp'}],
+                '1234-1': [{u'reference': '1234-1-Interp'}],
+                '1234-1-A': [{u'reference': '1234-1-A-Interp'}],
         }
         self.assertEqual(expected_result, interp_dict)
 
@@ -195,11 +197,11 @@ class TreeTestCase(TestCase):
         """)
         expected_result = {
             'foo': [{
-                'locations': [0], 
+                'locations': [0],
                 'subscript_data': {
-                    'subscript': 'n', 
+                    'subscript': 'n',
                     'variable': 'Val'
-                }, 
+                },
                 'text': 'Val_{n}'
             }]
         }
@@ -237,14 +239,14 @@ class TreeTestCase(TestCase):
             'foo': [{
                 'fence_data': {
                     'lines': [
-                        'Note:', 
+                        'Note:',
                         'Some notes'
-                    ], 
+                    ],
                     'type': 'note'
-                }, 
+                },
                 'locations': [
                     0
-                ], 
+                ],
                 'text': 'Note:Some notes',
             }]
         }
@@ -268,6 +270,44 @@ class TreeTestCase(TestCase):
         result = apply_formatting(content)
         self.assertEqual(expected_result.text.strip(), result.text)
 
+    def test_build_formatting_layer_dash(self):
+        tree = etree.fromstring("""
+        <section xmlns="eregs">
+          <paragraph label="foo">
+            <content>
+              <dash>Date</dash>
+            </content>
+          </paragraph>
+        </section>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        expected_result = {
+            'foo': [{
+                'dash_data': {
+                    'text': 'Date'
+                }, 
+                'locations': [
+                    0
+                ], 
+                'text': 'Date_____',
+            }]
+        }
+        result = build_formatting_layer(tree)
+        self.assertEqual(expected_result, result)
+
+    def test_apply_formatting_dash(self):
+        content = etree.fromstring("""
+        <content xmlns="eregs">
+          <dash>Date</dash>
+        </content>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        expected_result = etree.fromstring("""
+        <content xmlns="eregs">
+          Date_____
+        </content>
+        """, parser=etree.XMLParser(remove_blank_text=True))
+        result = apply_formatting(content)
+        self.assertEqual(expected_result.text.strip(), result.text)
+
     def test_build_reg_tree_intro_para(self):
         tree = etree.fromstring("""
         <section label="foo" xmlns="eregs">
@@ -285,23 +325,201 @@ class TreeTestCase(TestCase):
         expected_result = {
             'children': [
                 {
-                    'children': [], 
+                    'children': [],
                     'label': [
-                        'foo', 
+                        'foo',
                         'a'
-                    ], 
-                    'node_type': 'regtext', 
-                    'text': 'a A marked paragraph', 
+                    ],
+                    'node_type': 'regtext',
+                    'text': 'a A marked paragraph',
                     'marker': 'a'
                 }
-            ], 
+            ],
             'label': [
                 'foo'
-            ], 
-            'node_type': 'regtext', 
-            'text': 'An unmarked intro paragraph.', 
+            ],
+            'node_type': 'regtext',
+            'text': 'An unmarked intro paragraph.',
             'title': 'Some Subject'
         }
         result = build_reg_tree(tree)
         self.assertEqual(expected_result, result.to_json())
 
+    def test_appendix_callout(self):
+        reg_xml = etree.fromstring("""
+        <appendixSection appendixSecNum="6" label="1024-A-h6" xmlns="eregs">
+          <subject>Instructions for Completing HUD-1A</subject>
+          <paragraph label="1024-A-h6-p92" marker="">
+            <content>
+              <callout type="note">
+                <line>Note:</line>
+                <line>The HUD-1A is an optional form that may be used for refinancing and subordinate-lien federally related mortgage loans, as well as for any other one-party transaction that does not involve the transfer of title to residential real property. The HUD-1 form may also be used for such transactions, by utilizing the borrower's side of the HUD-1 and following the relevant parts of the instructions as set forth above. The use of either the HUD-1 or HUD-1A is not mandatory for open-end lines of credit (home-equity plans), as long as the provisions of Regulation Z are followed.</line>
+              </callout>
+            </content>
+          </paragraph>
+        </appendixSection>""")
+        result = build_reg_tree(reg_xml)
+
+        expected_result = {
+            "children": [
+                {
+                    "children": [],
+                    "label": [
+                        "1024",
+                        "A",
+                        "h6",
+                        "p92"
+                    ],
+                    "node_type": "appendix",
+                    "text": "Note:\n                The HUD-1A is an optional form that may be used for refinancing and subordinate-lien federally related mortgage loans, as well as for any other one-party transaction that does not involve the transfer of title to residential real property. The HUD-1 form may also be used for such transactions, by utilizing the borrower's side of the HUD-1 and following the relevant parts of the instructions as set forth above. The use of either the HUD-1 or HUD-1A is not mandatory for open-end lines of credit (home-equity plans), as long as the provisions of Regulation Z are followed."
+                }
+            ],
+            "label": [
+                "1024",
+                "A",
+                "h6"
+            ],
+            "node_type": "appendix",
+            "text": "",
+            "title": "Instructions for Completing HUD-1A"
+        }
+
+        # This callout should correctly get identified as NOT an intro paragraph, and its content should stay in
+        # an element with the paragraph's label and not smushed into the appendixSection's label
+        self.assertEqual(expected_result, result.to_json())
+
+    def test_section_callout(self):
+        reg_xml = etree.fromstring("""
+          <section label="1024-3" sectionNum="3" xmlns="eregs">
+            <subject>§ 1024.3 Questions or suggestions from public and copies of public guidance documents.</subject>
+            <paragraph label="1024-3-p1" marker="">
+              <content>
+                <callout type="note">
+                  <line>Note:</line>
+                  <line>This is a test callout.</line>
+                </callout>
+              </content>
+            </paragraph>
+          </section>""")
+        result = build_reg_tree(reg_xml)
+
+        expected_result = OrderedDict([(u'children',
+                                      [OrderedDict([(u'children', []),
+                                                    (u'label', [u'1024', u'3', u'p1']),
+                                                    (u'node_type', u'regtext'),
+                                                    (u'text', u'Note:\n                  This is a test callout.')])]),
+                                       (u'label',
+                                        [u'1024', u'3']),
+                                       (u'node_type', u'regtext'),
+                                       (u'text', u''),
+                                       (u'title', u'\xa7 1024.3 Questions or suggestions from public and copies of public guidance documents.')
+                                      ]
+                                     )
+
+
+        # This callout should correctly get identified as NOT an intro paragraph, and its content should stay in
+        # an element with the paragraph's label and not smushed into the section's label
+        self.assertEqual(expected_result, result.to_json())
+
+    def test_appendix_graphic(self):
+        reg_xml = etree.fromstring("""
+          <appendixSection appendixSecNum="1" label="1013-A-1" xmlns="eregs">
+              <subject>A-1—Model Open-End or Finance Vehicle Lease Disclosures</subject>
+              <paragraph label="1013-A-1-p1" marker="">
+                <content>
+                  <graphic>
+                    <altText></altText>
+                    <text>![](ER19DE11.010)</text>
+                    <url>https://s3.amazonaws.com/images.federalregister.gov/ER19DE11.010/original.gif</url>
+                  </graphic>
+                </content>
+              </paragraph>
+          </appendixSection>""")
+        result = build_reg_tree(reg_xml)
+
+        expected_result = OrderedDict([(u'children',
+                              [OrderedDict([(u'children', []),
+                                          (u'label', [u'1013', u'A', u'1', u'p1']),
+                                          (u'node_type', u'appendix'),
+                                          (u'text', '![](ER19DE11.010)')])]),
+                                  (u'label', [u'1013', u'A', u'1']), (u'node_type', u'appendix'),
+                                  (u'text', u''),
+                                  (u'title', u'A-1\u2014Model Open-End or Finance Vehicle Lease Disclosures')])
+
+        # This graphic should correctly get identified as NOT an intro paragraph, and its content should stay in
+        # an element with the paragraph's label and not smushed into the section's label
+        self.assertEqual(expected_result, result.to_json())
+
+    def test_appendix_intro_references(self):
+        reg_xml = etree.fromstring("""
+        <appendixSection appendixSecNum="1" label="1024-B-s1" xmlns="eregs">
+          <subject/>
+          <paragraph label="1024-B-p1-0" marker="">
+            <content>The following illustrations provide provisions of <ref target="1024-defs" reftype="term">RESPA</ref>.
+            </content>
+          </paragraph>
+          <paragraph label="1024-B-p1-1" marker="">
+            <content>Refer to the <ref target="1024-defs" reftype="term">Bureau</ref>'s regulations for <ref target="1024-defs" reftype="term">HUD-1</ref>.
+            </content>
+          </paragraph>
+          <paragraph label="1024-defs" marker="">
+            <content>This paragraph contains terms <def term="bureau">Bureau</def>, <def term="respa">RESPA</def>, and <def term="hud-1">HUD-1</def>.
+            </content>
+          </paragraph>
+        </appendixSection>""")
+        result = build_terms_layer(reg_xml)
+
+        # This paragraph is an intro paragraph, so for reg-site the content gets pushed into the appendixSection text
+        # Therefore, the terms layer should have the reference for the appendixSection's label, not the paragraph label
+        # This also checks that only the first paragraph becomes an intro paragraph.
+        expected_result = OrderedDict([('1024-B-s1', 
+                                [OrderedDict([(u'offsets', [[50, 55]]), 
+                                              (u'ref', u'bureau:1024-defs')])]),
+                               ('1024-B-p1-1', 
+                                [OrderedDict([(u'offsets', [[13, 19]]),
+                                              (u'ref', u'bureau:1024-defs')]), 
+                                 OrderedDict([(u'offsets', [[38, 43]]),
+                                              (u'ref', u'bureau:1024-defs')])]),
+                               (u'referenced', OrderedDict([
+                                                    (u'bureau:1024-defs', 
+                                                     OrderedDict([(u'position', [30, 36]),
+                                                                  (u'reference', '1024-defs'),
+                                                                  (u'term', 'bureau')])),
+                                                    (u'respa:1024-defs', 
+                                                     OrderedDict([(u'position', [38, 43]),
+                                                                  (u'reference', '1024-defs'),
+                                                                  (u'term', 'respa')])),
+                                                    (u'hud-1:1024-defs',
+                                                     OrderedDict([(u'position', [49, 54]),
+                                                                  (u'reference', '1024-defs'),
+                                                                  (u'term', 'hud-1')]))]))])
+
+        self.assertEqual(expected_result, result)
+
+    def test_section_intro_references(self):
+        reg_xml = etree.fromstring("""
+        <section label="1024-3" sectionNum="3" xmlns="eregs">
+            <subject>§ 1024.3 Questions or suggestions from public and copies of public guidance documents.</subject>
+            <paragraph label="1024-3-p1" marker="">
+              <content>Any questions regarding <ref target="1024-defs" reftype="term">RESPA</ref>.
+              </content>
+            </paragraph>
+            <paragraph label="1024-defs" marker="">
+              <content>This paragraph contains references for the term <def term="respa">RESPA</def>.
+              </content>
+            </paragraph>
+          </section>""")
+        result = build_terms_layer(reg_xml)
+
+        # This paragraph is an intro paragraph, so for reg-site the content gets pushed into the section's text area
+        # Therefore, the terms layer should have the reference for the section's label, not the paragraph's label
+        expected_result = OrderedDict([('1024-3', 
+                                        [OrderedDict([(u'offsets', [[24, 29]]),
+                                                      (u'ref', u'respa:1024-defs')])]),
+                                       (u'referenced', 
+                                        OrderedDict([(u'respa:1024-defs', 
+                                        OrderedDict([(u'position', [48, 53]),
+                                                     (u'reference', '1024-defs'),
+                                                     (u'term', 'respa')]))]))])
+
+        self.assertEqual(expected_result, result)

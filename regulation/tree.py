@@ -14,12 +14,18 @@ import settings
 
 from lxml import etree
 
+
 # This array contains tag types that can exist in a paragraph
-# that are not part of paragraph text. 
+# that are not part of paragraph text.
 # E.g. tags like <ref> are part of the paragraph text.
 NON_PARA_SUBELEMENT = ['{eregs}paragraph',
                        '{eregs}callout',
-                       '{eregs}table']
+                       '{eregs}table',
+                       '{eregs}graphic']
+
+TAGS_WITH_INTRO_PARAS = ['{eregs}section',
+                         '{eregs}appendixSection']
+
 
 def build_reg_tree(root, parent=None, depth=0):
     """
@@ -90,15 +96,11 @@ def build_reg_tree(root, parent=None, depth=0):
         # node rather than child nodes in their own right.
         if len(children) > 0:
             first_child = children[0]
-            # if first_child doesn't have a title and doesn't have a marker
-            # it may be an intro paragraph
-            if first_child.find('{eregs}title') is None and first_child.get('marker') == '':
-                # Reg-site expects intro paragraphs to be be the 'text' of this
-                # node rather than child nodes in their own right.
-                if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT, first_child[0].getchildren())) == 0:
-                    content = xml_node_text(first_child.find('{eregs}content'))
-                    node.text = content.strip()
-                    del children[0]
+            # First_child may be an intro paragraph
+            if is_intro_text(first_child):
+                content = xml_node_text(first_child.find('{eregs}content'))
+                node.text = content.strip()
+                del children[0]
 
     elif tag == 'paragraph':
         title = root.find('{eregs}title')
@@ -160,15 +162,11 @@ def build_reg_tree(root, parent=None, depth=0):
         # node rather than child nodes in their own right.
         if len(children) > 0:
             first_child = children[0]
-            # if first_child doesn't have a title and doesn't have a marker
-            # it may be an intro paragraph
-            if first_child.find('{eregs}title') is None and first_child.get('marker') == '':
-                # Reg-site expects intro paragraphs to be be the 'text' of this
-                # node rather than child nodes in their own right.
-                if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT, first_child[0].getchildren())) == 0:
-                    content = xml_node_text(first_child.find('{eregs}content'))
-                    node.text = content.strip()
-                    del children[0]
+            # First_child may be an intro paragraph
+            if is_intro_text(first_child):
+                content = xml_node_text(first_child.find('{eregs}content'))
+                node.text = content.strip()
+                del children[0]
 
     elif tag == 'interpretations':
 
@@ -244,10 +242,10 @@ def build_paragraph_marker_layer(root):
         transformation into JSON for use with the eRegs frontend.
     :rtype: :class:`collections.OrderedDict`:
     """
-    parapgraphs = root.findall('.//{eregs}paragraph') # + root.findall('.//{eregs}interpParagraph')
+    paragraphs = root.findall('.//{eregs}paragraph') # + root.findall('.//{eregs}interpParagraph')
     paragraph_dict = OrderedDict()
 
-    for paragraph in parapgraphs:
+    for paragraph in paragraphs:
 
         marker = paragraph.get('marker')
         label = paragraph.get('label')
@@ -284,12 +282,9 @@ def build_internal_citations_layer(root):
             paragraph.find('{eregs}content'))).strip()
 
         par_label = paragraph.get('label')
-        if paragraph.getparent().tag == '{eregs}section' and \
-                paragraph.find('{eregs}title') is None and \
-                paragraph.get('marker') == '' and \
-                len(paragraph.findall('{eregs}paragraph')) == 0:
-            # This paragraph will get attached to its parent node by
-            # build_reg_text
+        if wants_intro_text(paragraph.getparent()) and is_intro_text(paragraph):
+            # This intro paragraph will get attached to its parent node by
+            # build_reg_tree
             par_label = paragraph.getparent().get('label')
 
         if marker != '' and paragraph.tag != '{eregs}interpParagraph':
@@ -459,9 +454,9 @@ def build_formatting_layer(root):
                 dash_text = dash.text
                 if dash_text is None:
                     dash_text = ''
-                dash_dict['text'] = dash_text
                 dash_dict['dash_data'] = {'text': dash_text}
                 dash_dict['locations'] = [0]
+                dash_dict['text'] = dash_text + '_____'
                 layer_dict[label].append(dash_dict)
 
         if len(variables) > 0:
@@ -564,8 +559,8 @@ def apply_formatting(content_elm):
 
     working_content = deepcopy(content_elm)
 
-    # Before building the content text, replace any variable 
-    # elements with Var_{sub} so that reg-site will know what to 
+    # Before building the content text, replace any variable
+    # elements with Var_{sub} so that reg-site will know what to
     # do with them.
     variables = working_content.findall('{eregs}variable') or []
     for variable in variables:
@@ -609,6 +604,25 @@ def apply_formatting(content_elm):
             working_content.text = '```\n' + \
                         '\n'.join([l.text for l in lines]) + \
                         '```'
+
+    # Do the same for dashes.
+    dashes = working_content.findall('.//{eregs}dash')
+    for dash in dashes:
+        # Dashes have to end a line, so we ignore the dash's tail
+        dash_text = dash.text
+        if dash_text is None:
+            dash_text = ''
+
+        dash_text = dash_text + '_____'
+
+        # Append the dash_text to either parent or previous sibling to
+        # replace the dash element.
+        previous = dash.getprevious()
+        if previous is not None:
+            previous.tail = (previous.tail or '') + dash_text
+        else:
+            working_content.text = (working_content.text or '') + dash_text
+        working_content.remove(dash)
 
     return working_content
 
@@ -672,12 +686,12 @@ def build_terms_layer(root):
         marker = paragraph.get('marker') or ''
 
         label = paragraph.get('label')
-        if paragraph.getparent().tag == '{eregs}section' and \
-                paragraph.find('{eregs}title') is None and \
-                paragraph.get('marker') == '' and \
-                len(paragraph.findall('{eregs}paragraph')) == 0:
-            # This paragraph will get attached to its parent node by
-            # build_reg_text
+        # If this is a subparagraph of a type that wants an intro paragraph
+        # and this paragraph is intro text, set the paragraph's label to reference
+        # the parent's
+        if wants_intro_text(paragraph.getparent()) and is_intro_text(paragraph):
+            # This intro paragraph will get attached to its parent node by
+            # build_reg_tree
             label = paragraph.getparent().get('label')
 
         if len(terms) > 0:
@@ -922,7 +936,7 @@ def build_interp_layer(root):
             './/{eregs}interpSection')
         interp_paragraphs = interpretations.findall(
             './/{eregs}interpParagraph')
-        targetted_interps = [i for i in 
+        targetted_interps = [i for i in
             interp_sections + interp_paragraphs
             if i.get('target') is not None]
 
@@ -1085,3 +1099,44 @@ def build_notice(root):
 
     return notice_dict
 
+
+def is_intro_text(item):
+    """
+    Determines whether an element is an intro paragraph to some type of
+    section because reg-site expects text in the parent node rather than
+    in a subelement.
+
+    :param item: The element to check for introductory-ness
+    :type root: :class:`etree.Element`
+
+    :return: A boolean where True indicates the element is an intro paragraph.
+    :rtype: boolean
+    """
+    if item.find('{eregs}title') is None and item.get('marker') == '':
+        # Only the first child may be an intro text item
+        child_num = item.getparent().index(item)
+        if child_num > 1:
+            return False
+        # Note: item[0] is always a <content> tag - check that element's children
+        if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT, item[0].getchildren())) == 0:
+            return True
+
+    return False
+
+def wants_intro_text(element):
+    """
+    Determines whether an element is a type of element that wants
+    an intro paragraph because reg-site expects text in the parent node
+    rather than in a subelement.
+
+    :param element: The element to check for wanting an intro
+    :type root: :class:`etree.Element`
+
+    :return: A boolean where True indicates the element wants an intro paragraph.
+    :rtype: boolean
+    """
+
+    if element.tag in TAGS_WITH_INTRO_PARAS:
+        return True
+    else:
+        return False
