@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 from copy import deepcopy
 import itertools
 import logging
+import ipdb
 from lxml import etree
 
 # Import regparser here with the eventual goal of breaking off the parts
@@ -178,16 +179,16 @@ def process_changes(original_xml, notice_xml, dry=False):
     additions = list(sorted(additions, key=get_label, cmp=label_compare))
     movements = list(sorted(movements, key=get_label, cmp=label_compare))
 
-    changes = itertools.chain(additions, movements, modifications, deletions)
+    changes = itertools.chain(additions, movements, deletions, modifications)
     for change in changes:
         label = change.get('label')
         op = change.get('operation')
 
         logging.info("Applying operation '{}' to {}".format(op, label))
-
         # For added labels, we need to break up the label and find its
         # parent and its preceding sibling to know where to add it.
         if op == 'added':
+
             before_label = change.get('before')
             after_label = change.get('after')
             parent_label = change.get('parent')
@@ -241,7 +242,6 @@ def process_changes(original_xml, notice_xml, dry=False):
                     sibling_label = '-'.join(sibling_label_parts)
                     sibling_elm = new_xml.find(
                         './/*[@label="{}"]'.format(sibling_label))
-
                     try:
                         new_index = parent_elm.index(sibling_elm) + 1
                     except ValueError:
