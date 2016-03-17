@@ -7,6 +7,7 @@ import lxml.etree as etree
 from regulation.changes import (get_parent_label, get_sibling_label,
                                 process_changes, generate_diff)
 
+import logging
 
 class ChangesTests(TestCase):
 
@@ -603,3 +604,89 @@ class ChangesTests(TestCase):
         self.assertEqual(len(diff.keys()), 1)
         self.assertTrue('1234-1-a' in diff)
         self.assertEqual(diff['1234-1-a']['op'], 'deleted')
+
+    def test_process_changes_modified_xpath(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="modified" label="1234" subpath='title'>
+                  <title>Modified Title</title>
+                </change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <title>Test Title</title>
+                <content>
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </content>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        mod_title = new_xml.findall('.//{eregs}title')
+        self.assertEqual(len(mod_title), 1)
+        self.assertNotEqual(mod_title[0], None)
+        self.assertEqual("Modified Title", mod_title[0].text)
+
+    def test_process_changes_deleted_xpath(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="deleted" label="1234" subpath='title'></change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <title>Test Title</title>
+                <content>
+                  <paragraph label="1234-1">An existing paragraph</paragraph>
+                </content>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        del_title = new_xml.findall('.//{eregs}title')
+        self.assertEqual(len(del_title), 0)
+
+    def test_process_changes_moved_xpath(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="moved" label="1234-Subpart-A" subpath='title' parent="1234-Subpart-B"></change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <content>
+                  <subpart label="1234-Subpart-A">
+                    <title>Test Title</title>
+                    <content>
+                      <paragraph label="1234-1">An existing paragraph</paragraph>
+                    </content>
+                  </subpart>
+                  <subpart label="1234-Subpart-B">
+                    <content>
+                      <paragraph label="1234-2">Another existing paragraph</paragraph>
+                    </content>
+                  </subpart>
+                </content>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        moved_title = new_xml.find('.//{eregs}title')
+        self.assertEqual(moved_title.getparent().get('label'),
+                         '1234-Subpart-B')
+        old_title = new_xml.find('.//{eregs}subpart[@label="1234-Subpart-A"]/{eregs}title')
+        self.assertEqual(old_title, None)
+
