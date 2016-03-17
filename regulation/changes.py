@@ -238,7 +238,7 @@ def process_changes(original_xml, notice_xml, dry=False):
             # inserting the namespace into findstr between label and subpath
             # will PROBABLY be the problem you're looking for
             if subpath is not None:
-                findstr = str('.//*[@label="{}"]/{}{}'.format(label, "{eregs}", subpath))
+                findstr = './/*[@label="{}"]/{}{}'.format(label, "{eregs}", subpath)
                 matching_elm = new_xml.find(findstr)
                 logging.debug("Performing {} operation on '{}'".format(op, findstr))
 
