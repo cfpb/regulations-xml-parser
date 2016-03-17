@@ -235,6 +235,9 @@ def process_changes(original_xml, notice_xml, dry=False):
         # Handle existing elements
         if op in ('moved', 'modified', 'deleted'):
             # Find a match to the given label and subpath (optional)
+            # NOTE: If subpath isn't a single sub-element of a labelled node,
+            # inserting the namespace into findstr between label and subpath
+            # will PROBABLY be the problem you're looking for
             if subpath is not None:
                 findstr = str('.//*[@label="{}"]/{}{}'.format(label, "{eregs}", subpath))
                 matching_elm = new_xml.find(findstr)
