@@ -1020,6 +1020,11 @@ def build_notice(root):
                     inline_img = '<img src="{}">'.format(url)
                     paragraph_text += '\n' + inline_img + '\n'
 
+                # If it's something else, like an em tag, include the
+                # text.
+                else:
+                    paragraph_text += p_child_elm.text or ''
+
                 # Append the footnote 'tail' to the paragraph text
                 tail = p_child_elm.tail or ''
                 paragraph_text += tail

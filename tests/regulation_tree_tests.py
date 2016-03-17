@@ -106,6 +106,7 @@ class TreeTestCase(TestCase):
                     ],
                     'paragraphs': [
                         'I am a paragraph in an analysis section, love me!',
+                        'I am a paragraph with italicized text.',
                     ],
                     'title': '(a) Section of the Analysis'
                 }],

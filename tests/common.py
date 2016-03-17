@@ -35,6 +35,7 @@ test_xml = """
                         <analysisSection>
                           <title>(a) Section of the Analysis</title>
                           <analysisParagraph>I am a paragraph<footnote ref="1">Paragraphs contain text.</footnote> in an analysis<footnote ref="2">Analysis analyzes things.</footnote> section, love me!</analysisParagraph>
+                          <analysisParagraph>I am a paragraph with <em>italicized</em> text.</analysisParagraph>
                         </analysisSection>
                       </analysisSection>
                     </analysis>
