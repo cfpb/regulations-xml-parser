@@ -19,7 +19,6 @@ from regulation.tree import build_reg_tree
 logger = logging.getLogger(__name__)
 
 TAGS_WITH_SUBCONTENT = ["{eregs}part", "{eregs}subpart"]
-TAGS_WITH_NO_SUBCONTENT = ["{eregs}title"]
 
 
 def get_parent_label(label_parts):
@@ -269,7 +268,7 @@ def process_changes(original_xml, notice_xml, dry=False):
 
                 # If the parent is a part or subpart, we need to add to the
                 # content element, unless this is an item found by subpath with no content
-                if parent_elm.tag in TAGS_WITH_SUBCONTENT and matching_elm.tag not in TAGS_WITH_NO_SUBCONTENT:
+                if parent_elm.tag in TAGS_WITH_SUBCONTENT and subpath is None:
                     parent_elm = parent_elm.find('./{eregs}content')
 
                 # Figure out where we're putting the element when we
