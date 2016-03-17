@@ -18,6 +18,7 @@ from regulation.tree import build_reg_tree
 
 logger = logging.getLogger(__name__)
 
+TAGS_WITH_SUBCONTENT = ["{eregs}part", "{eregs}subpart"]
 
 
 def get_parent_label(label_parts):
@@ -155,9 +156,8 @@ def process_changes(original_xml, notice_xml, dry=False):
     changes = itertools.chain(additions, movements, modifications, deletions)
     for change in changes:
         label = change.get('label')
+        subpath = change.get('subpath')
         op = change.get('operation')
-
-        logging.info("Applying operation '{}' to {}".format(op, label))
 
         # For added labels, we need to break up the label and find its
         # parent and its preceding sibling to know where to add it.
@@ -184,7 +184,7 @@ def process_changes(original_xml, notice_xml, dry=False):
 
             # If the parent is a part or subpart, we need to add to the
             # content element.
-            if parent_elm.tag in ("{eregs}part", "{eregs}subpart"):
+            if parent_elm.tag in TAGS_WITH_SUBCONTENT:
                 parent_elm = parent_elm.find('./{eregs}content')
  
             # Figure out where we're putting the new element 
@@ -233,11 +233,23 @@ def process_changes(original_xml, notice_xml, dry=False):
 
         # Handle existing elements
         if op in ('moved', 'modified', 'deleted'):
-            # Find a match to the given label
-            matching_elm = new_xml.find('.//*[@label="{}"]'.format(label))
-            if matching_elm is None:
-                raise KeyError("Unable to find label {} to be "
-                               "{}".format(label, op))
+            # Find a match to the given label and subpath (optional)
+            # NOTE: If subpath isn't a single sub-element of a labelled node,
+            # inserting the namespace into findstr between label and subpath
+            # will PROBABLY be the problem you're looking for
+            if subpath is not None:
+                findstr = './/*[@label="{}"]/{}{}'.format(label, "{eregs}", subpath)
+                matching_elm = new_xml.find(findstr)
+                logging.debug("Performing {} operation on '{}'".format(op, findstr))
+
+                if matching_elm is None:
+                    logging.debug("Finding str: {}".format(repr(findstr)))
+                    raise KeyError("Unable to find element '{}' to be {}".format(findstr, op))
+            else:
+                matching_elm = new_xml.find('.//*[@label="{}"]'.format(label))
+                logging.debug("Performing {} operation on '{}'".format(op, label))
+                if matching_elm is None:
+                    raise KeyError("Unable to find label {} to be {}".format(label, op))
 
             match_parent = matching_elm.getparent()
 
@@ -247,17 +259,16 @@ def process_changes(original_xml, notice_xml, dry=False):
                 before_label = change.get('before')
                 after_label = change.get('after')
 
-                # Find the parent element
-                parent_elm = new_xml.find('.//*[@label="{}"]'.format(
-                    parent_label))
+                # Find the new parent element
+                parent_elm = new_xml.find('.//*[@label="{}"]'.format(parent_label))
                 if parent_elm is None:
                     raise ValueError("'parent' attribute is required "
                                      "for 'moved' operation on "
                                      "{}".format(label))
 
                 # If the parent is a part or subpart, we need to add to the
-                # content element.
-                if parent_elm.tag in ("{eregs}part", "{eregs}subpart"):
+                # content element, unless this is an item found by subpath with no content
+                if parent_elm.tag in TAGS_WITH_SUBCONTENT and subpath is None:
                     parent_elm = parent_elm.find('./{eregs}content')
 
                 # Figure out where we're putting the element when we
@@ -310,5 +321,3 @@ def generate_diff(left_xml, right_xml):
     diff = dict(changes_between(FrozenNode.from_node(left_tree),
                                 FrozenNode.from_node(right_tree)))
     return diff
-
-
