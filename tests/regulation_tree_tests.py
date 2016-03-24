@@ -645,3 +645,26 @@ class TreeTestCase(TestCase):
         }
         result = build_toc_layer(tree)
         self.assertEqual(expected_result, result)
+
+    def test_para_with_defs_offsets(self):
+        reg_xml = etree.fromstring("""
+        <appendixSection appendixSecNum="1" label="1024-s1" xmlns="eregs">
+          <subject/>
+          <paragraph label="1024-defs" marker="1.">
+            <title type="keyterm">Definitions.</title>
+            <content>This paragraph contains definitions to check offsets, like <def term="bureau">Bureau</def>.
+            </content>
+          </paragraph>
+        </appendixSection>""")
+        result = build_terms_layer(reg_xml)
+
+        # This paragraph is a paragraph with definitions and a title (type: keyterm) to test
+        # that the appropriate offsets are calculated for both marker and title.
+        expected_result = OrderedDict([(u'referenced', 
+                                        OrderedDict([(u'bureau:1024-defs',
+                                                      OrderedDict([(u'position', [74, 80]),
+                                                                   (u'reference', '1024-defs'),
+                                                                   (u'term', 'bureau')]))])
+                                        )])
+
+        self.assertEqual(expected_result, result)
