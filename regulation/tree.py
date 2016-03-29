@@ -23,8 +23,15 @@ NON_PARA_SUBELEMENT = ['{eregs}paragraph',
                        '{eregs}table',
                        '{eregs}graphic']
 
+# This array contains tag types that can have introductory
+# paragraphs, as reg-site often wants the first paragraph
+# to be moved into the parent node's text
 TAGS_WITH_INTRO_PARAS = ['{eregs}section',
                          '{eregs}appendixSection']
+
+# reg-site treats interpParagraphs specially, so they
+# should not have offsets calculated for the layers
+TAGS_WITHOUT_OFFSETS = ['{eregs}interpParagraph']
 
 
 def build_reg_tree(root, parent=None, depth=0):
@@ -287,20 +294,7 @@ def build_internal_citations_layer(root):
             # build_reg_tree
             par_label = paragraph.getparent().get('label')
 
-        if marker != '' and paragraph.tag != '{eregs}interpParagraph':
-            marker_offset = len(marker + ' ')
-        else:
-            marker_offset = 0
-
-        # Keyterm offset.
-        # Note: reg-site treats interp-paragraphs as "special" — they
-        # don't get the keyterm text included, so we don't include an
-        # offset here.
-        if title is not None and title.get('type') == 'keyterm' and \
-                paragraph.tag != '{eregs}interpParagraph':
-            keyterm_offset = len(title.text)
-        else:
-            keyterm_offset = 0
+        total_offset = get_offset(paragraph, marker, title)
 
         cite_positions = OrderedDict()
         cite_targets = OrderedDict()
@@ -320,7 +314,7 @@ def build_internal_citations_layer(root):
                 else:
                     break
 
-            cite_position = len(running_par_text) + marker_offset + keyterm_offset
+            cite_position = len(running_par_text) + total_offset
             cite_positions.setdefault(text, []).append(cite_position)
             cite_targets[text] = target
             running_par_text = ''
@@ -656,9 +650,12 @@ def build_terms_layer(root):
     for paragraph in paragraphs_with_defs:
         label = paragraph.get('label')
         marker = paragraph.get('marker') or ''
+        title = paragraph.find('{eregs}title')
         content = apply_formatting(paragraph.find('{eregs}content'))
-        par_text = (marker + ' ' + xml_node_text(content)).strip()
+        par_text = xml_node_text(content).strip()
         definitions = content.findall('{eregs}def')
+
+        total_offset = get_offset(paragraph, marker, title)
 
         for defn in definitions:
             defined_term = defn.get('term')
@@ -673,7 +670,7 @@ def build_terms_layer(root):
             positions = find_all_occurrences(par_text, def_text)
             def_dict = OrderedDict()
             pos = positions[0]
-            def_dict['position'] = [pos, pos + len(def_text)]
+            def_dict['position'] = [pos + total_offset, pos + len(def_text) + total_offset]
             def_dict['reference'] = label
             def_dict['term'] = defined_term
             if def_dict['position'] != []:
@@ -697,20 +694,7 @@ def build_terms_layer(root):
         if len(terms) > 0:
             terms_dict[label] = []
 
-        if marker != '' and paragraph.tag != '{eregs}interpParagraph':
-            marker_offset = len(marker + ' ')
-        else:
-            marker_offset = 0
-
-        # Keyterm offset.
-        # Note: reg-site treats interp-paragraphs as "special" — they
-        # don't get the keyterm text included, so we don't include an
-        # offset here.
-        if title is not None and title.get('type') == 'keyterm' and \
-                paragraph.tag != '{eregs}interpParagraph':
-            keyterm_offset = len(title.text)
-        else:
-            keyterm_offset = 0
+        total_offset = get_offset(paragraph, marker, title)
 
         term_positions = OrderedDict()
         term_targets = OrderedDict()
@@ -729,7 +713,7 @@ def build_terms_layer(root):
             defn_location = [key for key, defn in definitions_dict.items() if defn['reference'] == target]
             if len(defn_location) > 0:
                 defn_location = defn_location[0]
-                term_position = len(running_par_text) + marker_offset + keyterm_offset
+                term_position = len(running_par_text) + total_offset
                 term_positions.setdefault(text, []).append(term_position)
                 term_targets[text] = defn_location
 
@@ -753,7 +737,7 @@ def build_toc_layer(root):
     """
     Build the paragraph table-of-contents layer from the provided root of the XML tree.
 
-    :param root: The root element of the XML tree.
+    :param root: A root element containing tableOfContents elements.
     :type root: :class:`etree.Element`
 
     :return: An OrderedDict containing the table of contents, suitable for direct
@@ -763,67 +747,30 @@ def build_toc_layer(root):
 
     toc_dict = OrderedDict()
 
-    part = root.find('{eregs}part')
-    part_toc = part.find('{eregs}tableOfContents')
-    part_number = part.get('label')
-    toc_dict[part_number] = []
-    appendix_letters = []
+    # Look for all tables of contents in the given element and add them
+    # to the layer.
+    tables_of_contents = root.findall('.//{eregs}tableOfContents')
+    for toc in tables_of_contents:
+        parent = toc.getparent()
+        if parent.tag == '{eregs}content':
+            parent = parent.getparent()
 
-    for section in part_toc.findall('{eregs}tocSecEntry'):
-        target = section.get('target').split('-')
-        subject = section.find('{eregs}sectionSubject').text
-        toc_entry = {'index': target, 'title': subject}
-        toc_dict[part_number].append(toc_entry)
+        label = parent.get('label')
+        toc_dict[label] = []
 
-    for appendix_section in part_toc.findall('{eregs}tocAppEntry'):
-        target = appendix_section.get('target').split('-')
-        subject = appendix_section.find('{eregs}appendixSubject').text
-        toc_entry = {'index': target, 'title': subject}
-        toc_dict[part_number].append(toc_entry)
-
-    subparts = part.find('{eregs}content').findall('{eregs}subpart')
-    for subpart in subparts:
-        subpart_letter = subpart.get('subpartLetter')
-        if subpart_letter is not None:
-            subpart_key = part_number + '-Subpart-' + subpart_letter
-        else:
-            subpart_key = part_number + '-Subpart'
-        toc_dict[subpart_key] = []
-
-        subpart_toc = subpart.find('{eregs}tableOfContents')
-        for section in subpart_toc.findall('{eregs}tocSecEntry'):
+        # Build sections
+        for section in toc.findall('{eregs}tocSecEntry'):
             target = section.get('target').split('-')
             subject = section.find('{eregs}sectionSubject').text
             toc_entry = {'index': target, 'title': subject}
-            toc_dict[subpart_key].append(toc_entry)
+            toc_dict[label].append(toc_entry)
 
-    appendices = part.find('{eregs}content').findall('{eregs}appendix')
-    for appendix in appendices:
-        appendix_letter = appendix.get('appendixLetter')
-        appendix_letters.append(appendix_letter)
-        appendix_key = part_number + '-' + appendix_letter
-        toc_dict[appendix_key] = []
-
-        appendix_toc = appendix.find('{eregs}tableOfContents')
-
-        if appendix_toc is not None:
-            for section in appendix_toc.findall('{eregs}tocAppEntry'):
-                target = section.get('target').split('-')
-                subject = section.find('{eregs}appendixSubject').text
-                toc_entry = {'index': target, 'title': subject}
-                toc_dict[appendix_key].append(toc_entry)
-
-    interpretations = part.find('.//{eregs}interpretations')
-
-    if interpretations is not None:
-        interps = interpretations.findall('{eregs}interpSection')
-        interp_key = part_number + '-Interp'
-        for interp in interps:
-            title = interp.find('{eregs}title').text
-            target = interp.get('label').split('-')
-            if target[-1] not in appendix_letters:
-                toc_entry = {'index': target, 'title': title}
-                toc_dict.setdefault(interp_key, []).append(toc_entry)
+        # Build appendix sections 
+        for appendix_section in toc.findall('{eregs}tocAppEntry'):
+            target = appendix_section.get('target').split('-')
+            subject = appendix_section.find('{eregs}appendixSubject').text
+            toc_entry = {'index': target, 'title': subject}
+            toc_dict[label].append(toc_entry)
 
     return toc_dict
 
@@ -1057,6 +1004,11 @@ def build_notice(root):
                     inline_img = '<img src="{}">'.format(url)
                     paragraph_text += '\n' + inline_img + '\n'
 
+                # If it's something else, like an em tag, include the
+                # text.
+                else:
+                    paragraph_text += p_child_elm.text or ''
+
                 # Append the footnote 'tail' to the paragraph text
                 tail = p_child_elm.tail or ''
                 paragraph_text += tail
@@ -1140,3 +1092,32 @@ def wants_intro_text(element):
         return True
     else:
         return False
+
+def get_offset(element, marker='', title=None):
+    """
+    Determines the overall offset to apply to an element from the given
+    marker and title.
+
+    :param element: The element to check for offset amounts
+    :type root: :class:`etree.Element`
+
+    :return: The amount of offset characters
+    :rtype: integer
+    """
+    # Marker offsets
+    if marker != '' and element.tag not in TAGS_WITHOUT_OFFSETS:
+        marker_offset = len(marker + ' ')
+    else:
+        marker_offset = 0
+
+    # Keyterm offset
+    # Note: reg-site treats some elements (e.g. interpParagraphs)
+    # as "special" — they don't get the keyterm text included,
+    # so we don't include an offset here.
+    if title is not None and title.get('type') == 'keyterm' and \
+            element.tag not in TAGS_WITHOUT_OFFSETS:
+        keyterm_offset = len(title.text)
+    else:
+        keyterm_offset = 0
+
+    return marker_offset + keyterm_offset

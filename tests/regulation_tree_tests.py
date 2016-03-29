@@ -14,7 +14,8 @@ from regulation.tree import (build_reg_tree,
                              build_analysis,
                              build_notice,
                              build_formatting_layer,
-                             apply_formatting)
+                             apply_formatting,
+                             build_toc_layer)
 from regulation.node import RegNode
 
 
@@ -105,6 +106,7 @@ class TreeTestCase(TestCase):
                     ],
                     'paragraphs': [
                         'I am a paragraph in an analysis section, love me!',
+                        'I am a paragraph with italicized text.',
                     ],
                     'title': '(a) Section of the Analysis'
                 }],
@@ -521,5 +523,148 @@ class TreeTestCase(TestCase):
                                         OrderedDict([(u'position', [48, 53]),
                                                      (u'reference', '1024-defs'),
                                                      (u'term', 'respa')]))]))])
+
+        self.assertEqual(expected_result, result)
+
+    def test_build_toc_layer_part(self):
+        tree = etree.fromstring("""
+        <part xmlns="eregs" label="1234">
+          <tableOfContents>
+            <tocSecEntry target="1234-1">
+              <sectionNum>1</sectionNum>
+              <sectionSubject>§ 1234.1</sectionSubject>
+            </tocSecEntry>
+            <tocAppEntry target="1234-A">
+              <appendixLetter>A</appendixLetter>
+              <appendixSubject>Appendix</appendixSubject>
+            </tocAppEntry>
+          </tableOfContents>
+          <content/>
+        </part>
+        """)
+        expected_result = {
+            '1234': [
+                {'index': [u'1234', u'1'], 'title': u'\xa7 1234.1'},
+                {'index': [u'1234', u'A'], 'title': 'Appendix'}
+            ],
+        }
+        result = build_toc_layer(tree)
+        self.assertEqual(expected_result, result)
+        
+    def test_build_toc_layer_subpart(self):
+        tree = etree.fromstring("""
+        <subpart xmlns="eregs" subpartLetter="A" label="1234-Subpart-A">
+          <title>General</title>
+          <tableOfContents label="1234-Subpart-A-TOC">
+            <tocSecEntry target="1234-1">
+              <sectionNum>1</sectionNum>
+              <sectionSubject>§ 1234.1</sectionSubject>
+            </tocSecEntry>
+            <tocSecEntry target="1234-1">
+              <sectionNum>1</sectionNum>
+              <sectionSubject>§ 1234.2</sectionSubject>
+            </tocSecEntry>
+          </tableOfContents>
+          <content></content>
+        </subpart>
+        """)
+        expected_result = {
+            '1234-Subpart-A': [
+                {'index': [u'1234', u'1'], 'title': u'\xa7 1234.1'},
+                {'index': [u'1234', u'1'], 'title': u'\xa7 1234.2'}
+            ],
+        }
+        result = build_toc_layer(tree)
+        self.assertEqual(expected_result, result)
+        
+    def test_build_toc_layer_section(self):
+        tree = etree.fromstring("""
+        <section xmlns="eregs" label="1234-1" sectionNum="1">
+          <subject>§ 1234.1</subject>
+          <tableOfContents label="1234-Subpart-A-TOC">
+            <tocSecEntry target="1234-1-a">
+              <sectionNum>1</sectionNum>
+              <sectionSubject>§ 1234.1(a)</sectionSubject>
+            </tocSecEntry>
+          </tableOfContents>
+          <paragraph label="1234-1-a" marker="a">
+            <content>This is a section with its own TOC</content>
+          </paragraph>
+        </section>
+        """)
+        expected_result = {
+            '1234-1': [
+                {u'index': [u'1234', u'1', u'a'], u'title': u'\xa7 1234.1(a)'}
+            ],
+        }
+        result = build_toc_layer(tree)
+        self.assertEqual(expected_result, result)
+
+    def test_build_toc_layer_appendix(self):
+        tree = etree.fromstring("""
+        <appendix xmlns="eregs" appendixLetter="A" label="1234-A">
+          <appendixTitle>Appendix A</appendixTitle>
+          <tableOfContents>
+            <tocAppEntry target="1234-A-1">
+              <appendixLetter>A-1</appendixLetter>
+              <appendixSubject>Some Subject</appendixSubject>
+            </tocAppEntry>
+          </tableOfContents>
+        </appendix>
+        """)
+        expected_result = {
+            '1234-A': [
+                {u'index': [u'1234', u'A', u'1'], u'title': 'Some Subject'}
+            ],
+        }
+        result = build_toc_layer(tree)
+        self.assertEqual(expected_result, result)
+        
+    def test_build_toc_layer_appendix_section(self):
+        tree = etree.fromstring("""
+        <appendix xmlns="eregs" appendixLetter="A" label="1234-A">
+          <appendixTitle>Appendix A</appendixTitle>
+          <appendixSection appendixSecNum="1" label="1234-A-1">
+            <subject>Section 1</subject>
+            <tableOfContents>
+              <tocAppEntry target="1234-A-1-A">
+                <appendixLetter>A-1-A</appendixLetter>
+                <appendixSubject>Something</appendixSubject>
+              </tocAppEntry>
+            </tableOfContents>
+            <paragraph label="1234-A-1-A" marker="">
+              <content>Something here</content>
+            </paragraph>
+          </appendixSection>
+        </appendix>
+        """)
+        expected_result = {
+            '1234-A-1': [
+                {u'index': [u'1234', u'A', u'1', 'A'], u'title': 'Something'}
+            ],
+        }
+        result = build_toc_layer(tree)
+        self.assertEqual(expected_result, result)
+
+    def test_para_with_defs_offsets(self):
+        reg_xml = etree.fromstring("""
+        <appendixSection appendixSecNum="1" label="1024-s1" xmlns="eregs">
+          <subject/>
+          <paragraph label="1024-defs" marker="1.">
+            <title type="keyterm">Definitions.</title>
+            <content>This paragraph contains definitions to check offsets, like <def term="bureau">Bureau</def>.
+            </content>
+          </paragraph>
+        </appendixSection>""")
+        result = build_terms_layer(reg_xml)
+
+        # This paragraph is a paragraph with definitions and a title (type: keyterm) to test
+        # that the appropriate offsets are calculated for both marker and title.
+        expected_result = OrderedDict([(u'referenced', 
+                                        OrderedDict([(u'bureau:1024-defs',
+                                                      OrderedDict([(u'position', [74, 80]),
+                                                                   (u'reference', '1024-defs'),
+                                                                   (u'term', 'bureau')]))])
+                                        )])
 
         self.assertEqual(expected_result, result)

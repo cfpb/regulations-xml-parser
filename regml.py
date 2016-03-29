@@ -360,6 +360,132 @@ def apply_notice(regulation_file, notice_file):
         f.write(new_xml_string)
 
 
+# Given a regulation title and part number, prompts the user to select
+# which notice to stop at and applies all notices applicable to the reg
+@cli.command('apply-through')
+@click.argument('cfr_title')
+@click.argument('cfr_part')
+@click.option('--through',
+              help="Skips prompt and applies notices through given notice number " +
+                   "(e.g. --through YYYY-#####")
+def apply_through(cfr_title, cfr_part, through=None):
+    # Get list of notices that apply to this reg
+    # Look for locally available notices
+    regml_notice_dir = os.path.join(settings.XML_ROOT, 'notice', cfr_part, '*.xml')
+    regml_notice_files = glob.glob(regml_notice_dir)
+
+    regml_notices = []
+    for notice_file in regml_notice_files:
+        file_name = os.path.join(notice_file)
+        with open(file_name, 'r') as f:
+            notice_xml = f.read()
+        xml_tree = etree.fromstring(notice_xml)
+        doc_number = xml_tree.find(
+            './{eregs}preamble/{eregs}documentNumber').text
+        effective_date = xml_tree.find(
+            './{eregs}preamble/{eregs}effectiveDate').text
+        applies_to = xml_tree.find(
+            './{eregs}changeset').get('leftDocumentNumber')
+        regml_notices.append((doc_number, effective_date, applies_to, file_name))
+
+    regml_notices.sort(key=lambda n: n[1])
+    
+    regs = [nn[2] for nn in regml_notices]
+    regs.sort()
+
+    # Generate prompt for user
+    print(colored("\nAvailable notices for reg {}:".format(cfr_part),
+          attrs=['bold']))
+    print("{:>3}. {:<22}(Initial version)".format(0, regs[0]))
+    for kk in range(len(regml_notices)):
+        print("{0:>3}. {1[0]:<22}(Effective: {1[1]})".format(kk+1,
+                                               regml_notices[kk]))
+    print()
+
+    # Possible answers are blank (all), the numbers, or the notice names
+    possible_indices = [str(kk) for kk in range(len(regml_notices) + 1)]
+    possible_notices = [nn[0] for nn in regml_notices]
+
+    # If notice number is supplied, use that one
+    if through is not None:
+        print("Command-line option selected notice '{}'".format(through))
+        answer = through
+    else: 
+        # Get user input to specify end version
+        answer = None
+        while answer not in [""] + possible_indices + possible_notices: 
+            answer = raw_input('Press enter to apply all or enter notice number: [all] ')
+        # print("Answer: '{}'".format(answer))
+
+    if len(answer) == 0:
+        # Apply notices
+        last_ver_idx = len(regml_notices) - 1
+    elif answer is "0":
+        # Cancel - this is just the initial version
+        print(colored("CANCELED: Version", attrs=['bold']),
+              colored("{}".format(regs[0]), 'yellow', attrs=['bold']),
+              colored("is the initial version - no changes have been made.", attrs=['bold']))
+        return
+    elif answer in possible_indices:
+        # Apply notices through answer-1 to adjust for the initial ver offset
+        last_ver_idx = int(answer) - 1
+    elif answer in possible_notices:
+        # Find index to stop at in notice list
+        last_ver_idx = possible_notices.index(answer)
+    else:
+        print(colored("ERROR: Notice", attrs=['bold']),
+              colored("{}".format(answer), 'red', attrs=['bold']),
+              colored("does not exist - no changes have been made.", attrs=['bold']))
+        return
+
+    print(colored("\nApplying notices through {0[0]}\n".format(regml_notices[last_ver_idx]),
+          attrs=['bold']))
+
+    # Perform the notice application process
+    reg_path = os.path.abspath(os.path.join(settings.XML_ROOT,
+                                            'regulation',
+                                            cfr_part,
+                                            '{}.xml'.format(regs[0])))
+    print("Opening initial version {}".format(reg_path))
+    regulation_file = find_file(reg_path)
+    with open(regulation_file, 'r') as f:
+        left_reg_xml = f.read()
+    left_xml_tree = etree.fromstring(left_reg_xml)
+
+    kk = 1
+    prev_tree = left_xml_tree
+    for notice in regml_notices[:last_ver_idx+1]:
+        doc_number, effective_date, prev_notice, file_name = notice
+
+        print("[{}] Applying notice {} to version {}".format(kk,
+                                                             doc_number,
+                                                             prev_notice))
+
+        # Open the notice file
+        notice_file = find_file(file_name, is_notice=True)
+        with open(notice_file, 'r') as f:
+            notice_string = f.read()
+        notice_xml = etree.fromstring(notice_string)
+
+        # Process the notice changeset
+        new_xml_tree = process_changes(prev_tree, notice_xml)
+
+        # Write the new xml tree
+        new_xml_string = etree.tostring(new_xml_tree,
+                                        pretty_print=True,
+                                        xml_declaration=True,
+                                        encoding='UTF-8')
+        new_path = os.path.join(
+            os.path.dirname(regulation_file),
+            os.path.basename(notice_file))
+        with open(new_path, 'w') as f:
+            print("[{}] Writing regulation to {}".format(kk, new_path))
+            f.write(new_xml_string)
+
+        prev_tree = new_xml_tree
+        kk += 1
+
+
 # Given a notice, apply it to a previous RegML regulation verson to
 # generate a new version in RegML.
 @cli.command('notice-changes')
