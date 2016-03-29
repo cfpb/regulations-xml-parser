@@ -145,6 +145,9 @@ def process_changes(original_xml, notice_xml, dry=False):
         './/{eregs}change[@operation="added"]')
     movements = notice_xml.findall(
         './/{eregs}change[@operation="moved"]')
+    relabelings = notice_xml.findall(
+        './/{eregs}change[@operation="changeTarget"]')
+
 
     # Sort them appropriately by label using our custom comparison
     get_label = lambda c: c.get('label')
@@ -153,7 +156,7 @@ def process_changes(original_xml, notice_xml, dry=False):
     additions = list(sorted(additions, key=get_label, cmp=label_compare))
     movements = list(sorted(movements, key=get_label, cmp=label_compare))
 
-    changes = itertools.chain(additions, movements, deletions, modifications)
+    changes = itertools.chain(additions, movements, deletions, modifications, relabelings)
     for change in changes:
         label = change.get('label')
         op = change.get('operation')
@@ -297,6 +300,19 @@ def process_changes(original_xml, notice_xml, dry=False):
 
                     # Remove the element itself
                     match_parent.remove(matching_elm)
+
+        if op == 'changeTarget':
+
+            old_target = change.get('oldTarget')
+            new_target = change.get('newTarget')
+
+            if old_target is None or new_target is None:
+                raise ValueError('Need to know both the old target and '
+                                 'the new target to relabel a reference!')
+
+            references = new_xml.findall('.//{{eregs}}ref[@target="{}"]'.format(old_target))
+            for ref in references:
+                ref.set('target', new_target)
 
     return new_xml
 
