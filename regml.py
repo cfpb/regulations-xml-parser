@@ -288,6 +288,40 @@ def check_changes(file, label=None):
     validator.remove_duplicate_changes(xml_tree, file, label=label)
     
 
+@cli.command('migrate-analysis')
+@click.argument('cfr_title')
+@click.argument('cfr_part')
+def migrate_analysis(cfr_title, cfr_part):
+    """ Migrate analysis from its context to top-level """
+    
+    # Migrate regulation files
+    regml_reg_dir = os.path.join(settings.XML_ROOT, 'regulation', cfr_part, '*.xml')
+    regml_reg_files = glob.glob(regml_reg_dir)
+    for reg_file in regml_reg_files:
+        print(reg_file)
+        file_name = os.path.join(reg_file)
+        with open(file_name, 'r') as f:
+            reg_xml = f.read()
+        xml_tree = etree.fromstring(reg_xml)
+        validator = EregsValidator(settings.XSD_FILE)
+        validator.migrate_analysis(xml_tree, file_name)
+        validator.validate_reg(xml_tree)
+
+    # Migrate notices
+    regml_notice_dir = os.path.join(settings.XML_ROOT, 'notice', cfr_part, '*.xml')
+    regml_notice_files = glob.glob(regml_notice_dir)
+    regml_notices = []
+    for notice_file in regml_notice_files:
+        print(notice_file)
+        file_name = os.path.join(notice_file)
+        with open(file_name, 'r') as f:
+            reg_xml = f.read()
+        xml_tree = etree.fromstring(reg_xml)
+        validator = EregsValidator(settings.XSD_FILE)
+        validator.migrate_analysis(xml_tree, file_name)
+        validator.validate_reg(xml_tree)
+        
+
 # Validate the given regulation file (or files) and generate the JSON
 # output expected by regulations-core and regulations-site if the RegML
 # validates.
