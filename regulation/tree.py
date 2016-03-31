@@ -772,6 +772,13 @@ def build_toc_layer(root):
             toc_entry = {'index': target, 'title': subject}
             toc_dict[label].append(toc_entry)
 
+        # Build interp sections
+        for interp_section in toc.findall('{eregs}tocInterpEntry'):
+            target = interp_section.get('target').split('-')
+            subject = interp_section.find('{eregs}interpTitle').text
+            toc_entry = {'index': target, 'title': subject}
+            toc_dict[label].append(toc_entry)
+
     return toc_dict
 
 

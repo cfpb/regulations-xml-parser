@@ -286,6 +286,7 @@ def check_changes(file, label=None):
     # Validate the file relative to schema
     validator = get_validator(xml_tree)
     validator.remove_duplicate_changes(xml_tree, file, label=label)
+    validator.remove_empty_refs(xml_tree, file)
     
 
 # Validate the given regulation file (or files) and generate the JSON
