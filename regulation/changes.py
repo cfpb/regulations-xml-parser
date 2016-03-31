@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 from copy import deepcopy
 import itertools
 import logging
-import ipdb
+
 from lxml import etree
 
 # Import regparser here with the eventual goal of breaking off the parts
