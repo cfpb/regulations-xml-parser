@@ -601,7 +601,7 @@ def apply_through(cfr_title, cfr_part, through=None):
         old_analysis = new_xml_tree.find('.//{eregs}analysis')
         if old_analysis is not None:
             old_analysis.getparent().remove(old_analysis)
-        notice_analysis = notice_xml.find('.//{eregs}analyis')
+        notice_analysis = notice_xml.find('.//{eregs}analysis')
         if notice_analysis is not None:
             new_xml_tree.append(notice_analysis)
 
