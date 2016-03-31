@@ -28,17 +28,6 @@ test_xml = """
                     <paragraph label="1234-1-a" marker="a">
                       <content>I'm a marked paragraph</content>
                     </paragraph>
-                    <analysis>
-                      <analysisSection>
-                        <title>Section 1234.1</title>
-                        <analysisParagraph>This paragraph is in the top-level section.</analysisParagraph>
-                        <analysisSection>
-                          <title>(a) Section of the Analysis</title>
-                          <analysisParagraph>I am a paragraph<footnote ref="1">Paragraphs contain text.</footnote> in an analysis<footnote ref="2">Analysis analyzes things.</footnote> section, love me!</analysisParagraph>
-                          <analysisParagraph>I am a paragraph with <em>italicized</em> text.</analysisParagraph>
-                        </analysisSection>
-                      </analysisSection>
-                    </analysis>
                   </section>
                 </content>
               </subpart>
@@ -68,5 +57,16 @@ test_xml = """
 
             </content>
           </part>
+          <analysis>
+            <analysisSection target="1234-1">
+              <title>Section 1234.1</title>
+              <analysisParagraph>This paragraph is in the top-level section.</analysisParagraph>
+              <analysisSection>
+                <title>(a) Section of the Analysis</title>
+                <analysisParagraph>I am a paragraph<footnote ref="1">Paragraphs contain text.</footnote> in an analysis<footnote ref="2">Analysis analyzes things.</footnote> section, love me!</analysisParagraph>
+                <analysisParagraph>I am a paragraph with <em>italicized</em> text.</analysisParagraph>
+              </analysisSection>
+            </analysisSection>
+          </analysis>
         </regulation>
         """
