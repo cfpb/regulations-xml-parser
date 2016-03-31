@@ -439,6 +439,42 @@ class ChangesTests(TestCase):
                          '1234-Subpart-B')
         self.assertEqual(moved_para.getparent().index(moved_para), 1)
 
+    def test_process_changes_change_target(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys><preamble></preamble>
+              <changeset>
+                <change operation="changeTarget" oldTarget="1234-1" newTarget="1234-3"></change>
+              </changeset>
+            </notice>""")
+        original_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys></fdsys>
+              <preamble></preamble>
+              <part label="1234">
+                <content>
+                  <subpart label="1234-Subpart-A">
+                    <content>
+                      <paragraph label="1234-1">An existing paragraph</paragraph>
+                    </content>
+                  </subpart>
+                  <subpart label="1234-Subpart-B">
+                    <content>
+                      <paragraph label="1234-2">Another existing paragraph with a
+                      <ref target="1234-1" reftype="internal">reference to 1234-1</ref></paragraph>
+                      <paragraph label="1234-3">One more existing paragraph</paragraph>
+                    </content>
+                  </subpart>
+                </content>
+              </part>
+            </regulation>""")
+        new_xml = process_changes(original_xml, notice_xml)
+        new_ref = new_xml.find('.//{eregs}ref[@target="1234-3"]')
+        self.assertFalse(new_ref is None)
+        self.assertEqual(new_ref.get('target'), '1234-3')
+        self.assertEqual(new_ref.text, 'reference to 1234-1')
+
+
     def test_generate_diff_added(self):
         left_xml = etree.fromstring("""
             <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
