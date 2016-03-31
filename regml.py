@@ -323,6 +323,84 @@ def json_command(regulation_files, from_notices=[], check_terms=False):
                         diff_notice=left_version)
 
 
+# Given a regulation title and part number, prompts the user to select
+# which notice to stop at and applies all notices applicable to the reg
+@cli.command('json-through')
+@click.argument('cfr_title')
+@click.argument('cfr_part')
+@click.option('--through',
+              help="Skips prompt and performs JSON through given document number " +
+                   "(e.g. --through YYYY-#####")
+@click.option('--suppress_output', is_flag=True,
+              help="Suppresses output except for errors")
+def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
+    # Get list of available regs
+    regml_reg_dir = os.path.join(settings.XML_ROOT, 'regulation', cfr_part, '*.xml')
+    regml_reg_files = glob.glob(regml_reg_dir)
+
+    regml_regs = []
+    regulation_files = []
+    for reg_file in regml_reg_files:
+        file_name = os.path.join(reg_file)
+        with open(file_name, 'r') as f:
+            reg_xml = f.read()
+        xml_tree = etree.fromstring(reg_xml)
+        doc_number = xml_tree.find(
+            './{eregs}preamble/{eregs}documentNumber').text
+        effective_date = xml_tree.find(
+            './{eregs}preamble/{eregs}effectiveDate').text
+        regml_regs.append((doc_number, effective_date, file_name))
+        regulation_files.append(os.path.join(file_name))
+
+    regml_regs.sort(key=lambda n: n[1])
+    
+    # Generate prompt for user
+    print(colored("\nAvailable RegML documents for reg {}:".format(cfr_part),
+          attrs=['bold']))
+    for kk in range(len(regml_regs)):
+        print("{0:>3}. {1[0]:<22}(Effective: {1[1]})".format(kk+1,
+                                                             regml_regs[kk]))
+    print()
+
+    # Possible answers are blank (all), the numbers, or the doc names
+    possible_indices = [str(kk+1) for kk in range(len(regml_regs))]
+    possible_regs = [nn[0] for nn in regml_regs]
+
+    # If number is supplied, use that one
+    if through is not None:
+        print("Command-line option selected document number '{}'".format(through))
+        answer = through
+    else: 
+        # Get user input to specify end version
+        answer = None
+        while answer not in [""] + possible_indices + possible_regs: 
+            answer = raw_input('Press enter to apply all or enter document number: [all] ')
+        # print("Answer: '{}'".format(answer))
+
+    if len(answer) == 0:
+        # Apply JSON to all documents
+        last_ver_idx = len(regml_regs) - 1
+    elif answer in possible_indices:
+        # Apply through answer-1 to adjust for the initial ver offset
+        last_ver_idx = int(answer) - 1
+    elif answer in possible_regs:
+        # Find index to stop at in list
+        last_ver_idx = possible_regs.index(answer)
+    else:
+        print(colored("ERROR: Document", attrs=['bold']),
+              colored("{}".format(answer), 'red', attrs=['bold']),
+              colored("does not exist - no changes have been made.", attrs=['bold']))
+        return
+
+    print(colored("\nApplying JSON through {0[0]}\n".format(regml_regs[last_ver_idx]),
+          attrs=['bold']))
+
+    # Perform the json application process
+    # Unlike apply-through, since json outputs its own command line output, here we
+    # reuse the existing json structure
+    json_command(regulation_files)
+
+
 # Given a notice, apply it to a previous RegML regulation verson to
 # generate a new version in RegML.
 @cli.command('apply-notice')
@@ -392,10 +470,16 @@ def apply_through(cfr_title, cfr_part, through=None):
     regs = [nn[2] for nn in regml_notices]
     regs.sort()
 
+    # If no notices found, issue error message
+    if not regml_notices:
+        print(colored("\nNo available notices for reg {} in part {}".format(cfr_part, cfr_title)))
+        return
+
     # Generate prompt for user
     print(colored("\nAvailable notices for reg {}:".format(cfr_part),
           attrs=['bold']))
     print("{:>3}. {:<22}(Initial version)".format(0, regs[0]))
+    # Process notices found
     for kk in range(len(regml_notices)):
         print("{0:>3}. {1[0]:<22}(Effective: {1[1]})".format(kk+1,
                                                regml_notices[kk]))
