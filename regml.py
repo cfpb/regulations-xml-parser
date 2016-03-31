@@ -458,6 +458,16 @@ def apply_notice(regulation_file, notice_file):
     # Process the notice changeset
     new_xml_tree = process_changes(left_xml_tree, notice_xml)
 
+    # Replace old xml's analysis with analysis in the notice
+    old_analysis = new_xml_tree.find('.//{eregs}analysis')
+    print("old analysis", old_analysis)
+    if old_analysis is not None:
+        old_analysis.getparent().remove(old_analysis)
+    notice_analysis = notice_xml.find('.//{eregs}analysis')
+    print("new analysis", notice_analysis)
+    if notice_analysis is not None:
+        new_xml_tree.append(notice_analysis)
+
     # Write the new xml tree
     new_xml_string = etree.tostring(new_xml_tree,
                                     pretty_print=True,
@@ -586,6 +596,14 @@ def apply_through(cfr_title, cfr_part, through=None):
 
         # Process the notice changeset
         new_xml_tree = process_changes(prev_tree, notice_xml)
+
+        # Replace old xml's analysis with analysis in the notice
+        old_analysis = new_xml_tree.find('.//{eregs}analysis')
+        if old_analysis is not None:
+            old_analysis.getparent().remove(old_analysis)
+        notice_analysis = notice_xml.find('.//{eregs}analyis')
+        if notice_analysis is not None:
+            new_xml_tree.append(notice_analysis)
 
         # Write the new xml tree
         new_xml_string = etree.tostring(new_xml_tree,
