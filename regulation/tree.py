@@ -910,7 +910,7 @@ def build_analysis(root):
     analysis_dict = OrderedDict()
 
     # Find the analysis element
-    analysis_elm = root.find('.//{eregs}analysis')
+    analysis_elm = root.find('.//{eregs}analysis') or []
 
     # Get regulation date and document number for the analysis reference
     publication_date = root.find('.//{eregs}fdsys/{eregs}date').text
@@ -966,7 +966,7 @@ def build_notice(root):
     ])
 
     # Analysis
-    analysis_elm = root.find('.//{eregs}analysis')
+    analysis_elm = root.find('.//{eregs}analysis') or []
 
     def build_analysis_dict(child_elm):
         """ Recursively build a dictionary for the given analysis
