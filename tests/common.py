@@ -58,7 +58,7 @@ test_xml = """
             </content>
           </part>
           <analysis>
-            <analysisSection target="1234-1">
+            <analysisSection target="1234-1" notice="2015-12345" date="2015-11-17">
               <title>Section 1234.1</title>
               <analysisParagraph>This paragraph is in the top-level section.</analysisParagraph>
               <analysisSection>
@@ -66,6 +66,10 @@ test_xml = """
                 <analysisParagraph>I am a paragraph<footnote ref="1">Paragraphs contain text.</footnote> in an analysis<footnote ref="2">Analysis analyzes things.</footnote> section, love me!</analysisParagraph>
                 <analysisParagraph>I am a paragraph with <em>italicized</em> text.</analysisParagraph>
               </analysisSection>
+            </analysisSection>
+            <analysisSection target="1234-A" notice="2014-12345" date="2014-11-17">
+              <title>Appendix A Analysis</title>
+              <analysisParagraph>This paragraph.</analysisParagraph>
             </analysisSection>
           </analysis>
         </regulation>

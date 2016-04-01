@@ -755,11 +755,13 @@ class EregsValidator:
             to the given file. This will work on both regulation trees
             and notice trees. """
 
-
         # Find all analysis elements
         analyses = tree.findall('.//{eregs}analysis')
 
-        if len(analyses) <= 1:
+        if len(analyses) == 0:
+            return tree
+        if len(analyses) == 1 and \
+                analyses[0].getparent().tag in ('{eregs}notice', '{eregs}regulation'):
             return tree
 
         # Prompt user to be sure they want to do this
@@ -774,6 +776,10 @@ class EregsValidator:
 
         # Create the top level analysis element
         analysis = etree.SubElement(tree, '{eregs}analysis')
+
+        # Get metadata for individual analysisSections
+        document_number = tree.find('.//{eregs}documentNumber').text
+        publication_date = tree.find('.//{eregs}fdsys/{eregs}date').text
 
         # Get the analysis parents (targets)
         for old_analysis in analyses:
@@ -796,6 +802,8 @@ class EregsValidator:
                     parent.getparent().remove(parent)
 
             analysis_section.set('target', target)
+            analysis_section.set('notice', document_number)
+            analysis_section.set('date', publication_date)
 
             print(colored('Migrated analysis for ' + target + '.', 'green'))
 
