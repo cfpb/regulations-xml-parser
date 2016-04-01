@@ -753,17 +753,21 @@ class ChangesTests(TestCase):
         result = process_analysis(regulation_xml, notice_xml)
 
         sections = result.findall('.//{eregs}analysisSection')
-        self.assertEquals(len(sections), 3)
+        self.assertEquals(len(sections), 4)
 
         first_analysis = result.find('.//{eregs}analysisSection[@target="1234-1"]')
-        second_analysis = result.find('.//{eregs}analysisSection[@target="1234-2"]')
         third_analysis = result.find('.//{eregs}analysisSection[@target="1234-3"]')
         self.assertEquals(first_analysis.get('notice'), '2015-12345')
-        self.assertEquals(second_analysis.get('notice'), '2015-12345')
         self.assertEquals(third_analysis.get('notice'), '2014-12345')
         self.assertEquals(first_analysis.get('date'), '2015-11-17')
-        self.assertEquals(second_analysis.get('date'), '2015-11-17')
         self.assertEquals(third_analysis.get('date'), '2014-11-17')
+
+        second_analysis = result.findall('.//{eregs}analysisSection[@target="1234-2"]')
+        self.assertEquals(len(second_analysis), 2)
+        self.assertEquals(second_analysis[0].get('date'), '2014-11-17')
+        self.assertEquals(second_analysis[0].get('notice'), '2014-12345')
+        self.assertEquals(second_analysis[1].get('date'), '2015-11-17')
+        self.assertEquals(second_analysis[1].get('notice'), '2015-12345')
 
     def test_process_analysis_no_existing(self):
         notice_xml = etree.fromstring("""

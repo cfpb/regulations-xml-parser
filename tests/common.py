@@ -67,8 +67,8 @@ test_xml = """
                 <analysisParagraph>I am a paragraph with <em>italicized</em> text.</analysisParagraph>
               </analysisSection>
             </analysisSection>
-            <analysisSection target="1234-A" notice="2014-12345" date="2014-11-17">
-              <title>Appendix A Analysis</title>
+            <analysisSection target="1234-1" notice="2014-12345" date="2014-11-17">
+              <title>Section 1234.1</title>
               <analysisParagraph>This paragraph.</analysisParagraph>
             </analysisSection>
           </analysis>

@@ -350,19 +350,9 @@ def process_analysis(regulation_xml, notice_xml, dry=False):
         regulation_xml.append(notice_analysis)
         return regulation_xml
 
-    # Go through and merge the analysis
+    # Go through and add the new analysis
     for new_section in notice_analysis.getchildren():
-        target = new_section.get('target')
-
-        # See if the target already exists, and if so, replace it
-        existing_section = existing_analysis.find(
-            '{eregs}analysisSection[@target="' + target + '"]')
-        if existing_section is not None:
-            existing_analysis.replace(existing_section, new_section)
-
-        # Otherwise, add this section
-        else:
-            existing_analysis.append(new_section)
+        existing_analysis.append(new_section)
 
     return regulation_xml
 

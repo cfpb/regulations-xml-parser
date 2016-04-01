@@ -66,10 +66,9 @@ class TreeTestCase(TestCase):
             '1234-1': [{
                 'publication_date': u'2015-11-17',
                 'reference': (u'2015-12345', u'1234-1')
-            }],
-            '1234-A': [{
+            }, {
                 'publication_date': u'2014-11-17',
-                'reference': (u'2014-12345', u'1234-A')
+                'reference': (u'2014-12345', u'1234-1')
             }]
         }
         analysis_dict = build_analysis(self.root)
