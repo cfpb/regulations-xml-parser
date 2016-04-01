@@ -5,6 +5,7 @@ from __future__ import unicode_literals
 from copy import deepcopy
 import itertools
 import logging
+
 from lxml import etree
 
 # Import regparser here with the eventual goal of breaking off the parts
@@ -42,7 +43,7 @@ def get_parent_label(label_parts):
         parent_label = get_parent_label(parent_label)
         parent_label.append('Interp')
 
-    # Subparts are also special and their parent should be the label 
+    # Subparts are also special and their parent should be the label
     # until the "Subpart" portion
     if "Subpart" in label_parts:
         parent_label = label_parts[:label_parts.index("Subpart")]
@@ -114,7 +115,7 @@ def label_compare(left, right):
         return 1
 
     return cmp(left, right)
-    
+
 
 def process_changes(original_xml, notice_xml, dry=False):
     """ Process changes given in the notice_xml to modify the
@@ -145,6 +146,9 @@ def process_changes(original_xml, notice_xml, dry=False):
         './/{eregs}change[@operation="added"]')
     movements = notice_xml.findall(
         './/{eregs}change[@operation="moved"]')
+    relabelings = notice_xml.findall(
+        './/{eregs}change[@operation="changeTarget"]')
+
 
     # Sort them appropriately by label using our custom comparison
     get_label = lambda c: c.get('label')
@@ -153,19 +157,21 @@ def process_changes(original_xml, notice_xml, dry=False):
     additions = list(sorted(additions, key=get_label, cmp=label_compare))
     movements = list(sorted(movements, key=get_label, cmp=label_compare))
 
-    changes = itertools.chain(additions, movements, modifications, deletions)
+    changes = itertools.chain(additions, movements, deletions, modifications, relabelings)
     for change in changes:
         label = change.get('label')
         subpath = change.get('subpath')
         op = change.get('operation')
 
+        logging.info("Applying operation '{}' to {}".format(op, label))
         # For added labels, we need to break up the label and find its
         # parent and its preceding sibling to know where to add it.
         if op == 'added':
+
             before_label = change.get('before')
             after_label = change.get('after')
             parent_label = change.get('parent')
-        
+
             label_parts = label.split('-')
             new_elm = change.getchildren()[0]
             new_index = 0
@@ -186,8 +192,8 @@ def process_changes(original_xml, notice_xml, dry=False):
             # content element.
             if parent_elm.tag in TAGS_WITH_SUBCONTENT:
                 parent_elm = parent_elm.find('./{eregs}content')
- 
-            # Figure out where we're putting the new element 
+
+            # Figure out where we're putting the new element
             # If we're given a before or after label, look
             # for the corresponding elements.
             sibling_label = None
@@ -215,7 +221,6 @@ def process_changes(original_xml, notice_xml, dry=False):
                     sibling_label = '-'.join(sibling_label_parts)
                     sibling_elm = new_xml.find(
                         './/*[@label="{}"]'.format(sibling_label))
-
                     try:
                         new_index = parent_elm.index(sibling_elm) + 1
                     except TypeError:
@@ -303,11 +308,24 @@ def process_changes(original_xml, notice_xml, dry=False):
 
             # For deleted labels, find the node and remove it.
             if op == 'deleted':
-                
+
                 if not dry:
 
                     # Remove the element itself
                     match_parent.remove(matching_elm)
+
+        if op == 'changeTarget':
+
+            old_target = change.get('oldTarget')
+            new_target = change.get('newTarget')
+
+            if old_target is None or new_target is None:
+                raise ValueError('Need to know both the old target and '
+                                 'the new target to relabel a reference!')
+
+            references = new_xml.findall('.//{{eregs}}ref[@target="{}"]'.format(old_target))
+            for ref in references:
+                ref.set('target', new_target)
 
     return new_xml
 
