@@ -1,8 +1,8 @@
 import os
 
 XML_ROOT = '../regulations-xml'
-JSON_ROOT = '../regulations-xml-json/'
 XSD_FILE = 'http://cfpb.github.io/regulations-schema/src/eregs.xsd'
+JSON_ROOT = '../regulations-stub/'
 
 # the inflect module has a few problems... manual override for that
 SPECIAL_SINGULAR_NOUNS = [
