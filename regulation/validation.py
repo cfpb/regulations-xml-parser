@@ -788,7 +788,7 @@ class EregsValidator:
                           'Should it be migrated?', 'red'))
             answer = None
             while answer not in ['y', 'n']:
-                answer = raw_input('Save? y/n: ')
+                answer = raw_input('Migrate and save? y/n: ')
             if answer == 'n':
                 return tree
 
