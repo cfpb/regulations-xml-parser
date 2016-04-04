@@ -29,7 +29,7 @@ from regulation.tree import (build_analysis,
                              build_reg_tree,
                              build_terms_layer,
                              build_toc_layer)
-from regulation.changes import process_changes, generate_diff
+from regulation.changes import process_changes, process_analysis, generate_diff
 
 # Import regparser here with the eventual goal of breaking off the parts
 # we're using in the RegML parser into a library both can share.
@@ -289,6 +289,40 @@ def check_changes(file, label=None):
     validator.remove_empty_refs(xml_tree, file)
     
 
+@cli.command('migrate-analysis')
+@click.argument('cfr_title')
+@click.argument('cfr_part')
+def migrate_analysis(cfr_title, cfr_part):
+    """ Migrate analysis from its context to top-level """
+    
+    # Migrate regulation files
+    regml_reg_dir = os.path.join(settings.XML_ROOT, 'regulation', cfr_part, '*.xml')
+    regml_reg_files = glob.glob(regml_reg_dir)
+    for reg_file in regml_reg_files:
+        print(reg_file)
+        file_name = os.path.join(reg_file)
+        with open(file_name, 'r') as f:
+            reg_xml = f.read()
+        xml_tree = etree.fromstring(reg_xml)
+        validator = EregsValidator(settings.XSD_FILE)
+        validator.migrate_analysis(xml_tree, file_name)
+        validator.validate_reg(xml_tree)
+
+    # Migrate notices
+    regml_notice_dir = os.path.join(settings.XML_ROOT, 'notice', cfr_part, '*.xml')
+    regml_notice_files = glob.glob(regml_notice_dir)
+    regml_notices = []
+    for notice_file in regml_notice_files:
+        print(notice_file)
+        file_name = os.path.join(notice_file)
+        with open(file_name, 'r') as f:
+            reg_xml = f.read()
+        xml_tree = etree.fromstring(reg_xml)
+        validator = EregsValidator(settings.XSD_FILE)
+        validator.migrate_analysis(xml_tree, file_name)
+        validator.validate_reg(xml_tree)
+        
+
 # Validate the given regulation file (or files) and generate the JSON
 # output expected by regulations-core and regulations-site if the RegML
 # validates.
@@ -425,6 +459,9 @@ def apply_notice(regulation_file, notice_file):
     # Process the notice changeset
     new_xml_tree = process_changes(left_xml_tree, notice_xml)
 
+    # Add in any new analysis
+    new_xml_tree = process_analysis(new_xml_tree, notice_xml)
+
     # Write the new xml tree
     new_xml_string = etree.tostring(new_xml_tree,
                                     pretty_print=True,
@@ -553,6 +590,9 @@ def apply_through(cfr_title, cfr_part, through=None):
 
         # Process the notice changeset
         new_xml_tree = process_changes(prev_tree, notice_xml)
+
+        # Add in any new analysis
+        new_xml_tree = process_analysis(new_xml_tree, notice_xml)
 
         # Write the new xml tree
         new_xml_string = etree.tostring(new_xml_tree,

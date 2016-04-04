@@ -765,3 +765,69 @@ class EregsValidator:
         if answer == 'y':
             with open(xml_file, 'w') as f:
                 f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
+
+    def migrate_analysis(self, tree, regulation_file=None):
+        """ For the given tree, break all out analysis and migrate it to
+            a top-level analysis element with targets for the original
+            labels it belongs to. The resulting file will be writen out
+            to the given file. This will work on both regulation trees
+            and notice trees. """
+
+        # Find all analysis elements
+        analyses = tree.findall('.//{eregs}analysis')
+
+        if len(analyses) == 0:
+            return tree
+        if len(analyses) == 1 and \
+                analyses[0].getparent().tag in ('{eregs}notice', '{eregs}regulation'):
+            return tree
+
+        # Prompt user to be sure they want to do this
+        if regulation_file is not None:
+            print(colored('The file ' + regulation_file + ' has invalid old-style analysis. '
+                          'Should it be migrated?', 'red'))
+            answer = None
+            while answer not in ['y', 'n']:
+                answer = raw_input('Migrate and save? y/n: ')
+            if answer == 'n':
+                return tree
+
+        # Create the top level analysis element
+        analysis = etree.SubElement(tree, '{eregs}analysis')
+
+        # Get metadata for individual analysisSections
+        document_number = tree.find('.//{eregs}documentNumber').text
+        publication_date = tree.find('.//{eregs}fdsys/{eregs}date').text
+
+        # Get the analysis parents (targets)
+        for old_analysis in analyses:
+            parent = old_analysis.getparent()
+            analysis_section = old_analysis.find('{eregs}analysisSection')
+
+            # Add the analysis elements to the top-level analysis
+            analysis.append(analysis_section)
+
+            # Remove the old analysis element
+            old_analysis.getparent().remove(old_analysis)
+
+            # Get and set the analysis section's target
+            target = parent.get('label')
+            if parent.tag == '{eregs}change':
+                target = parent.get('parent')
+                # If the parent is a change, it should be empty and can
+                # also be deleted
+                if len(parent) == 0:
+                    parent.getparent().remove(parent)
+
+            analysis_section.set('target', target)
+            analysis_section.set('notice', document_number)
+            analysis_section.set('date', publication_date)
+
+            print(colored('Migrated analysis for ' + target + '.', 'green'))
+
+        if regulation_file is not None:
+            with open(regulation_file, 'w') as f:
+                f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
+
+        return tree
+

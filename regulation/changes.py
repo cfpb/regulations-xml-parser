@@ -330,6 +330,33 @@ def process_changes(original_xml, notice_xml, dry=False):
     return new_xml
 
 
+def process_analysis(regulation_xml, notice_xml, dry=False):
+    """ Given a notice tree and a regulation xml tree, add any analysis
+        in the notice to the regulation. If analysis for the same target
+        already exists, it will be replaced. """
+
+    notice_analysis = notice_xml.find('.//{eregs}analysis')
+
+    # If there is no notice analysis, we have nothing to do here.
+    if notice_analysis is None:
+        print("no analysis")
+        return regulation_xml
+
+    existing_analysis = regulation_xml.find('.//{eregs}analysis')
+
+    # If there's no existing analysis, but the notice contains
+    # analysis, just copy from the notice wholesale.
+    if existing_analysis is None and notice_analysis is not None:
+        regulation_xml.append(notice_analysis)
+        return regulation_xml
+
+    # Go through and add the new analysis
+    for new_section in notice_analysis.getchildren():
+        existing_analysis.append(new_section)
+
+    return regulation_xml
+
+
 def generate_diff(left_xml, right_xml):
     """ Given two full RegML trees, generate a dictionary of changes
         between the two in the style of regulations-parser.

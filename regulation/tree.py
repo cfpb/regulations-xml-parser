@@ -916,16 +916,18 @@ def build_analysis(root):
 
     analysis_dict = OrderedDict()
 
-    # Find all analysis elements within the regulation
-    analyses = root.findall('.//{eregs}analysis')
+    # Find the analysis element
+    analysis_elm = root.find('.//{eregs}analysis')
+    if analysis_elm is None:
+        return analysis_dict
 
-    # Get regulation date and document number for the analysis reference
-    publication_date = root.find('.//{eregs}fdsys/{eregs}date').text
-    document_number = root.find('.//{eregs}documentNumber').text
-
-    for analysis_elm in analyses:
-        # Fetch the parent's label
-        label = analysis_elm.xpath('../@label')[0]
+    # For each child section of the analysis, add a reference for its
+    # target
+    for analysis_section_elm in analysis_elm:
+        # Get the target label
+        label = analysis_section_elm.get('target')
+        document_number = analysis_section_elm.get('notice')
+        publication_date = analysis_section_elm.get('date')
 
         # Labels might have multiple analysis refs. If it's not already
         # in the analyses_dict, add it.
@@ -970,8 +972,10 @@ def build_notice(root):
         ('footnotes', {})
     ])
 
-    # Analyses
-    analyses = root.findall('.//{eregs}analysis')
+    # Analysis
+    analysis_elm = root.find('.//{eregs}analysis')
+    if analysis_elm is None:
+        return notice_dict
 
     def build_analysis_dict(child_elm):
         """ Recursively build a dictionary for the given analysis
@@ -1040,12 +1044,16 @@ def build_notice(root):
 
         return analysis_dict
 
-    for analysis_elm in analyses:
-        section_elm = analysis_elm.find('{eregs}analysisSection')
+    for section_elm in analysis_elm:
+        # If this analysis section doesn't originate with this document
+        # number, skip it.
+        if section_elm.get('notice') != document_number:
+            continue
+
         analysis_dict = build_analysis_dict(section_elm)
 
         # Add the parent's label to the top-level of the dict
-        analysis_dict['labels'] = analysis_elm.xpath('../@label')
+        analysis_dict['labels'] = [section_elm.get('target')]
 
         # Add the analysis to the notice
         notice_dict['section_by_section'].append(analysis_dict)

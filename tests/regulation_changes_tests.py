@@ -5,7 +5,7 @@ from unittest import TestCase
 import lxml.etree as etree
 
 from regulation.changes import (get_parent_label, get_sibling_label,
-                                process_changes, generate_diff)
+                                process_changes, process_analysis, generate_diff)
 
 import logging
 
@@ -726,3 +726,73 @@ class ChangesTests(TestCase):
         old_title = new_xml.find('.//{eregs}subpart[@label="1234-Subpart-A"]/{eregs}title')
         self.assertEqual(old_title, None)
 
+    def test_process_analysis(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys>
+                <date>2014-11-17</date>
+              </fdsys>
+              <preamble>
+                <documentNumber>2015-12345</documentNumber>
+              </preamble>
+              <changeset></changeset>
+              <analysis label="1234-Analysis">
+                <analysisSection target="1234-1" notice="2015-12345" date="2015-11-17">An added analysis</analysisSection>
+                <analysisSection target="1234-2" notice="2015-12345" date="2015-11-17">An updated analysis</analysisSection>
+              </analysis>
+            </notice>""")
+        regulation_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <part label="1234"></part>
+              <analysis label="1234-Analysis">
+                <analysisSection target="1234-2" notice="2014-12345" date="2014-11-17">An existing analysis</analysisSection>
+                <analysisSection target="1234-3" notice="2014-12345" date="2014-11-17">An unchanging analysis</analysisSection>
+              </analysis>
+            </regulation>""")
+
+        result = process_analysis(regulation_xml, notice_xml)
+
+        sections = result.findall('.//{eregs}analysisSection')
+        self.assertEquals(len(sections), 4)
+
+        first_analysis = result.find('.//{eregs}analysisSection[@target="1234-1"]')
+        third_analysis = result.find('.//{eregs}analysisSection[@target="1234-3"]')
+        self.assertEquals(first_analysis.get('notice'), '2015-12345')
+        self.assertEquals(third_analysis.get('notice'), '2014-12345')
+        self.assertEquals(first_analysis.get('date'), '2015-11-17')
+        self.assertEquals(third_analysis.get('date'), '2014-11-17')
+
+        second_analysis = result.findall('.//{eregs}analysisSection[@target="1234-2"]')
+        self.assertEquals(len(second_analysis), 2)
+        self.assertEquals(second_analysis[0].get('date'), '2014-11-17')
+        self.assertEquals(second_analysis[0].get('notice'), '2014-12345')
+        self.assertEquals(second_analysis[1].get('date'), '2015-11-17')
+        self.assertEquals(second_analysis[1].get('notice'), '2015-12345')
+
+    def test_process_analysis_no_existing(self):
+        notice_xml = etree.fromstring("""
+            <notice xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <fdsys>
+                <date>2015-11-17</date>
+              </fdsys>
+              <preamble>
+                <documentNumber>2015-12345</documentNumber>
+              </preamble>
+              <changeset></changeset>
+              <analysis label="1234-Analysis">
+                <analysisSection target="1234-2" notice="2015-12345" date="2015-11-17">An existing analysis</analysisSection>
+                <analysisSection target="1234-3" notice="2015-12345" date="2015-11-17">An unchanging analysis</analysisSection>
+              </analysis>
+            </notice>""")
+        regulation_xml = etree.fromstring("""
+            <regulation xmlns="eregs" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="eregs ../../eregs.xsd">
+              <part label="1234"></part>
+            </regulation>""")
+
+        result = process_analysis(regulation_xml, notice_xml)
+
+        analysis = result.find('.//{eregs}analysis')
+        self.assertTrue(analysis is not None)
+
+        sections = analysis.findall('{eregs}analysisSection')
+        self.assertEquals(len(sections), 2)
