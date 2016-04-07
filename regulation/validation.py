@@ -280,6 +280,10 @@ class EregsValidator:
         :type terms_layer: :class:`collections.OrderedDict`
         :param regulation_file: path to the regulation file to which to save changes.
         :type regulation_file: :class:`str`
+        :param label: check the contents of this label within the regulation tree (entire reg tree if None)
+        :type label: :class:`str`
+        :param term: the term the check (all if None)
+        :type term: :class:`str`
         :return: None
         """
 
@@ -310,7 +314,10 @@ class EregsValidator:
                     './/*[@label="{}"]'.format(label))
 
         paragraphs = working_section.findall('.//{eregs}paragraph') + \
-                working_section.findall('.//{eregs}interpParagraph')
+                     working_section.findall('.//{eregs}interpParagraph')
+        if len(paragraphs) == 0 and 'aragraph' in working_section.tag:
+            paragraphs = [working_section,]
+
         ignore = set()
         always = set()
 
