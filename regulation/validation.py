@@ -329,7 +329,7 @@ class EregsValidator:
             offsets_and_values = []
 
             for term in terms:
-                if term[0] not in ignore:
+                if term[0] not in ignore and label != term[1]:
                     input_state = None
                     term_locations = set(find_all_occurrences(par_text, term[0]))
                     plural_term = inf.plural(term[0])
