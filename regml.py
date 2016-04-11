@@ -228,25 +228,43 @@ def validate(file, no_terms=False, no_citations=False, no_keyterms=False):
 @click.argument('file')
 @click.option('--label')
 @click.option('--term')
-def check_terms(file, label=None, term=None):
+@click.option('--with-notice')
+def check_terms(file, label=None, term=None, with_notice=None):
     """ Check the terms in a RegML file """
 
     file = find_file(file)
     with open(file, 'r') as f:
-        reg_xml = f.read()
-    xml_tree = etree.fromstring(reg_xml)
+        reg_string = f.read()
+    reg_tree = etree.fromstring(reg_string)
 
-    if xml_tree.tag == '{eregs}notice':
-        print("Cannot check terms in notice files")
+    if reg_tree.tag == '{eregs}notice':
+        print("Cannot check terms in notice files directly.")
+        print("Use a regulation file and --with-notice to specify the notice that applies.")
         sys.exit(1)
 
-    # Validate the file relative to schema
-    validator = get_validator(xml_tree)
+    # If we're given a notice, apply it to the given regulation file,
+    # then check terms in the result and write it out to the notice file
+    # as changes.
+    notice_tree = None
+    if with_notice is not None:
+        # file is changed here so the term checker will write the notice
+        # instead of the regulation
+        file = find_file(with_notice, is_notice=True)
+        with open(file, 'r') as f:
+            notice_xml = f.read()
+        notice_tree = etree.fromstring(notice_xml)
 
-    terms = build_terms_layer(xml_tree)
-    validator.validate_terms(xml_tree, terms)
-    validator.validate_term_references(xml_tree, terms, file,
-            label=label, term=term)
+        # Process the notice changeset
+        print(colored('Applying notice...', attrs=['bold']))
+        reg_tree = process_changes(reg_tree, notice_tree)
+
+    # Validate the file relative to schema
+    validator = get_validator(reg_tree)
+
+    terms = build_terms_layer(reg_tree)
+    validator.validate_terms(reg_tree, terms)
+    validator.validate_term_references(reg_tree, terms, file,
+            label=label, term=term, notice=notice_tree)
 
 
 @cli.command()
@@ -410,7 +428,9 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
         answer = None
         while answer not in [""] + possible_indices + possible_regs: 
             answer = raw_input('Press enter to apply all or enter document number: [all] ')
-        # print("Answer: '{}'".format(answer))
+        print("Answer: '{}'".format(answer))
+
+    print(possible_indices)
 
     if len(answer) == 0:
         # Apply JSON to all documents
