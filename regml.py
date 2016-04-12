@@ -312,6 +312,15 @@ def check_changes(file, label=None):
 @click.argument('cfr_part')
 def migrate_analysis(cfr_title, cfr_part):
     """ Migrate analysis from its context to top-level """
+
+    # Prompt user to be sure they want to do this
+    print(colored('This will irrevocably modify all regulation and notice files for this regulation. '
+                  'Is this ok?', 'red'))
+    answer = None
+    while answer not in ['y', 'n']:
+        answer = raw_input('Migrate all analysis? y/n: ')
+    if answer != 'y':
+        return 
     
     # Migrate regulation files
     regml_reg_dir = os.path.join(settings.XML_ROOT, 'regulation', cfr_part, '*.xml')

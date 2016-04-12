@@ -822,16 +822,6 @@ class EregsValidator:
                 analyses[0].getparent().tag in ('{eregs}notice', '{eregs}regulation'):
             return tree
 
-        # Prompt user to be sure they want to do this
-        if regulation_file is not None:
-            print(colored('The file ' + regulation_file + ' has invalid old-style analysis. '
-                          'Should it be migrated?', 'red'))
-            answer = None
-            while answer not in ['y', 'n']:
-                answer = raw_input('Migrate and save? y/n: ')
-            if answer == 'n':
-                return tree
-
         # Create the top level analysis element
         analysis = etree.SubElement(tree, '{eregs}analysis')
 
