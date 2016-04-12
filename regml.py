@@ -11,6 +11,7 @@ import sys
 
 import click
 from lxml import etree
+from lxml import objectify
 from termcolor import colored, cprint
 
 from regulation.validation import EregsValidator
@@ -113,7 +114,9 @@ def get_validator(xml_tree):
 def generate_json(regulation_file, check_terms=False):
     with open(find_file(regulation_file), 'r') as f:
         reg_xml = f.read()
-    xml_tree = etree.fromstring(reg_xml)
+    parser = objectify.makeparser(huge_tree=True)
+    xml_tree = objectify.fromstring(reg_xml, parser)
+    # xml_tree = etree.fromstring(reg_xml)
 
     # Validate the file relative to schema
     validator = get_validator(xml_tree)
@@ -433,7 +436,7 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
     # Perform the json application process
     # Unlike apply-through, since json outputs its own command line output, here we
     # reuse the existing json structure
-    json_command(regulation_files)
+    json_command(regulation_files[:last_ver_idx])
 
 
 # Given a notice, apply it to a previous RegML regulation verson to
@@ -501,6 +504,13 @@ def apply_through(cfr_title, cfr_part, through=None):
             './{eregs}preamble/{eregs}effectiveDate').text
         applies_to = xml_tree.find(
             './{eregs}changeset').get('leftDocumentNumber')
+        if applies_to is None:
+            # Major problem here
+            print(colored("Error locating"),
+                  colored("leftDocumentNumber", attrs=['bold']),
+                  colored("attribute in"),
+                  colored("{}".format(doc_number), 'red',
+                          attrs=['bold']))
         regml_notices.append((doc_number, effective_date, applies_to, file_name))
 
     regml_notices.sort(key=lambda n: n[1])
@@ -511,6 +521,12 @@ def apply_through(cfr_title, cfr_part, through=None):
     # If no notices found, issue error message
     if not regml_notices:
         print(colored("\nNo available notices for reg {} in part {}".format(cfr_part, cfr_title)))
+        return
+
+    # If initial version is not findable, issue error message
+    if regs[0] is None:
+        print(colored("\nError reading initial version and apply order for reg {} in part {}. No changes have been made.".format(cfr_part, cfr_title),
+                      attrs=['bold']))
         return
 
     # Generate prompt for user
