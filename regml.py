@@ -476,6 +476,10 @@ def apply_notice(regulation_file, notice_file):
         notice_string = f.read()
     notice_xml = etree.fromstring(notice_string)
 
+    # Validate the files
+    regulation_validator = get_validator(left_xml_tree)
+    notice_validator = get_validator(notice_xml)
+
     # Process the notice changeset
     new_xml_tree = process_changes(left_xml_tree, notice_xml)
 
@@ -607,6 +611,10 @@ def apply_through(cfr_title, cfr_part, through=None):
         with open(notice_file, 'r') as f:
             notice_string = f.read()
         notice_xml = etree.fromstring(notice_string)
+
+        # Validate the files
+        regulation_validator = get_validator(prev_tree)
+        notice_validator = get_validator(notice_xml)
 
         # Process the notice changeset
         new_xml_tree = process_changes(prev_tree, notice_xml)
