@@ -329,18 +329,10 @@ def find_all_occurrences(source, target):
     :rtype: :class:`list` of :class:`int`
     """
     positions = []
-    remainder = source
-    start = 0
-    while remainder != []:
-        pos = remainder.find(target)
-        if pos != -1:
-            positions.append(pos + start)
-            pivot = pos + len(target)
-            start += len(remainder[:pivot])
-            remainder = remainder[pivot:]
-        else:
-            remainder = []
-
+    results = re.finditer(r"\b" + re.escape(target.lower()) + r"\b",
+            source.lower())
+    for match in results:
+        positions.append(match.start())
     return positions
 
 
