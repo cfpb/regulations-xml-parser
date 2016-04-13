@@ -387,21 +387,20 @@ class EregsValidator:
                     # Otherwise, look for this paragraph in the notice.
                     # If it doesn't exist there, add a modified change
                     # for it.
-                    notice_paragraphs = notice.findall('.//{tag}[@label="{label}"]'.format(
+                    notice_paragraph = notice.find('.//{tag}[@label="{label}"]'.format(
                         tag=paragraph.tag, label=label))
 
-                    if len(notice_paragraphs) == 0:
-                        print(colored('adding change for paragraph in notice', attrs=['bold']))
+                    if notice_paragraphs is None:
+                        print(colored('adding change for paragraph in notice\n', attrs=['bold']))
                         changeset = notice.find('.//{eregs}changeset')
                         change = etree.SubElement(changeset, 'change')
                         change.set('operation', 'modified')
                         change.set('label', label)
                         change.append(paragraph)
                     else:
-                        for notice_paragraph in notice_paragraphs:
-                            print(colored('replacing content in notice paragraph', attrs=['bold']))
-                            notice_content = notice_paragraph.find('.//{eregs}content')
-                            notice_paragraph.replace(notice_content, new_content)
+                        print(colored('replacing content in notice paragraph\n', attrs=['bold']))
+                        notice_content = notice_paragraph.find('.//{eregs}content')
+                        notice_paragraph.replace(notice_content, new_content)
 
         if problem_flag:
             print(colored('The tree has been altered! Do you want to write the result to disk?'))
