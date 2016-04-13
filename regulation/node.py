@@ -329,8 +329,7 @@ def find_all_occurrences(source, target):
     :rtype: :class:`list` of :class:`int`
     """
     positions = []
-    results = re.finditer(r"\b" + re.escape(target.lower()) + r"\b",
-            source.lower())
+    results = re.finditer(r"\b" + re.escape(target) + r"\b", source)
     for match in results:
         positions.append(match.start())
     return positions

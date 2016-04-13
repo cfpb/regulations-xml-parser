@@ -12,7 +12,7 @@ import settings
 class NodeTests(TestCase):
 
     def test_find_all_occurrences(self):
-        s = "There are many days. Sunday is a day. Saturday is a day too. Days happen."
+        s = "There are many days. Sunday is a day. Saturday is a day too. Days happen.".lower()
         occurances = find_all_occurrences(s, 'day')
         self.assertTrue(33 in occurances)
         self.assertTrue(52 in occurances)
