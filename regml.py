@@ -11,7 +11,6 @@ import sys
 
 import click
 from lxml import etree
-from lxml import objectify
 from termcolor import colored, cprint
 
 from regulation.validation import EregsValidator
@@ -114,8 +113,8 @@ def get_validator(xml_tree):
 def generate_json(regulation_file, check_terms=False):
     with open(find_file(regulation_file), 'r') as f:
         reg_xml = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    xml_tree = objectify.fromstring(reg_xml, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
 
     # Validate the file relative to schema
     validator = get_validator(xml_tree)
@@ -199,8 +198,8 @@ def validate(file, no_terms=False, no_citations=False, no_keyterms=False):
     file = find_file(file)
     with open(file, 'r') as f:
         reg_xml = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    xml_tree = objectify.fromstring(reg_xml, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
 
     # Validate the file relative to schema
     validator = get_validator(xml_tree)
@@ -237,8 +236,8 @@ def check_terms(file, label=None, term=None):
     file = find_file(file)
     with open(file, 'r') as f:
         reg_xml = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    xml_tree = objectify.fromstring(reg_xml, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
 
     if xml_tree.tag == '{eregs}notice':
         print("Cannot check terms in notice files")
@@ -262,8 +261,8 @@ def check_interp_targets(file, label=None):
     file = find_file(file)
     with open(file, 'r') as f:
         reg_xml = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    xml_tree = objectify.fromstring(reg_xml, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
 
     if xml_tree.tag == '{eregs}notice':
         print("Cannot check terms in notice files")
@@ -282,8 +281,8 @@ def check_changes(file, label=None):
     file = find_file(file, is_notice=True)
     with open(file, 'r') as f:
         reg_xml = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    xml_tree = objectify.fromstring(reg_xml, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
 
     if xml_tree.tag != '{eregs}notice':
         print("Can only check changes in notice files")
@@ -309,8 +308,8 @@ def migrate_analysis(cfr_title, cfr_part):
         file_name = os.path.join(reg_file)
         with open(file_name, 'r') as f:
             reg_xml = f.read()
-        parser = objectify.makeparser(huge_tree=True)
-        xml_tree = objectify.fromstring(reg_xml, parser)
+        parser = etree.XMLParser(huge_tree=True)
+        xml_tree = etree.fromstring(reg_xml, parser)
         validator = EregsValidator(settings.XSD_FILE)
         validator.migrate_analysis(xml_tree, file_name)
         validator.validate_reg(xml_tree)
@@ -324,8 +323,8 @@ def migrate_analysis(cfr_title, cfr_part):
         file_name = os.path.join(notice_file)
         with open(file_name, 'r') as f:
             reg_xml = f.read()
-        parser = objectify.makeparser(huge_tree=True)
-        xml_tree = objectify.fromstring(reg_xml, parser)
+        parser = etree.XMLParser(huge_tree=True)
+        xml_tree = etree.fromstring(reg_xml, parser)
         validator = EregsValidator(settings.XSD_FILE)
         validator.migrate_analysis(xml_tree, file_name)
         validator.validate_reg(xml_tree)
@@ -387,8 +386,8 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
         file_name = os.path.join(reg_file)
         with open(file_name, 'r') as f:
             reg_xml = f.read()
-        parser = objectify.makeparser(huge_tree=True)
-        xml_tree = objectify.fromstring(reg_xml, parser)
+        parser = etree.XMLParser(huge_tree=True)
+        xml_tree = etree.fromstring(reg_xml, parser)
         doc_number = xml_tree.find(
             './{eregs}preamble/{eregs}documentNumber').text
         effective_date = xml_tree.find(
@@ -457,15 +456,15 @@ def apply_notice(regulation_file, notice_file):
 
     with open(regulation_file, 'r') as f:
         left_reg_xml = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    left_xml_tree = objectify.fromstring(left_reg_xml, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    left_xml_tree = etree.fromstring(left_reg_xml, parser)
         
     # Read the notice file
     notice_file = find_file(notice_file, is_notice=True)
     with open(notice_file, 'r') as f:
         notice_string = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    notice_xml = objectify.fromstring(notice_string, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    notice_xml = etree.fromstring(notice_string, parser)
 
     # Process the notice changeset
     new_xml_tree = process_changes(left_xml_tree, notice_xml)
@@ -505,8 +504,8 @@ def apply_through(cfr_title, cfr_part, through=None):
         file_name = os.path.join(notice_file)
         with open(file_name, 'r') as f:
             notice_xml = f.read()
-        parser = objectify.makeparser(huge_tree=True)
-        xml_tree = objectify.fromstring(notice_xml, parser)
+        parser = etree.XMLParser(huge_tree=True)
+        xml_tree = etree.fromstring(notice_xml, parser)
         doc_number = xml_tree.find(
             './{eregs}preamble/{eregs}documentNumber').text
         effective_date = xml_tree.find(
@@ -520,6 +519,8 @@ def apply_through(cfr_title, cfr_part, through=None):
                   colored("attribute in"),
                   colored("{}".format(doc_number), 'red',
                           attrs=['bold']))
+            return
+
         regml_notices.append((doc_number, effective_date, applies_to, file_name))
 
     regml_notices.sort(key=lambda n: n[1])
@@ -596,8 +597,8 @@ def apply_through(cfr_title, cfr_part, through=None):
     regulation_file = find_file(reg_path)
     with open(regulation_file, 'r') as f:
         left_reg_xml = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    left_xml_tree = objectify.fromstring(left_reg_xml, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    left_xml_tree = etree.fromstring(left_reg_xml, parser)
 
     kk = 1
     prev_tree = left_xml_tree
@@ -612,8 +613,8 @@ def apply_through(cfr_title, cfr_part, through=None):
         notice_file = find_file(file_name, is_notice=True)
         with open(notice_file, 'r') as f:
             notice_string = f.read()
-        parser = objectify.makeparser(huge_tree=True)
-        notice_xml = objectify.fromstring(notice_string, parser)
+        parser = etree.XMLParser(huge_tree=True)
+        notice_xml = etree.fromstring(notice_string, parser)
         
         # Process the notice changeset
         new_xml_tree = process_changes(prev_tree, notice_xml)
@@ -647,8 +648,8 @@ def notice_changes(notice_file):
     notice_file = find_file(notice_file, is_notice=True)
     with open(notice_file, 'r') as f:
         notice_string = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    notice_xml = objectify.fromstring(notice_string, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    notice_xml = etree.fromstring(notice_string, parser)
     doc_number = notice_xml.find(
             './{eregs}preamble/{eregs}documentNumber').text
 
@@ -678,8 +679,8 @@ def apply_notices(cfr_part, version, notices):
     regulation_file = find_file(os.path.join(cfr_part, version))
     with open(regulation_file, 'r') as f:
         left_reg_xml = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    left_xml_tree = objectify.fromstring(left_reg_xml, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    left_xml_tree = etree.fromstring(left_reg_xml, parser)
     
     prev_notice = version
     prev_tree = left_xml_tree
@@ -688,8 +689,8 @@ def apply_notices(cfr_part, version, notices):
         notice_file = find_file(os.path.join(cfr_part, notice), is_notice=True)
         with open(notice_file, 'r') as f:
             notice_string = f.read()
-        parser = objectify.makeparser(huge_tree=True)
-        notice_xml = objectify.fromstring(notice_string, parser)
+        parser = etree.XMLParser(huge_tree=True)
+        notice_xml = etree.fromstring(notice_string, parser)
         
         # Process the notice changeset
         new_xml_tree = process_changes(prev_tree, notice_xml)
@@ -736,8 +737,8 @@ def versions(title, part, from_fr=False, from_regml=True):
     for notice_file in regml_notice_files:
         with open(os.path.join(notice_file), 'r') as f:
             notice_xml = f.read()
-        parser = objectify.makeparser(huge_tree=True)
-        xml_tree = objectify.fromstring(notice_xml, parser)
+        parser = etree.XMLParser(huge_tree=True)
+        xml_tree = etree.fromstring(notice_xml, parser)
         doc_number = xml_tree.find(
             './{eregs}preamble/{eregs}documentNumber').text
         effective_date = xml_tree.find(
