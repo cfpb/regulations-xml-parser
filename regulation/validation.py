@@ -267,7 +267,8 @@ class EregsValidator:
         self.events.append(event)
 
     def validate_term_references(self, tree, terms_layer,
-            regulation_file, label=None, term=None, notice=None):
+            regulation_file, label=None, term=None, notice=None,
+            ignore_phrases=[]):
         """
         Validate term references. If label is given, only validate
         term references within that label. If term is given, only
@@ -390,7 +391,7 @@ class EregsValidator:
                     notice_paragraph = notice.find('.//{tag}[@label="{label}"]'.format(
                         tag=paragraph.tag, label=label))
 
-                    if notice_paragraphs is None:
+                    if notice_paragraph is None:
                         print(colored('adding change for paragraph in notice\n', attrs=['bold']))
                         changeset = notice.find('.//{eregs}changeset')
                         change = etree.SubElement(changeset, 'change')
