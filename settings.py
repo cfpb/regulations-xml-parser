@@ -56,3 +56,13 @@ OUTPUT_DIR=os.environ.get('OUTPUT_DIR', XML_ROOT)
 # files don't exist, they'll be downloaded).
 # For CFPB regulations, this is https://github.com/cfpb/fr-notices
 LOCAL_XML_PATHS = ['../fr-notices/',]
+
+
+#######################################################################
+## Local Settings
+# Any of the above settings can be overridden by a local_settings.py
+# file. Try to import that here.
+try:
+    from local_settings import *
+except ImportError:
+    pass
