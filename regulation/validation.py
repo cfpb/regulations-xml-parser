@@ -267,19 +267,28 @@ class EregsValidator:
         self.events.append(event)
 
     def validate_term_references(self, tree, terms_layer,
-            regulation_file, label=None, term=None):
+            regulation_file, label=None, term=None, notice=None,
+            ignore_phrases=[]):
         """
         Validate term references. If label is given, only validate
         term references within that label. If term is given, only
-        validate references to that term. Prompts to overwrite
-        original file.
+        validate references to that term. If notice is given as a notice
+        xml tree, the modified paragraph content will be writen back to
+        the notice, either to an existing paragraph or as a modified
+        change. Prompts to overwrite original file.
 
         :param tree: the root of the XML tree.
         :type tree: :class:`etree.Element`
         :param terms_layer: the layer dictionary produced by :func:`regulation.tree.build_term_layer`.
         :type terms_layer: :class:`collections.OrderedDict`
-        :param regulation_file: path to the regulation file to which to save changes.
+        :param regulation_file: path to the regulation or notice file to which to save changes.
         :type regulation_file: :class:`str`
+        :param label: check the contents of this label within the regulation tree (entire reg tree if None)
+        :type label: :class:`str`
+        :param term: the term the check (all if None)
+        :type term: :class:`str`
+        :param notice: the root of a notice XML tree
+        :type notice: :class:`etree.Element`
         :return: None
         """
 
@@ -310,7 +319,10 @@ class EregsValidator:
                     './/*[@label="{}"]'.format(label))
 
         paragraphs = working_section.findall('.//{eregs}paragraph') + \
-                working_section.findall('.//{eregs}interpParagraph')
+                     working_section.findall('.//{eregs}interpParagraph')
+        if len(paragraphs) == 0 and 'aragraph' in working_section.tag:
+            paragraphs = [working_section,]
+
         ignore = set()
         always = set()
 
@@ -322,7 +334,7 @@ class EregsValidator:
             offsets_and_values = []
 
             for term in terms:
-                if term[0] not in ignore:
+                if term[0] not in ignore and label != term[1]:
                     input_state = None
                     term_locations = set(find_all_occurrences(par_text, term[0]))
                     plural_term = inf.plural(term[0])
@@ -365,10 +377,31 @@ class EregsValidator:
                 values, offsets = zip(*offsets_and_values)
                 new_par_text = interpolate_string(par_text, offsets, values)
                 highlight = interpolate_string(par_text, offsets, values, colorize=True)
-                new_content = etree.fromstring(new_par_text)
-                paragraph.replace(content, new_content)
                 print(highlight)
 
+                # If we were not given a notice, just replace the
+                # paragraph in the reg tree and move on.
+                new_content = etree.fromstring(new_par_text)
+                if notice is None:
+                    paragraph.replace(content, new_content)
+                else:
+                    # Otherwise, look for this paragraph in the notice.
+                    # If it doesn't exist there, add a modified change
+                    # for it.
+                    notice_paragraph = notice.find('.//{tag}[@label="{label}"]'.format(
+                        tag=paragraph.tag, label=label))
+
+                    if notice_paragraph is None:
+                        print(colored('adding change for paragraph in notice\n', attrs=['bold']))
+                        changeset = notice.find('.//{eregs}changeset')
+                        change = etree.SubElement(changeset, 'change')
+                        change.set('operation', 'modified')
+                        change.set('label', label)
+                        change.append(paragraph)
+                    else:
+                        print(colored('replacing content in notice paragraph\n', attrs=['bold']))
+                        notice_content = notice_paragraph.find('.//{eregs}content')
+                        notice_paragraph.replace(notice_content, new_content)
 
         if problem_flag:
             print(colored('The tree has been altered! Do you want to write the result to disk?'))
@@ -377,7 +410,14 @@ class EregsValidator:
                 answer = raw_input('Save? y/n: ')
             if answer == 'y':
                 with open(regulation_file, 'w') as f:
-                    f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
+                    print('Writing ' + regulation_file + '...')
+                    if notice is None:
+                        f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
+                    else:
+                        # If notice was given, presume that the file
+                        # path given is to the notice, not the
+                        # regulation.
+                        f.write(etree.tostring(notice, pretty_print=True, encoding='UTF-8'))
 
     def validate_internal_cites(self, tree, internal_cites_layer):
         """
@@ -781,16 +821,6 @@ class EregsValidator:
         if len(analyses) == 1 and \
                 analyses[0].getparent().tag in ('{eregs}notice', '{eregs}regulation'):
             return tree
-
-        # Prompt user to be sure they want to do this
-        if regulation_file is not None:
-            print(colored('The file ' + regulation_file + ' has invalid old-style analysis. '
-                          'Should it be migrated?', 'red'))
-            answer = None
-            while answer not in ['y', 'n']:
-                answer = raw_input('Migrate and save? y/n: ')
-            if answer == 'n':
-                return tree
 
         # Create the top level analysis element
         analysis = etree.SubElement(tree, '{eregs}analysis')
