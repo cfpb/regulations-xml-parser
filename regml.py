@@ -238,7 +238,7 @@ def check_terms(file, label=None, term=None, with_notice=None):
     with open(file, 'r') as f:
         reg_string = f.read()
     parser = etree.XMLParser(huge_tree=True)
-    xml_tree = etree.fromstring(reg_xml, parser)
+    reg_tree = etree.fromstring(reg_string, parser)
 
     if reg_tree.tag == '{eregs}notice':
         print("Cannot check terms in notice files directly.")
