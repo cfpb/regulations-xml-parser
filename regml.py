@@ -649,7 +649,11 @@ def apply_through(cfr_title, cfr_part, through=None):
         parser = etree.XMLParser(huge_tree=True)
 
         notice_xml = etree.fromstring(notice_string, parser)
-        
+
+        # Validate the files
+        regulation_validator = get_validator(prev_tree)
+        notice_validator = get_validator(notice_xml)
+
         # Process the notice changeset
         new_xml_tree = process_changes(prev_tree, notice_xml)
 
