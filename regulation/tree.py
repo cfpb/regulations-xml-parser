@@ -322,9 +322,15 @@ def build_internal_citations_layer(root):
         for cite, positions in cite_positions.items():
             # positions = find_all_occurrences(par_text, text)
             for pos in positions:
-                #print cite, positions, par_label
-                cite_dict = {'citation': cite_targets[cite],
-                             'offsets': [[pos, pos + len(cite)]]}
+                # Handle empty citations
+                try:
+                    cite_dict = {'citation': cite_targets[cite],
+                                 'offsets': [[pos, pos + len(cite)]]}
+                except TypeError as e:
+                    print "TypeError occurred: {}".format(str(e))
+                    print "Look for an empty citation in {} @ pos {}".format(par_label, positions)
+                    raise
+
                 if cite_dict not in citation_list:
                     citation_list.append(cite_dict)
 
@@ -756,6 +762,11 @@ def build_toc_layer(root):
             parent = parent.getparent()
 
         label = parent.get('label')
+        
+        # Warn user about elements without labels
+        if label is None:
+            raise ValueError("TOC parent element {} has no label; this will cause JSON issues.".format(parent.tag))
+
         toc_dict[label] = []
 
         # Build sections
@@ -928,6 +939,11 @@ def build_analysis(root):
         label = analysis_section_elm.get('target')
         document_number = analysis_section_elm.get('notice')
         publication_date = analysis_section_elm.get('date')
+
+        # Warn user about analysisSection elements without labels/attributes
+        if label is None or document_number is None or publication_date is None:
+            err_info = {"label": label, "notice": document_number, "date": publication_date}
+            raise ValueError("analysisSection element is missing attribute information:\n{}".format(err_info))
 
         # Labels might have multiple analysis refs. If it's not already
         # in the analyses_dict, add it.

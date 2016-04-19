@@ -29,7 +29,10 @@ from regulation.tree import (build_analysis,
                              build_reg_tree,
                              build_terms_layer,
                              build_toc_layer)
-from regulation.changes import process_changes, process_analysis, generate_diff
+from regulation.changes import (process_changes,
+                               process_analysis,
+                               generate_diff,
+                               rectify_analysis)
 
 # Import regparser here with the eventual goal of breaking off the parts
 # we're using in the RegML parser into a library both can share.
@@ -357,6 +360,62 @@ def migrate_analysis(cfr_title, cfr_part):
         validator.validate_reg(xml_tree)
 
 
+# 
+@cli.command('fix-analysis')
+@click.argument('file')
+@click.option('--always-save', is_flag=True)
+# @click.option('--label')
+def fix_analysis(file, always_save=False):
+    """Checks and fixes the analysis in a notice RegML file"""
+    file = find_file(file, is_notice=True)
+    with open(file, 'r') as f:
+        reg_xml = f.read()
+    parser = objectify.makeparser(huge_tree=True)
+    xml_tree = objectify.fromstring(reg_xml, parser)
+    
+    if xml_tree.tag != '{eregs}notice':
+        print("Can only check changes in notice files")
+        sys.exit(1)
+
+    # Parse through the analysis tree
+    print("Checking analysis tree")
+    new_xml_tree = rectify_analysis(xml_tree)
+
+    if new_xml_tree is None:
+        print(colored("ERROR: No analysis found in notice.",
+              attrs=['bold']))
+        return
+
+    # Validate the file relative to schema
+    print("Validating updated notice xml")
+    validator = get_validator(new_xml_tree)
+    print("Validation complete!")  
+
+    # Write the new xml tree
+    new_xml_string = etree.tostring(new_xml_tree,
+                                    pretty_print=True,
+                                    xml_declaration=True,
+                                    encoding='UTF-8')
+
+    # Prompt user whether to update the notice
+    if always_save:
+        answer = "y"
+    else:
+        answer = None
+
+    while answer not in ["", "y", "n"]: 
+        answer = raw_input('Save updated analysis to notice file? y/n [y] ')
+
+    if answer in ["", "y"]:
+        # Save the new xml tree to the original file
+        print("Writing regulation to {}".format(file))
+        with open(file, 'w') as f:
+            f.write(new_xml_string)
+    else:
+        # Cancel save
+        print("Canceling analysis fixes - changes have not been saved.")    
+
+
 # Validate the given regulation file (or files) and generate the JSON
 # output expected by regulations-core and regulations-site if the RegML
 # validates.
@@ -453,8 +512,8 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
         # Apply JSON to all documents
         last_ver_idx = len(regml_regs) - 1
     elif answer in possible_indices:
-        # Apply through answer-1 to adjust for the initial ver offset
-        last_ver_idx = int(answer) - 1
+        # Apply through answer
+        last_ver_idx = int(answer)
     elif answer in possible_regs:
         # Find index to stop at in list
         last_ver_idx = possible_regs.index(answer)
@@ -595,7 +654,6 @@ def apply_through(cfr_title, cfr_part, through=None):
         answer = None
         while answer not in [""] + possible_indices + possible_notices: 
             answer = raw_input('Press enter to apply all or enter notice number: [all] ')
-        # print("Answer: '{}'".format(answer))
 
     if len(answer) == 0:
         # Apply notices
