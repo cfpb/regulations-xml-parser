@@ -44,7 +44,7 @@ class RegNode:
         self.depth = 0
 
         self.mixed_text = []
-        self.source_xml = ''
+        self.source_xml = None
 
         if 'include_children' in kwargs:
             if not (kwargs['include_children'] is True or

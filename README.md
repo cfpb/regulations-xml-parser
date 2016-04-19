@@ -2,12 +2,13 @@
 
 [![Build Status](https://travis-ci.org/cfpb/regulations-xml-parser.svg)](https://travis-ci.org/cfpb/regulations-xml-parser)
 
-Part of [eRegulations](http://eregs.github.io/eRegulations/).
+Part of [eRegulations](http://eregs.github.io/eRegulations/). 
 
-Parse [regulation XML](https://github.com/cfpb/regulations-schema) to
+Parse [Regulation XML](https://github.com/cfpb/regulations-schema) to
 generate JSON for [regulations-core](https://github.com/cfpb/regulations-core)
 to serve to [regulations-site](https://github.com/cfpb/regulations-site).
 
+A full development envinronment to perform all of these tasks can be set up using [regulations-bootstrap](https://github.com/cfpb/regulations-bootstrap).
 
 ## Usage
 
@@ -19,22 +20,36 @@ There are two types of RegML files:
 
 ### Generating RegML from eCFR
 
+Scenario: *You have a regulation and no RegML and you need to generate 
+the entire RegML history for that regulation.*
+
 To generate RegML from an eCFR XML file using
  [regulations-parser](https://github.com/cfpb/regulations-parser):
 
 ```shell
-./regml.py ecfr 12 [eCFR File]
+./regml.py ecfr parse-all [CFR title number] [eCFR file]
 ```
 
 This will generate the RegML `regulation` tree for the initial version
 and RegML `notice` trees with the necessary changeset for each
-subsequent version.
+subsequent version of the regulation based on notices published in the 
+Federal Register.
 
-If you want only want to output RegML for a single notice:
+### Generating RegML from a single eCFR Notice
+
+Scenario: *You have a regulation and a body of RegML for its history, 
+but a new final notice was published in the Federal Register.*
+
+To generate RegML from a single eCFR XML notice, you need to have a 
+RegML `regulation` file for the immediately prior notice. 
 
 ```shell
-./regml.py ecfr 12 [eCFR File] --only-notice [notice number]
+./regml.py ecfr parse-notice [CFR title number] [CFR part number] [notice document number] --applies-to [prior notice document number]
 ```
+
+This will generate the RegML `notice` changeset for the new notice. 
+That changeset can then be applied as described below to generate the 
+RegML `regulation` file.
 
 ## Generating RegML from `regulation` + `notice`
 
