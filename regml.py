@@ -939,7 +939,6 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
 
     # Write the notice file
     if not without_notice:
-        print("writing notice file")
         builder.write_notice(version,
                              old_tree=old_tree,
                              reg_tree=reg_tree,
@@ -948,7 +947,6 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
         
     # Write the regulation file for the new notice
     if with_version:
-        print("writing version")
         builder.write_regulation(new_tree, layers=layers)
     
 
