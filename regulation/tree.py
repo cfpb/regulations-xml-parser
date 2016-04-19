@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import unicode_literals
+from __future__ import print_function
 
 from copy import deepcopy
 from collections import OrderedDict
@@ -327,8 +328,8 @@ def build_internal_citations_layer(root):
                     cite_dict = {'citation': cite_targets[cite],
                                  'offsets': [[pos, pos + len(cite)]]}
                 except TypeError as e:
-                    print "TypeError occurred: {}".format(str(e))
-                    print "Look for an empty citation in {} @ pos {}".format(par_label, positions)
+                    print("TypeError occurred: {}".format(str(e)))
+                    print("Look for an empty citation in {} @ pos {}".format(par_label, positions))
                     raise
 
                 if cite_dict not in citation_list:
