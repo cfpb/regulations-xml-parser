@@ -342,7 +342,7 @@ def process_analysis(regulation_xml, notice_xml, dry=False):
 
     # If there is no notice analysis, we have nothing to do here.
     if notice_analysis is None:
-        print("no analysis")
+        # print("No analysis found in notice.")
         return regulation_xml
 
     existing_analysis = regulation_xml.find('.//{eregs}analysis')
@@ -358,6 +358,41 @@ def process_analysis(regulation_xml, notice_xml, dry=False):
         existing_analysis.append(new_section)
 
     return regulation_xml
+
+
+def rectify_analysis(notice_xml, dry=False):
+    """
+    Parses through the analysis section and fixes common problems:
+    - analysisSection with only a title: adds an empty analysisParagraph
+    """
+
+    new_xml = deepcopy(notice_xml)
+    notice_analysis = new_xml.find('.//{eregs}analysis')
+
+    # If there is no notice analysis, we have nothing to do here.
+    if notice_analysis is None:
+        return
+
+    # Iterate through the tree and find any problem areas
+    for toplevelsection in notice_analysis.iterchildren():
+        sections = toplevelsection.findall('.//{eregs}analysisSection')
+        
+        # Determine whether this section has non-title children
+        for section in sections:
+            title = section.find('{eregs}title')
+            subsections = len(section.findall('{eregs}analysisSection'))
+            subparas = len(section.findall('{eregs}analysisParagraph'))
+
+            # Find analysisSection nodes that don't fit the schema because
+            # they have no child analysisSection or analysisParagraph.
+            if subsections + subparas == 0:
+                print("Found no subsections or subparas in {0}".format(title))
+
+                # Insert an empty analysisParagraph node so the schema validates.
+                if not dry:
+                    etree.SubElement(section, "{eregs}analysisParagraph")
+
+    return new_xml
 
 
 def generate_diff(left_xml, right_xml):
