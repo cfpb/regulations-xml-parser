@@ -117,14 +117,15 @@ def label_compare(left, right):
     return cmp(left, right)
 
 
-def process_changes(original_xml, notice_xml, dry=False):
+def process_changes(original_xml, original_notice_xml, dry=False):
     """ Process changes given in the notice_xml to modify the
         original_xml. The 'dry' param controls whether this is a
         dry run (True) or to apply the xml changes (False).
         The result is returned as a new XML tree. """
 
-    # Copy the original XML for our new tree
+    # Copy the original XML trees for our new tree
     new_xml = deepcopy(original_xml)
+    notice_xml = deepcopy(original_notice_xml)
 
     # Replace the fdsys and preamble with the notice preamble.
     fdsys_elm = new_xml.find('./{eregs}fdsys')
@@ -318,6 +319,7 @@ def process_changes(original_xml, notice_xml, dry=False):
 
             old_target = change.get('oldTarget')
             new_target = change.get('newTarget')
+            target_text = change.text
 
             if old_target is None or new_target is None:
                 raise ValueError('Need to know both the old target and '
@@ -325,7 +327,8 @@ def process_changes(original_xml, notice_xml, dry=False):
 
             references = new_xml.findall('.//{{eregs}}ref[@target="{}"]'.format(old_target))
             for ref in references:
-                ref.set('target', new_target)
+                if target_text is None or ref.text.lower() == target_text.lower():
+                    ref.set('target', new_target)
 
     return new_xml
 
