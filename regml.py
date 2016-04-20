@@ -370,8 +370,8 @@ def fix_analysis(file, always_save=False):
     file = find_file(file, is_notice=True)
     with open(file, 'r') as f:
         reg_xml = f.read()
-    parser = objectify.makeparser(huge_tree=True)
-    xml_tree = objectify.fromstring(reg_xml, parser)
+    parser = etree.XMLParser(huge_tree=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
     
     if xml_tree.tag != '{eregs}notice':
         print("Can only check changes in notice files")
