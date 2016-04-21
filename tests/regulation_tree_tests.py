@@ -155,7 +155,7 @@ class TreeTestCase(TestCase):
 
         result = reg_tree.find_node(predicate)
 
-        self.assertEqual(len(result), 2)
+        self.assertEqual(len(result), 4)
         self.assertEqual(result[0].string_label, '1234-1')
         self.assertEqual(result[0].text, "I'm an unmarked paragraph")
         self.assertEqual(result[0].marker, None)
@@ -182,13 +182,21 @@ class TreeTestCase(TestCase):
         self.assertEqual(1, 1)
 
     def test_height(self):
-
         xml_tree = etree.fromstring(test_xml)
         reg_tree = build_reg_tree(xml_tree)
 
         result = reg_tree.height()
 
-        self.assertEqual(result, 4)
+        self.assertEqual(result, 5)
+
+    def test_markerless_nodes(self):
+        """ Make sure marker: '' comes through in the json """
+        xml_tree = etree.fromstring(test_xml)
+        reg_tree = build_reg_tree(xml_tree)
+
+        parent = reg_tree.find_node(lambda n: n.string_label == '1234-1-a')[0]
+        self.assertEqual(parent.children[0].to_json()['marker'], '')
+        self.assertEqual(parent.children[1].to_json()['marker'], '')
 
     def test_build_formatting_layer_variable(self):
         tree = etree.fromstring("""
@@ -375,6 +383,7 @@ class TreeTestCase(TestCase):
                         "h6",
                         "p92"
                     ],
+                    "marker": "",
                     "node_type": "appendix",
                     "text": "Note:\n                The HUD-1A is an optional form that may be used for refinancing and subordinate-lien federally related mortgage loans, as well as for any other one-party transaction that does not involve the transfer of title to residential real property. The HUD-1 form may also be used for such transactions, by utilizing the borrower's side of the HUD-1 and following the relevant parts of the instructions as set forth above. The use of either the HUD-1 or HUD-1A is not mandatory for open-end lines of credit (home-equity plans), as long as the provisions of Regulation Z are followed."
                 }
@@ -412,7 +421,9 @@ class TreeTestCase(TestCase):
                                       [OrderedDict([(u'children', []),
                                                     (u'label', [u'1024', u'3', u'p1']),
                                                     (u'node_type', u'regtext'),
-                                                    (u'text', u'Note:\n                  This is a test callout.')])]),
+                                                    (u'text', u'Note:\n                  This is a test callout.'),
+                                                    (u'marker', u''),
+                                                    ])]),
                                        (u'label',
                                         [u'1024', u'3']),
                                        (u'node_type', u'regtext'),
@@ -446,7 +457,9 @@ class TreeTestCase(TestCase):
                               [OrderedDict([(u'children', []),
                                           (u'label', [u'1013', u'A', u'1', u'p1']),
                                           (u'node_type', u'appendix'),
-                                          (u'text', '![](ER19DE11.010)')])]),
+                                          (u'text', '![](ER19DE11.010)'),
+                                          (u'marker', ''),
+                                  ])]),
                                   (u'label', [u'1013', u'A', u'1']), (u'node_type', u'appendix'),
                                   (u'text', u''),
                                   (u'title', u'A-1\u2014Model Open-End or Finance Vehicle Lease Disclosures')])
