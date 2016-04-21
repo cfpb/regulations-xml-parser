@@ -713,7 +713,17 @@ def apply_through(cfr_title, cfr_part, through=None):
         notice_validator = get_validator(notice_xml)
 
         # Process the notice changeset
-        new_xml_tree = process_changes(prev_tree, notice_xml)
+        try:
+            new_xml_tree = process_changes(prev_tree, notice_xml)
+        except Exception as e:
+            print("[{}]".format(kk),
+                  colored("Exception occurred; details are below. ".format(kk), 'red'),
+                  "When ready to retry, use:\n\n",
+                  colored("> ./regml.py apply-notice {0}/{1} {0}/{2}\n".format(cfr_part,
+                                                                               prev_notice,
+                                                                               doc_number),
+                          attrs=['bold']))
+            raise e
 
         # Add in any new analysis
         new_xml_tree = process_analysis(new_xml_tree, notice_xml)
