@@ -189,6 +189,11 @@ def process_changes(original_xml, original_notice_xml, dry=False):
                 parent_label = '-'.join(get_parent_label(label_parts))
             parent_elm = new_xml.find('.//*[@label="{}"]'.format(parent_label))
 
+            if parent_elm is None:
+                raise TypeError("Label {} cannot be added because its parent "
+                                "element '{}' does not exist or is missing a "
+                                "'label' attribute".format(label, parent_label))
+
             # If the parent is a part or subpart, we need to add to the
             # content element.
             if parent_elm.tag in TAGS_WITH_SUBCONTENT:
