@@ -15,7 +15,8 @@ from regulation.tree import (build_reg_tree,
                              build_notice,
                              build_formatting_layer,
                              apply_formatting,
-                             build_toc_layer)
+                             build_toc_layer,
+                             build_keyterm_layer)
 from regulation.node import RegNode
 
 
@@ -670,4 +671,65 @@ class TreeTestCase(TestCase):
                                                                    (u'term', 'bureau')]))])
                                         )])
 
+        self.assertEqual(expected_result, result)
+
+    def test_build_keyterm_layer_subpart(self):
+        """ Make sure subpart paragraphs with keyterms are properly
+            recognized """
+        tree = etree.fromstring("""
+        <section label="1234-1" xmlns="eregs">
+          <paragraph label="1234-1-a" marker="a">
+           <title type="keyterm">Keyterm.</title>
+            <content>I'm a paragraph</content>
+          </paragraph>
+        </section>
+        """)
+        expected_result = {
+            '1234-1-a': [
+                {'locations': [0], 
+                 'key_term': 'Keyterm.'}
+            ],
+        }
+        result = build_keyterm_layer(tree)
+        self.assertEqual(expected_result, dict(result))
+
+    def test_build_keyterm_layer_appendix(self):
+        """ Make sure appendix paragraphs with keyterms are properly
+            recognized """
+        tree = etree.fromstring("""
+        <appendixSection appendixSecNum="1" label="1234-A-p1" xmlns="eregs">
+          <subject/>
+            <paragraph label="1234-A-1" marker="1">
+              <title type="keyterm">Keyterm.</title>
+              <content>I'm a paragraph</content>
+            </paragraph>
+        </appendixSection>
+        """)
+        expected_result = {
+            '1234-A-1': [
+                {'locations': [0], 
+                 'key_term': 'Keyterm.'}
+            ],
+        }
+        result = build_keyterm_layer(tree)
+        self.assertEqual(expected_result, result)
+
+    def test_build_keyterm_layer_interp(self):
+        """ Make sure interpParagraphs with keyterms are properly
+            recognized """
+        tree = etree.fromstring("""
+        <interpSection label="1234-1-Interp" target="1234-1" xmlns="eregs">
+          <interpParagraph label="1234-1-A-Interp" target="1234-1-A">
+            <title type="keyterm">Keyterm.</title>
+            <content>Some interpretation content here.</content>
+          </interpParagraph>
+        </interpSection>
+        """)
+        expected_result = {
+            '1234-1-A-Interp': [
+                {'locations': [0], 
+                 'key_term': 'Keyterm.'}
+            ],
+        }
+        result = build_keyterm_layer(tree)
         self.assertEqual(expected_result, result)

@@ -47,6 +47,7 @@ test_xml = """
                 <interpSection label="1234-1-Interp" target="1234-1">
                   <title>Introduction</title>
                   <interpParagraph label="1234-1-A-Interp" target="1234-1-A">
+                    <title type="keyterm">An initial keyterm</title>
                     <content>Some interpretation content here.</content>
                   </interpParagraph>
                   <interpParagraph label="1234-1-A-Interp-1">
