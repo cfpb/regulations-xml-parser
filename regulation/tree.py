@@ -214,8 +214,14 @@ def build_reg_tree(root, parent=None, depth=0):
         title = root.find('{eregs}title')
         content = apply_formatting(root.find('{eregs}content'))
         content_text = xml_node_text(content)
+
         if title is not None:
-            node.title = title.text
+            if title.get('type') != 'keyterm':
+                node.title = title.text
+            else:
+                # Keyterms are expected by reg-site to be included in
+                # the content text rather than the title of a node.
+                content_text = title.text + content_text
 
         node.marker = root.get('marker', '')
         if node.marker == 'none':
@@ -796,9 +802,9 @@ def build_toc_layer(root):
 
 def build_keyterm_layer(root):
     """
-    Build the keyterm layer from the provided root of the XML tree.
+    Build the keyterm layer from the provided XML tree.
 
-    :param root: The root element of the XML tree.
+    :param root: The root element of an XML tree containing paragraphs.
     :type root: :class:`etree.Element`
 
     :return: An OrderedDict containing the locations of keyterms, suitable for direct
@@ -807,24 +813,19 @@ def build_keyterm_layer(root):
     """
 
     keyterm_dict = OrderedDict()
+    paragraphs = root.findall('.//{eregs}paragraph') \
+               + root.findall('.//{eregs}interpParagraph')
 
-    subparts = root.findall('.//{eregs}subpart')
-    appendices = root.findall('.//{eregs}appendix')
-
-    paragraph_locations = subparts + appendices
-
-    for element in paragraph_locations:
-        paragraphs = element.findall('.//{eregs}paragraph')
-        for paragraph in paragraphs:
-            title = paragraph.find('{eregs}title')
-            if title is not None and title.get('type') == 'keyterm':
-                label = paragraph.get('label')
-                keyterm_dict[label] = [
-                    {
-                        'key_term': title.text,
-                        'locations': [0]
-                    }
-                ]
+    for paragraph in paragraphs:
+        title = paragraph.find('{eregs}title')
+        if title is not None and title.get('type') == 'keyterm':
+            label = paragraph.get('label')
+            keyterm_dict[label] = [
+                {
+                    'key_term': title.text,
+                    'locations': [0]
+                }
+            ]
 
     return keyterm_dict
 
