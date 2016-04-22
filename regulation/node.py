@@ -73,7 +73,7 @@ class RegNode:
         node_dict['text'] = self.text
         if self.title and self.title != '':
             node_dict['title'] = self.title
-        if self.marker:
+        if self.marker is not None:
             node_dict['marker'] = self.marker
 
         if self.mixed_text != []:

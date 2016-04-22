@@ -27,6 +27,12 @@ test_xml = """
                     </paragraph>
                     <paragraph label="1234-1-a" marker="a">
                       <content>I'm a marked paragraph</content>
+                      <paragraph label="1234-1-a-p1" marker="">
+                        <content>We are unmarked paragraphs</content>
+                      </paragraph>
+                      <paragraph label="1234-1-a-p2" marker="">
+                        <content>We are unmarked paragraphs</content>
+                      </paragraph>
                     </paragraph>
                   </section>
                 </content>
