@@ -1147,8 +1147,7 @@ def get_offset(element, marker='', title=None):
     # Note: reg-site treats some elements (e.g. interpParagraphs)
     # as "special" — they don't get the keyterm text included,
     # so we don't include an offset here.
-    if title is not None and title.get('type') == 'keyterm' and \
-            element.tag not in TAGS_WITHOUT_OFFSETS:
+    if title is not None and title.get('type') == 'keyterm':
         keyterm_offset = len(title.text)
     else:
         keyterm_offset = 0
