@@ -157,7 +157,6 @@ def generate_json(regulation_file, check_terms=False):
 
     validator.validate_terms(xml_tree, terms)
     validator.validate_internal_cites(xml_tree, internal_citations)
-    validator.validate_keyterms(xml_tree)
     if check_terms:
         validator.validate_term_references(xml_tree, terms, regulation_file)
     for event in validator.events:
@@ -329,6 +328,50 @@ def check_changes(file, label=None):
     validator.remove_duplicate_changes(xml_tree, file, label=label)
     validator.remove_empty_refs(xml_tree, file)
     
+
+@cli.command('check-keyterms')
+@click.argument('file')
+@click.option('--with-notice')
+def check_keyterms(file, with_notice=None):
+    """ Check for keyterm fragments in a RegML file
+
+        If --with-notice is used, only *new* keyterm fragments
+        introduced in the notice will be given. """
+
+    file = find_file(file)
+    with open(file, 'r') as f:
+        reg_string = f.read()
+    parser = etree.XMLParser(huge_tree=True)
+    reg_tree = etree.fromstring(reg_string, parser)
+
+    if reg_tree.tag == '{eregs}notice':
+        print("Cannot check terms in notice files directly.")
+        print("Use a regulation file and --with-notice to specify the notice that applies.")
+        sys.exit(1)
+
+    # If we're given a notice, apply it to the given regulation file,
+    # then check terms in the result and write it out to the notice file
+    # as changes.
+    notice_tree = None
+    if with_notice is not None:
+        # file is changed here so the term checker will write the notice
+        # instead of the regulation
+        file = find_file(with_notice, is_notice=True)
+        with open(file, 'r') as f:
+            notice_xml = f.read()
+        notice_tree = etree.fromstring(notice_xml)
+
+        # Process the notice changeset
+        print(colored('Applying notice...', attrs=['bold']))
+        reg_tree = process_changes(reg_tree, notice_tree)
+
+    # Validate the file relative to schema
+    validator = get_validator(reg_tree)
+    validator.validate_keyterms(reg_tree, notice_tree=notice_tree)
+
+    for event in validator.events:
+        print(str(event))
+
 
 @cli.command('migrate-analysis')
 @click.argument('cfr_title')
