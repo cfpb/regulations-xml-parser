@@ -542,12 +542,12 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
     print(colored("\nAvailable RegML documents for reg {}:".format(cfr_part),
           attrs=['bold']))
     for kk in range(len(regml_regs)):
-        print("{0:>3}. {1[0]:<22}(Effective: {1[1]})".format(kk+1,
+        print("{0:>3}. {1[0]:<22}(Effective: {1[1]})".format(kk,
                                                              regml_regs[kk]))
     print()
 
     # Possible answers are blank (all), the numbers, or the doc names
-    possible_indices = [str(kk+1) for kk in range(len(regml_regs))]
+    possible_indices = [str(kk) for kk in range(len(regml_regs))]
     possible_regs = [nn[0] for nn in regml_regs]
 
     # If number is supplied, use that one
@@ -563,7 +563,7 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
 
     if len(answer) == 0:
         # Apply JSON to all documents
-        last_ver_idx = len(regml_regs)
+        last_ver_idx = len(regml_regs) - 1
     elif answer in possible_indices:
         # Apply through answer
         last_ver_idx = int(answer)
@@ -577,13 +577,13 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
         return
 
     print(colored("\nApplying JSON through {0[0]}\n".format(
-                  regml_regs[last_ver_idx-1]),
+                  regml_regs[last_ver_idx]),
           attrs=['bold']))
 
     # Perform the json application process
     # Unlike apply-through, since json outputs its own command line output, here we
     # reuse the existing json structure
-    json_command(regulation_files[:last_ver_idx])
+    json_command(regulation_files[:last_ver_idx+1])
 
 
 # Given a notice, apply it to a previous RegML regulation verson to
