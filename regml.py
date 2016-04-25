@@ -157,7 +157,6 @@ def generate_json(regulation_file, check_terms=False):
 
     validator.validate_terms(xml_tree, terms)
     validator.validate_internal_cites(xml_tree, internal_citations)
-    validator.validate_keyterms(xml_tree)
     if check_terms:
         validator.validate_term_references(xml_tree, terms, regulation_file)
     for event in validator.events:
