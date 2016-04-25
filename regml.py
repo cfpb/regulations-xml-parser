@@ -491,9 +491,9 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
         effective_date = xml_tree.find(
             './{eregs}preamble/{eregs}effectiveDate').text
         regml_regs.append((doc_number, effective_date, file_name))
-        regulation_files.append(os.path.join(file_name))
 
     regml_regs.sort(key=lambda n: n[1])
+    regulation_files = [r[2] for r in regml_regs]
     
     # Generate prompt for user
     print(colored("\nAvailable RegML documents for reg {}:".format(cfr_part),
@@ -518,11 +518,9 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
             answer = raw_input('Press enter to apply all or enter document number: [all] ')
         print("Answer: '{}'".format(answer))
 
-    print(possible_indices)
-
     if len(answer) == 0:
         # Apply JSON to all documents
-        last_ver_idx = len(regml_regs) - 1
+        last_ver_idx = len(regml_regs)
     elif answer in possible_indices:
         # Apply through answer
         last_ver_idx = int(answer)
@@ -535,7 +533,8 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
               colored("does not exist - no changes have been made.", attrs=['bold']))
         return
 
-    print(colored("\nApplying JSON through {0[0]}\n".format(regml_regs[last_ver_idx]),
+    print(colored("\nApplying JSON through {0[0]}\n".format(
+                  regml_regs[last_ver_idx-1]),
           attrs=['bold']))
 
     # Perform the json application process
