@@ -16,7 +16,8 @@ from regulation.tree import (build_reg_tree,
                              build_formatting_layer,
                              apply_formatting,
                              build_toc_layer,
-                             build_keyterm_layer)
+                             build_keyterm_layer, 
+                             get_offset)
 from regulation.node import RegNode
 
 
@@ -746,3 +747,32 @@ class TreeTestCase(TestCase):
         }
         result = build_keyterm_layer(tree)
         self.assertEqual(expected_result, result)
+
+    def test_get_offset(self):
+        """ Make sure offsets returned are correct """
+        element = etree.fromstring("""
+          <paragraph xmlns="eregs" marker="(1)">
+            <title type="keyterm">Keyterm.</title>
+            <content>Some content here.</content>
+          </paragraph>
+        """)
+        marker = "(1)"
+        title = etree.fromstring("""
+          <title type="keyterm">Keyterm.</title>
+        """)
+        result = get_offset(element, marker, title)
+        self.assertEqual(12, result)
+
+        element = etree.fromstring("""
+          <interpParagraph xmlns="eregs" marker="(1)">
+            <title type="keyterm">Keyterm.</title>
+            <content>Some content here.</content>
+          </interpParagraph>
+        """)
+        marker = "(1)"
+        title = etree.fromstring("""
+          <title type="keyterm">Keyterm.</title>
+        """)
+        result = get_offset(element, marker, title)
+        self.assertEqual(8, result)
+        
