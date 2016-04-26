@@ -44,7 +44,7 @@ class RegNode:
         self.depth = 0
 
         self.mixed_text = []
-        self.source_xml = ''
+        self.source_xml = None
 
         if 'include_children' in kwargs:
             if not (kwargs['include_children'] is True or
@@ -73,7 +73,7 @@ class RegNode:
         node_dict['text'] = self.text
         if self.title and self.title != '':
             node_dict['title'] = self.title
-        if self.marker:
+        if self.marker is not None:
             node_dict['marker'] = self.marker
 
         if self.mixed_text != []:

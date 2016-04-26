@@ -37,7 +37,8 @@ from regulation.changes import (process_changes,
 # Import regparser here with the eventual goal of breaking off the parts
 # we're using in the RegML parser into a library both can share.
 from regparser.federalregister import fetch_notice_json
-from regparser.builder import LayerCacheAggregator, tree_and_builder
+from regparser.builder import LayerCacheAggregator, tree_and_builder, Builder
+from regparser.notice.compiler import compile_regulation
 
 if (sys.version_info < (3, 0)):
     reload(sys)  # noqa
@@ -45,6 +46,17 @@ if (sys.version_info < (3, 0)):
 
 
 # Utility Functions ####################################################
+
+def base_path(is_notice=False):
+    """ Return the base RegML path based on our configuration. """
+    regml_base = settings.XML_ROOT
+    if is_notice:
+        regml_base = os.path.join(regml_base, 'notice')
+    else:
+        regml_base = os.path.join(regml_base, 'regulation')
+
+    return regml_base
+
 
 def find_file(file, is_notice=False, ecfr=False):
     """
@@ -66,18 +78,21 @@ def find_file(file, is_notice=False, ecfr=False):
             file = os.path.join(ecfr_base, file)
 
         else:
-            regml_base = settings.XML_ROOT
-            if is_notice:
-                regml_base = os.path.join(regml_base, 'notice')
-            else:
-                regml_base = os.path.join(regml_base, 'regulation')
-
-            file = os.path.join(regml_base, file)
-
+            file = os.path.join(base_path(is_notice=is_notice), file)
             if not file.endswith('.xml') and not os.path.isdir(file):
                 file += '.xml'
 
     return file
+
+
+def find_all(part, is_notice=False):
+    """ Find all regulation RegML files for the given part. 
+
+        If is_notice is True, all notice RegML files will be returned. """
+    regml_base = base_path(is_notice=is_notice)
+    regulation_pattern = os.path.join(regml_base, part, '*.xml')
+    files = glob.glob(regulation_pattern)
+    return files
 
 
 def find_version(part, notice, is_notice=False):
@@ -145,7 +160,6 @@ def generate_json(regulation_file, check_terms=False):
 
     validator.validate_terms(xml_tree, terms)
     validator.validate_internal_cites(xml_tree, internal_citations)
-    validator.validate_keyterms(xml_tree)
     if check_terms:
         validator.validate_term_references(xml_tree, terms, regulation_file)
     for event in validator.events:
@@ -183,7 +197,7 @@ def generate_json(regulation_file, check_terms=False):
 
 # Main CLI Commands ####################################################
 
-# Create a general CLI that can take additional comments
+# Create a general CLI that can take additional commands
 @click.group()
 def cli():
     pass
@@ -318,6 +332,50 @@ def check_changes(file, label=None):
     validator.remove_empty_refs(xml_tree, file)
     
 
+@cli.command('check-keyterms')
+@click.argument('file')
+@click.option('--with-notice')
+def check_keyterms(file, with_notice=None):
+    """ Check for keyterm fragments in a RegML file
+
+        If --with-notice is used, only *new* keyterm fragments
+        introduced in the notice will be given. """
+
+    file = find_file(file)
+    with open(file, 'r') as f:
+        reg_string = f.read()
+    parser = etree.XMLParser(huge_tree=True)
+    reg_tree = etree.fromstring(reg_string, parser)
+
+    if reg_tree.tag == '{eregs}notice':
+        print("Cannot check terms in notice files directly.")
+        print("Use a regulation file and --with-notice to specify the notice that applies.")
+        sys.exit(1)
+
+    # If we're given a notice, apply it to the given regulation file,
+    # then check terms in the result and write it out to the notice file
+    # as changes.
+    notice_tree = None
+    if with_notice is not None:
+        # file is changed here so the term checker will write the notice
+        # instead of the regulation
+        file = find_file(with_notice, is_notice=True)
+        with open(file, 'r') as f:
+            notice_xml = f.read()
+        notice_tree = etree.fromstring(notice_xml)
+
+        # Process the notice changeset
+        print(colored('Applying notice...', attrs=['bold']))
+        reg_tree = process_changes(reg_tree, notice_tree)
+
+    # Validate the file relative to schema
+    validator = get_validator(reg_tree)
+    validator.validate_keyterms(reg_tree, notice_tree=notice_tree)
+
+    for event in validator.events:
+        print(str(event))
+
+
 @cli.command('migrate-analysis')
 @click.argument('cfr_title')
 @click.argument('cfr_part')
@@ -334,8 +392,7 @@ def migrate_analysis(cfr_title, cfr_part):
         return 
     
     # Migrate regulation files
-    regml_reg_dir = os.path.join(settings.XML_ROOT, 'regulation', cfr_part, '*.xml')
-    regml_reg_files = glob.glob(regml_reg_dir)
+    regml_reg_files = find_all(cfr_part)
     for reg_file in regml_reg_files:
         print(reg_file)
         file_name = os.path.join(reg_file)
@@ -348,8 +405,7 @@ def migrate_analysis(cfr_title, cfr_part):
         validator.validate_reg(xml_tree)
 
     # Migrate notices
-    regml_notice_dir = os.path.join(settings.XML_ROOT, 'notice', cfr_part, '*.xml')
-    regml_notice_files = glob.glob(regml_notice_dir)
+    regml_notice_files = find_all(cfr_part, is_notice=True)
     regml_notices = []
     for notice_file in regml_notice_files:
         print(notice_file)
@@ -466,8 +522,7 @@ def json_command(regulation_files, from_notices=[], check_terms=False):
               help="Suppresses output except for errors")
 def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
     # Get list of available regs
-    regml_reg_dir = os.path.join(settings.XML_ROOT, 'regulation', cfr_part, '*.xml')
-    regml_reg_files = glob.glob(regml_reg_dir)
+    regml_reg_files = find_all(cfr_part)
 
     regml_regs = []
     regulation_files = []
@@ -482,20 +537,20 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
         effective_date = xml_tree.find(
             './{eregs}preamble/{eregs}effectiveDate').text
         regml_regs.append((doc_number, effective_date, file_name))
-        regulation_files.append(os.path.join(file_name))
 
     regml_regs.sort(key=lambda n: n[1])
+    regulation_files = [r[2] for r in regml_regs]
     
     # Generate prompt for user
     print(colored("\nAvailable RegML documents for reg {}:".format(cfr_part),
           attrs=['bold']))
     for kk in range(len(regml_regs)):
-        print("{0:>3}. {1[0]:<22}(Effective: {1[1]})".format(kk+1,
+        print("{0:>3}. {1[0]:<22}(Effective: {1[1]})".format(kk,
                                                              regml_regs[kk]))
     print()
 
     # Possible answers are blank (all), the numbers, or the doc names
-    possible_indices = [str(kk+1) for kk in range(len(regml_regs))]
+    possible_indices = [str(kk) for kk in range(len(regml_regs))]
     possible_regs = [nn[0] for nn in regml_regs]
 
     # If number is supplied, use that one
@@ -508,8 +563,6 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
         while answer not in [""] + possible_indices + possible_regs: 
             answer = raw_input('Press enter to apply all or enter document number: [all] ')
         print("Answer: '{}'".format(answer))
-
-    print(possible_indices)
 
     if len(answer) == 0:
         # Apply JSON to all documents
@@ -526,13 +579,14 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
               colored("does not exist - no changes have been made.", attrs=['bold']))
         return
 
-    print(colored("\nApplying JSON through {0[0]}\n".format(regml_regs[last_ver_idx]),
+    print(colored("\nApplying JSON through {0[0]}\n".format(
+                  regml_regs[last_ver_idx]),
           attrs=['bold']))
 
     # Perform the json application process
     # Unlike apply-through, since json outputs its own command line output, here we
     # reuse the existing json structure
-    json_command(regulation_files[:last_ver_idx])
+    json_command(regulation_files[:last_ver_idx+1])
 
 
 # Given a notice, apply it to a previous RegML regulation verson to
@@ -591,8 +645,7 @@ def apply_notice(regulation_file, notice_file):
 def apply_through(cfr_title, cfr_part, through=None):
     # Get list of notices that apply to this reg
     # Look for locally available notices
-    regml_notice_dir = os.path.join(settings.XML_ROOT, 'notice', cfr_part, '*.xml')
-    regml_notice_files = glob.glob(regml_notice_dir)
+    regml_notice_files = find_all(cfr_part, is_notice=True)
 
     regml_notices = []
     for notice_file in regml_notice_files:
@@ -851,9 +904,7 @@ def versions(title, part, from_fr=False, from_regml=True):
             print("\t\tinitially effective on", notice['effective_on'])
 
     # Look for locally available notices
-    regml_notice_dir = os.path.join(settings.XML_ROOT, 'notice', part, '*.xml')
-    regml_notice_files = glob.glob(regml_notice_dir)
-    # regml_notice_files = os.listdir(regml_notice_dir)
+    regml_notice_files = find_all(part, is_notice=True)
     print(colored("RegML Notices are available for:", attrs=['bold']))
     regml_notices = []
     for notice_file in regml_notice_files:
@@ -890,8 +941,14 @@ def versions(title, part, from_fr=False, from_regml=True):
 
 # eCFR Convenience Commands ############################################
 
-# Wrap the eCFR parser as a library for the purposes of our workflow
-@cli.command()
+# Create a general ecfr group that can take additional commands
+@cli.group()
+def ecfr():
+    pass
+
+# Wrap the eCFR parser as a library for the purposes of our workflow.
+# This is equivalent to build_from.py
+@ecfr.command('parse-all')
 @click.argument('title', type=int)
 @click.argument('file')
 @click.option('--act-section', default=0, type=int)
@@ -904,7 +961,7 @@ def versions(title, part, from_fr=False, from_regml=True):
               help="do not output any notice changesets")
 @click.option('--only-notice', default=None,
               help="only write output for this notice number")
-def ecfr(title, file, act_title, act_section,
+def ecfr_all(title, file, act_title, act_section,
          with_all_versions=False, without_versions=False,
          without_notices=False, only_notice=None):
     """ Parse eCFR into RegML """
@@ -949,6 +1006,79 @@ def ecfr(title, file, act_title, act_section,
         last_version = version
         del last_notice, old, new_tree, notices     # free some memory
 
+
+@ecfr.command('parse-notice')
+@click.argument('title', type=int)
+@click.argument('cfr_part')
+@click.argument('notice')
+@click.option('--applies-to',
+              help="document number to which the new notice applies")
+@click.option('--act-section', default=0, type=int)
+@click.option('--act-title', default=0, type=int)
+@click.option('--with-version', is_flag=True,
+              help="output the full reg tree version")
+@click.option('--without-notice', is_flag=True, 
+              help="output the notice changeset")
+def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
+        act_section, with_version=False, without_notice=False):
+    """ Generate RegML for a single notice from eCFR XML. """
+
+    # Get the notice the new one applies to
+    with open(find_file(os.path.join(cfr_part, applies_to)), 'r') as f:
+        reg_xml = f.read()
+    parser = etree.XMLParser(huge_tree=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
+    doc_number = xml_tree.find('.//{eregs}documentNumber').text
+            
+    # Validate the file relative to schema
+    validator = get_validator(xml_tree)
+
+    # Get the ecfr builder
+    builder = Builder(cfr_title=title,
+                      cfr_part=cfr_part,
+                      doc_number=doc_number,
+                      checkpointer=None,
+                      writer_type='XML')
+
+    # Fetch the notices from the FR API and find the notice we're
+    # looking for
+    builder.fetch_notices_json()
+    notice_json = next((n for n in builder.notices_json 
+                        if n['document_number'] == notice))
+
+    # Build the notice
+    notice = builder.build_single_notice(notice_json)[0]
+
+    if 'changes' not in notice:
+        print('There are no changes in this notice to apply.')
+        return
+
+    # We've successfully fetched and parsed the new notice.
+    # Build a the reg tree and layers for the notice it applies to.
+    old_tree = build_reg_tree(xml_tree)
+
+    # Build the new reg tree from the old_tree + notice changes
+    last_version = doc_number
+    version = notice['document_number']
+    merged_changes = builder.merge_changes(version, notice['changes'])
+    reg_tree = compile_regulation(old_tree, merged_changes)
+    layer_cache = LayerCacheAggregator()
+    layers = builder.generate_layers(reg_tree,
+                                     [act_title, act_section],
+                                     layer_cache)
+
+    # Write the notice file
+    if not without_notice:
+        builder.write_notice(version,
+                             old_tree=old_tree,
+                             reg_tree=reg_tree,
+                             layers=layers,
+                             last_version=last_version)
+        
+    # Write the regulation file for the new notice
+    if with_version:
+        builder.write_regulation(new_tree, layers=layers)
+    
 
 if __name__ == "__main__":
     cli()

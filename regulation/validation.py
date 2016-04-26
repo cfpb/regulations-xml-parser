@@ -120,7 +120,7 @@ class EregsValidator:
                 'Attempting to validate with empty schema!',
                 severity=Severity(Severity.CRITICAL))
 
-    def validate_keyterms(self, tree):
+    def validate_keyterms(self, tree, notice_tree=None):
         """
         Make sure that keyterm titles aren't repeated in the content of
         the paragraph they belong to. After validation, ``self.events``
@@ -139,6 +139,13 @@ class EregsValidator:
             # Get the parent and its label
             parent = keyterm.getparent()
             label = parent.get('label')
+
+            # If we're given a notice tree, and the label doesn't appear
+            # in the notice, just ignore it.
+            if notice_tree is not None:
+                in_notice = notice_tree.findall('.//*[@label="' + label + '"]')
+                if len(in_notice) == 0:
+                    continue
 
             # Get just the text of the keyterm. If the keyterm has other
             # tags, like a reference, we need to strip those.

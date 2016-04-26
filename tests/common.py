@@ -27,6 +27,12 @@ test_xml = """
                     </paragraph>
                     <paragraph label="1234-1-a" marker="a">
                       <content>I'm a marked paragraph</content>
+                      <paragraph label="1234-1-a-p1" marker="">
+                        <content>We are unmarked paragraphs</content>
+                      </paragraph>
+                      <paragraph label="1234-1-a-p2" marker="">
+                        <content>We are unmarked paragraphs</content>
+                      </paragraph>
                     </paragraph>
                   </section>
                 </content>
@@ -47,6 +53,7 @@ test_xml = """
                 <interpSection label="1234-1-Interp" target="1234-1">
                   <title>Introduction</title>
                   <interpParagraph label="1234-1-A-Interp" target="1234-1-A">
+                    <title type="keyterm">An initial keyterm</title>
                     <content>Some interpretation content here.</content>
                   </interpParagraph>
                   <interpParagraph label="1234-1-A-Interp-1">
