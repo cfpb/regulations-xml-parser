@@ -100,7 +100,7 @@ def write_layer(layer_object, reg_number, notice, layer_type,
               separators=(',', ':'))
 
 
-def get_validator(xml_tree):
+def get_validator(xml_tree, raise_instead_of_exiting=False):
     # Validate the file relative to schema
     validator = EregsValidator(settings.XSD_FILE)
     validator.validate_reg(xml_tree)
@@ -108,7 +108,10 @@ def get_validator(xml_tree):
     if not validator.is_valid:
         for event in validator.events:
             print(str(event))
-        sys.exit(0)
+        if raise_instead_of_exiting:
+            raise event
+        else:
+            sys.exit(0)
 
     return validator
 
@@ -710,7 +713,20 @@ def apply_through(cfr_title, cfr_part, through=None):
 
         # Validate the files
         regulation_validator = get_validator(prev_tree)
-        notice_validator = get_validator(notice_xml)
+
+        try:
+            notice_validator = get_validator(notice_xml, raise_instead_of_exiting=True)
+        except Exception as e:
+            print("[{}]".format(kk),
+                  colored("Exception occurred in notice", 'red'),
+                  colored(doc_number, attrs=['bold']),
+                  colored("; details are below. ", 'red'),
+                  "To retry this single notice, use:\n\n",
+                  colored("> ./regml.py apply-notice {0}/{1} {0}/{2}\n".format(cfr_part,
+                                                                               prev_notice,
+                                                                               doc_number),
+                          attrs=['bold']))
+            sys.exit(0)
 
         # Process the notice changeset
         try:
@@ -718,7 +734,7 @@ def apply_through(cfr_title, cfr_part, through=None):
         except Exception as e:
             print("[{}]".format(kk),
                   colored("Exception occurred; details are below. ".format(kk), 'red'),
-                  "When ready to retry, use:\n\n",
+                  "To retry this single notice, use:\n\n",
                   colored("> ./regml.py apply-notice {0}/{1} {0}/{2}\n".format(cfr_part,
                                                                                prev_notice,
                                                                                doc_number),
