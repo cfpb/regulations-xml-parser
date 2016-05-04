@@ -17,7 +17,8 @@ from regulation.tree import (build_reg_tree,
                              apply_formatting,
                              build_toc_layer,
                              build_keyterm_layer, 
-                             get_offset)
+                             get_offset,
+                             is_intro_text)
 from regulation.node import RegNode
 
 
@@ -776,3 +777,58 @@ class TreeTestCase(TestCase):
         result = get_offset(element, marker, title)
         self.assertEqual(8, result)
         
+    def test_is_intro_text(self):
+        # Has a title
+        with_title = etree.fromstring("""
+        <paragraph xmlns="eregs" marker="">
+            <title>A Title</title>
+            <content>Some content.</content>
+        </paragraph>""")
+        self.assertFalse(is_intro_text(with_title))
+
+        # Has a marker
+        with_marker = etree.fromstring("""
+        <paragraph xmlns="eregs" marker="1.">
+            <content>Some content.</content>
+        </paragraph>""")
+        self.assertFalse(is_intro_text(with_marker))
+
+        # Wrong index in parent
+        wrong_index = etree.fromstring("""
+        <paragraph xmlns="eregs" marker="1.">
+            <content>Some content.</content>
+        </paragraph>""")
+        parent = etree.Element('parent')
+        parent.append(etree.Element('{eregs}paragraph'))
+        parent.append(wrong_index)
+        self.assertFalse(is_intro_text(wrong_index))
+
+        # Wrong index in parent
+        no_callouts = etree.fromstring("""
+        <paragraph xmlns="eregs" marker="1.">
+            <content><callout><line>A line.</line></callout></content>
+        </paragraph>""")
+        etree.Element('parent').append(no_callouts)
+        self.assertFalse(is_intro_text(no_callouts))
+
+        # Has some child paragraphs
+        has_children = etree.fromstring("""
+        <paragraph xmlns="eregs" marker="">
+            <content>Some content.</content>
+            <paragraph marker="1.">
+                <content>Child paragraph 1.</content>
+            </paragraph>
+            <paragraph marker="2.">
+                <content>Child paragraph 2.</content>
+            </paragraph>
+        </paragraph>""")
+        etree.Element('parent').append(has_children)
+        self.assertFalse(is_intro_text(has_children))
+
+        # Perfect
+        intro_text = etree.fromstring("""
+        <paragraph xmlns="eregs" marker="">
+            <content>Some content.</content>
+        </paragraph>""")
+        etree.Element('parent').append(intro_text)
+        self.assertTrue(is_intro_text(intro_text))
