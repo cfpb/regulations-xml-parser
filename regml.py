@@ -650,7 +650,14 @@ def apply_through(cfr_title, cfr_part, through=None):
         with open(file_name, 'r') as f:
             notice_xml = f.read()
         parser = etree.XMLParser(huge_tree=True)
-        xml_tree = etree.fromstring(notice_xml, parser)
+
+        try:
+            xml_tree = etree.fromstring(notice_xml, parser)
+        except etree.XMLSyntaxError as e:
+            print(colored('Syntax error in {}'.format(notice_file), 'red'))
+            print(e)
+            return
+
         doc_number = xml_tree.find(
             './{eregs}preamble/{eregs}documentNumber').text
         effective_date = xml_tree.find(
@@ -1062,6 +1069,111 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
     # Write the regulation file for the new notice
     if with_version:
         builder.write_regulation(new_tree, layers=layers)
+
+
+@ecfr.command('analysis')
+@click.argument('ecfr_file')
+@click.argument('regml_file')
+def ecfr_analysis(ecfr_file, regml_file):
+    """ Extract analysis from eCFR XML using using XSL
+        
+        This is a blunt-force attempt to extract SxS analysis from an
+        eCFR XML file and force it into RegML using XSL
+        (utils/ecfr_sxs_to_regml.xsl).
+
+        The result will very likely have to be hand-edited before it
+        will work as intended. """
+
+    # Get the ecfr xml
+    with open(ecfr_file, 'r') as f:
+        ecfr_xml = f.read()
+    parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
+    ecfr_tree = etree.fromstring(ecfr_xml, parser)
+
+    # Get the regml 
+    with open(regml_file, 'r') as f:
+        reg_xml = f.read()
+    parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
+    regml_tree = etree.fromstring(reg_xml, parser)
+    doc_number = regml_tree.find('.//{eregs}documentNumber').text
+    date = regml_tree.find('.//{eregs}effectiveDate').text
+
+    # Get the XSL file
+    xsl_file = os.path.join(os.path.dirname(__file__), 'utils', 'ecfr_sxs_to_regml.xsl')
+    with open(xsl_file, 'r') as f:
+        xslt_xml = f.read()
+    parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
+    xslt_tree = etree.fromstring(xslt_xml, parser)
+    sxs_transform = etree.XSLT(xslt_tree)
+
+    # Now that we have all the files, try to find the section-by-section
+    # analysis in the eCFR file. It should be between two HD1 with
+    # "Section-by-Section Analysis" in the text.
+    hd1_elms = ecfr_tree.findall('.//HD[@SOURCE="HD1"]')
+    try:
+        hd1_sxs = next((e for e in hd1_elms 
+                        if 'Section-by-Section Analysis' in e.text))
+    except StopIteration:
+        print(colored('No section-by-section analysis found', 'red'))
+        return
+    print(colored('Found section-by-section header', 'green'))
+    
+    hd1_next = hd1_elms[hd1_elms.index(hd1_sxs)+1]
+
+    # The SxS is everything between those two HD1s
+    sxs_parent = hd1_sxs.getparent()
+    sxs_body = sxs_parent[sxs_parent.index(hd1_sxs):sxs_parent.index(hd1_next)]
+
+    if len(sxs_body) == 0:
+        print(colored('No section-by-section analysis found', 'red'))
+        return
+    print(colored('Found analysis', 'green'))
+
+    for elm in sxs_body:
+        if elm.tag == "HD" and elm.get('SOURCE') == 'HD2':
+            print(colored('\t' + elm.text, 'green'))
+
+    # Create a dummy root element that we can apply the xslt to
+    sxs_dummy = etree.Element("sxs")
+    sxs_dummy.extend(sxs_body)
+    result_tree = sxs_transform(sxs_dummy).getroot()
+    print(colored('Transformed analysis', 'green'))
+
+    # Add the resulting tree to the regml... if analysis already exists,
+    # append the analysisSections to the end.
+    existing_analysis = regml_tree.find('.//{eregs}analysis')
+    if existing_analysis is not None:
+        print(colored('Existing analysis found, adding analysis from eCFR',
+                      'yellow'))
+        print(colored('WARNING: There may be duplication that results.',
+                      'yellow'))
+        existing_analysis.append(etree.Comment("Added analysis from eCFR"))
+        for section_elm in result_tree:
+            existing_analysis.append(section_elm)
+        
+    else:
+        print(colored('Adding analysis to RegML', 'green'))
+        regml_tree.append(result_tree)
+
+    # Write the regml tree
+    regml_string = etree.tostring(regml_tree,
+                                  pretty_print=True,
+                                  xml_declaration=True,
+                                  encoding='UTF-8')
+    with open(regml_file, 'w') as f:
+        f.write(regml_string)
+
+    # Remind the user that hand-editing to add the appropriate
+    # attributes and structure is *required* 
+    print(colored('Saved analysis in {}'.format(regml_file),
+                  'green', attrs=['bold']))
+
+    print(colored('REMINDER: the analysis will require hand-editing to '
+                  'ensure correct structure.', 'yellow', attrs=['bold']))
+    print(colored('REMINDER: top-level analysisSections will need the '
+                  'following attributes added:', 'yellow', attrs=['bold']))
+    print(colored('    target="THE TARGET" notice="{}" date="{}"'.format(
+                  doc_number, date), attrs=['bold']))
     
 
 if __name__ == "__main__":
