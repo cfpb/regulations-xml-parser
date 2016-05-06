@@ -19,8 +19,7 @@ from lxml import etree
 # This array contains tag types that can exist in a paragraph
 # that are not part of paragraph text.
 # E.g. tags like <ref> are part of the paragraph text.
-NON_PARA_SUBELEMENT = ['{eregs}paragraph',
-                       '{eregs}callout',
+NON_PARA_SUBELEMENT = ['{eregs}callout',
                        '{eregs}table',
                        '{eregs}graphic']
 
@@ -1097,13 +1096,18 @@ def is_intro_text(item):
     :return: A boolean where True indicates the element is an intro paragraph.
     :rtype: boolean
     """
-    if item.find('{eregs}title') is None and item.get('marker') == '':
+    if item.find('{eregs}title') is None and \
+            item.get('marker') == '' and \
+            len(item) == 1:
         # Only the first child may be an intro text item
         child_num = item.getparent().index(item)
         if child_num > 1:
             return False
-        # Note: item[0] is always a <content> tag - check that element's children
-        if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT, item[0].getchildren())) == 0:
+
+        # Note: item[0] is always a <content> tag - check that 
+        # element's children
+        if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT, 
+                      item[0].getchildren())) == 0:
             return True
 
     return False
