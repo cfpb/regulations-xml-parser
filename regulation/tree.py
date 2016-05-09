@@ -927,7 +927,7 @@ def build_analysis(root):
     """
 
     analysis_dict = OrderedDict()
-
+    doc_number = root.find('{eregs}preamble').find('{eregs}documentNumber').text
     # Find the analysis element
     analysis_elm = root.find('.//{eregs}analysis')
     if analysis_elm is None:
@@ -944,7 +944,7 @@ def build_analysis(root):
         # Warn user about analysisSection elements without labels/attributes
         if label is None or document_number is None or publication_date is None:
             err_info = {"label": label, "notice": document_number, "date": publication_date}
-            raise ValueError("analysisSection element is missing attribute information:\n{}".format(err_info))
+            raise ValueError("In {}, analysisSection element is missing attribute information:\n{}".format(doc_number, err_info))
 
         # Labels might have multiple analysis refs. If it's not already
         # in the analyses_dict, add it.

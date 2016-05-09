@@ -110,7 +110,8 @@ class EregsValidator:
                     'XML Validated!', severity=Severity(Severity.OK))
                 self.events.append(validation_ok)
             except Exception as ex:
-                msg = 'Error validating regs XML!: {}'.format(ex)
+                doc_number = tree.find('{eregs}preamble').find('{eregs}documentNumber').text
+                msg = 'Error validating regs XML for part {}!: {}'.format(doc_number, ex)
                 validation_ex = EregsValidationEvent(
                     msg, severity=Severity(Severity.CRITICAL))
                 self.events.append(validation_ex)
