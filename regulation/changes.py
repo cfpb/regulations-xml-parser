@@ -215,7 +215,11 @@ def process_changes(original_xml, original_notice_xml, dry=False):
                 sibling_label = after_label
                 sibling_elm = new_xml.find('.//*[@label="{}"]'.format(
                     after_label))
-                new_index = parent_elm.index(sibling_elm) + 1
+                try:
+                    new_index = parent_elm.index(sibling_elm) + 1
+                except Exception as e:
+                    print("Sibling element '{}' not found".format(sibling_label))
+                    raise e
             # If there's an explicit parent but no siblings, insert at
             # the beginning of the parent.
             elif change.get('parent') is not None:

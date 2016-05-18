@@ -334,8 +334,8 @@ def build_internal_citations_layer(root):
                                  'offsets': [[pos, pos + len(cite)]]}
                 except TypeError as e:
                     print("TypeError occurred: {}".format(str(e)))
-                    print("Look for an empty citation in {} @ pos {}".format(par_label, positions))
-                    raise
+                    print("Look for a reference without text in {} @ pos {}".format(par_label, positions))
+                    raise e
 
                 if cite_dict not in citation_list:
                     citation_list.append(cite_dict)
@@ -371,7 +371,12 @@ def build_external_citations_layer(root):
         for cite in cites:
             target = cite.get('target').split(':')
             citation_type = target[0]
-            citation_target = target[1].split('-')
+            try:
+                citation_target = target[1].split('-')
+            except IndexError as e:
+                print("Error in external citations: '{}' is not formatted properly. ".format(target),
+                      "Look for an empty or malformed target in a reftype=\"external\".")
+                raise e
             text = cite.text
             positions = find_all_occurrences(par_text, text)
             cite_dict = OrderedDict()
@@ -943,6 +948,11 @@ def build_analysis(root):
 
         # Warn user about analysisSection elements without labels/attributes
         if label is None or document_number is None or publication_date is None:
+            if label is None and document_number is None and publication_date is None:
+                parent = analysis_section_elm.getparent()
+                print("Error with analysisSection: Parent is {}".format(analysis_section_elm.getparent()))
+                print("Element contents:\"\n{}\"".format(etree.tostring(analysis_section_elm)))
+                print("Check whether a comment is in the analysis.")
             err_info = {"label": label, "notice": document_number, "date": publication_date}
             raise ValueError("analysisSection element is missing attribute information:\n{}".format(err_info))
 
