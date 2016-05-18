@@ -483,7 +483,8 @@ def fix_analysis(file, always_save=False):
 @cli.command('json')
 @click.argument('regulation_files', nargs=-1, required=True)
 @click.option('--check-terms', is_flag=True)
-def json_command(regulation_files, from_notices=[], check_terms=False):
+@click.option('--skip_diffs', is_flag=True, help="Suppresses generation of diffs between versions.")
+def json_command(regulation_files, from_notices=[], check_terms=False, skip_diffs=False):
     """ Generate JSON from RegML files """
 
     # If the "file" is a directory, assume we want to operate on all the
@@ -497,17 +498,22 @@ def json_command(regulation_files, from_notices=[], check_terms=False):
     versions = {}
     reg_number = None
     for file in regulation_files:
+        print("Building JSON for {}".format(file))
         reg_number, notice, reg_xml_tree = generate_json(
             file, check_terms=check_terms)
         versions[notice] = reg_xml_tree
 
     # Generate diff JSON between each version
     # now build diffs - include "empty" diffs comparing a version to itself
-    for left_version, left_tree in versions.items():
-        for right_version, right_tree in versions.items():
-            diff = generate_diff(left_tree, right_tree)
-            write_layer(diff, reg_number, right_version, 'diff',
-                        diff_notice=left_version)
+    if not skip_diffs:
+        print(colored("\nBuilding inter-version diffs.", attrs=['bold']))
+        print(colored("WARNING: This may take an extended period of time.",
+              'red', attrs=['bold']))
+        for left_version, left_tree in versions.items():
+            for right_version, right_tree in versions.items():
+                diff = generate_diff(left_tree, right_tree)
+                write_layer(diff, reg_number, right_version, 'diff',
+                            diff_notice=left_version)
 
 
 # Given a regulation title and part number, prompts the user to select
@@ -515,12 +521,19 @@ def json_command(regulation_files, from_notices=[], check_terms=False):
 @cli.command('json-through')
 @click.argument('cfr_title')
 @click.argument('cfr_part')
+@click.option('--start', help="Performs JSON starting from document number" +
+              "(format: --from YYYY-#####). " +
+              "If no 'through' specified, goes til end.")
 @click.option('--through',
-              help="Skips prompt and performs JSON through given document number " +
-                   "(e.g. --through YYYY-#####")
+              help="Performs JSON through given document number " +
+                   "(e.g. --through YYYY-#####). " +
+                   "If no 'start' specified, starts from beginning.")
+@click.option('--skip_diffs', is_flag=True,
+              help="Suppresses generation of diffs between versions.")
 @click.option('--suppress_output', is_flag=True,
               help="Suppresses output except for errors")
-def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
+@click.pass_context
+def json_through(ctx, cfr_title, cfr_part, start=None, through=None, suppress_output=False, skip_diffs=False):
     # Get list of available regs
     regml_reg_files = find_all(cfr_part)
 
@@ -555,8 +568,16 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
 
     # If number is supplied, use that one
     if through is not None:
-        print("Command-line option selected document number '{}'".format(through))
+        if start is not None:
+            print("Command-line: selected documents '{}'-'{}'".format(start, through))
+
+        else:
+            print("Command-line: selected document number '{}'".format(through))
+
         answer = through
+    elif start is not None:
+        print("Command-line: selected start document number '{}'".format(start))
+        answer = possible_regs[-1] # JSON all documents
     else: 
         # Get user input to specify end version
         answer = None
@@ -579,14 +600,52 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
               colored("does not exist - no changes have been made.", attrs=['bold']))
         return
 
-    print(colored("\nApplying JSON through {0[0]}\n".format(
-                  regml_regs[last_ver_idx]),
-          attrs=['bold']))
+    # Support for telling user what we're doing on whether or not diffs will be created.
+    if skip_diffs:
+        skip_text = ", skipping creation of diffs."
+    else:
+        skip_text = ", including diffs."
 
-    # Perform the json application process
-    # Unlike apply-through, since json outputs its own command line output, here we
-    # reuse the existing json structure
-    json_command(regulation_files[:last_ver_idx+1])
+    if start is not None:
+        if start in possible_regs:
+            first_ver_idx = possible_regs.index(start)
+        else:
+            print(colored("ERROR: Document chosen for start", attrs=['bold']),
+                  colored("{}".format(start), 'red', attrs=['bold']),
+                  colored("does not exist - no changes have been made.", attrs=['bold']))
+            return
+
+        # Check that first_ver_idx < last_ver_idx
+        if first_ver_idx > last_ver_idx:
+            print(colored("ERROR: Start document", attrs=['bold']),
+                  colored("{}".format(regml_regs[first_ver_idx][0]), 'red', attrs=['bold']),
+                  colored("is not before 'through' notice"),
+                  colored("{}".format(regml_regs[last_ver_idx][0]), 'red', attrs=['bold']))
+            return
+
+        print(colored("\nApplying JSON from {1[0]} through {0[0]}{2}\n".format(
+                      regml_regs[last_ver_idx], regml_regs[first_ver_idx], skip_text),
+              attrs=['bold']))
+
+        # Perform the json application process
+        # Unlike apply-through, since json outputs its own command line output, here we
+        # reuse the existing json structure
+        ctx.invoke(json_command,
+                   regulation_files=regulation_files[first_ver_idx:last_ver_idx+1],
+                   skip_diffs=skip_diffs)
+
+    else:
+        print(colored("\nApplying JSON through {0[0]}{1}\n".format(
+                      regml_regs[last_ver_idx], skip_text),
+              attrs=['bold']))
+
+        # Perform the json application process
+        # Unlike apply-through, since json outputs its own command line output, here we
+        # reuse the existing json structure
+        # json_command(regulation_files[:last_ver_idx+1], skip_diffs=skip_diffs)
+        ctx.invoke(json_command,
+                   regulation_files=regulation_files[last_ver_idx+1],
+                   skip_diffs=skip_diffs)
 
 
 # Given a notice, apply it to a previous RegML regulation verson to
@@ -641,8 +700,8 @@ def apply_notice(regulation_file, notice_file):
 @click.argument('cfr_part')
 @click.option('--through',
               help="Skips prompt and applies notices through given notice number " +
-                   "(e.g. --through YYYY-#####")
-def apply_through(cfr_title, cfr_part, through=None):
+                   "(e.g. --through YYYY-#####)")
+def apply_through(cfr_title, cfr_part, start=None, through=None):
     # Get list of notices that apply to this reg
     # Look for locally available notices
     regml_notice_files = find_all(cfr_part, is_notice=True)
@@ -770,6 +829,9 @@ def apply_through(cfr_title, cfr_part, through=None):
         parser = etree.XMLParser(huge_tree=True)
 
         notice_xml = etree.fromstring(notice_string, parser)
+
+        # TODO: Validate labels for json-compliance?
+        # Example: JSON fails on upload only for interpParagraphs without "Interp" in them
 
         # Validate the files
         regulation_validator = get_validator(prev_tree)
