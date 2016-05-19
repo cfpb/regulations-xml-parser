@@ -702,7 +702,16 @@ def apply_notice(regulation_file, notice_file):
 @click.option('--through',
               help="Skips prompt and applies notices through given notice number " +
                    "(e.g. --through YYYY-#####)")
-def apply_through(cfr_title, cfr_part, start=None, through=None):
+@click.option('--fix-notices',
+              help="If set to True, use the validator to fix notices as you apply them.")
+@click.option('--skip-fix-notices', multiple=True,
+              help="Document numbers of notices to skip. Specify this multiple times because"
+                   "nargs='*' doesn't work in click.")
+@click.option('--skip-fix-notices-through',
+              help='Skip fixing notices through the specified document number.')
+def apply_through(cfr_title, cfr_part, start=None, through=None,
+                  fix_notices=False, skip_fix_notices=[],
+                  skip_fix_notices_through=None):
     # Get list of notices that apply to this reg
     # Look for locally available notices
     regml_notice_files = find_all(cfr_part, is_notice=True)
@@ -836,6 +845,7 @@ def apply_through(cfr_title, cfr_part, start=None, through=None):
 
         # Validate the files
         regulation_validator = get_validator(prev_tree)
+        terms_layer = build_terms_layer(prev_tree)
 
         try:
             notice_validator = get_validator(notice_xml, raise_instead_of_exiting=True)
@@ -850,6 +860,31 @@ def apply_through(cfr_title, cfr_part, start=None, through=None):
                                                                                doc_number),
                           attrs=['bold']))
             sys.exit(0)
+
+        # validate the notice XML with the layers derived from the
+        # tree of the previous version
+        reload_notice = False
+        skip_notices = list(skip_fix_notices)
+
+        if skip_fix_notices_through is not None:
+            if skip_fix_notices_through in possible_notices:
+                last_fix_idx = possible_notices.index(skip_fix_notices_through)
+                skip_notices.extend(possible_notices[:last_fix_idx + 1])
+
+        if fix_notices and doc_number not in skip_notices:
+            print('Fixing notice number {}:'.format(doc_number))
+            notice_validator.validate_terms(notice_xml, terms_layer)
+            notice_validator.validate_term_references(notice_xml, terms_layer, notice_file)
+            notice_validator.fix_omitted_cites(notice_xml, notice_file)
+            reload_notice = True
+
+        # at this point the file has possibly changed, so we should really reload it
+        if reload_notice:
+            with open(notice_file, 'r') as f:
+                notice_string = f.read()
+            parser = etree.XMLParser(huge_tree=True)
+
+            notice_xml = etree.fromstring(notice_string, parser)
 
         # Process the notice changeset
         try:
