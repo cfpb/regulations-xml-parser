@@ -645,7 +645,7 @@ def json_through(ctx, cfr_title, cfr_part, start=None, through=None, suppress_ou
         # reuse the existing json structure
         # json_command(regulation_files[:last_ver_idx+1], skip_diffs=skip_diffs)
         ctx.invoke(json_command,
-                   regulation_files=regulation_files[last_ver_idx+1],
+                   regulation_files=regulation_files[:last_ver_idx+1],
                    skip_diffs=skip_diffs)
 
 
