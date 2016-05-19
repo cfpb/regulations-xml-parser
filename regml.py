@@ -509,6 +509,7 @@ def json_command(regulation_files, from_notices=[], check_terms=False, skip_diff
         print(colored("\nBuilding inter-version diffs.", attrs=['bold']))
         print(colored("WARNING: This may take an extended period of time.",
               'red', attrs=['bold']))
+        print("To skip diff creation, use the --skip_diffs command line argument.\n")
         for left_version, left_tree in versions.items():
             for right_version, right_tree in versions.items():
                 diff = generate_diff(left_tree, right_tree)
