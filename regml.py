@@ -86,7 +86,7 @@ def find_file(file, is_notice=False, ecfr=False):
 
 
 def find_all(part, is_notice=False):
-    """ Find all regulation RegML files for the given part. 
+    """ Find all regulation RegML files for the given part.
 
         If is_notice is True, all notice RegML files will be returned. """
     regml_base = base_path(is_notice=is_notice)
@@ -207,11 +207,11 @@ def cli():
 # actions.
 @cli.command()
 @click.argument('file')
-@click.option('--no-terms', is_flag=True, 
+@click.option('--no-terms', is_flag=True,
     help="don't try to validate terms")
-@click.option('--no-citations', is_flag=True, 
+@click.option('--no-citations', is_flag=True,
     help="don't try to validate citations")
-@click.option('--no-keyterms', is_flag=True, 
+@click.option('--no-keyterms', is_flag=True,
     help="don't try to validate keyterms")
 def validate(file, no_terms=False, no_citations=False, no_keyterms=False):
     """ Validate a RegML file """
@@ -293,23 +293,20 @@ def check_terms(file, label=None, term=None, with_notice=None):
 @cli.command()
 @click.argument('file')
 @click.option('--label')
-def check_interp_targets(file, label=None):
+@click.option('--is-notice', is_flag=True)
+def check_interp_targets(file, label=None, is_notice=False):
     """ Check the interpretations targets in a RegML file """
 
-    file = find_file(file)
+    file = find_file(file, is_notice=is_notice)
     with open(file, 'r') as f:
         reg_xml = f.read()
     parser = etree.XMLParser(huge_tree=True)
     xml_tree = etree.fromstring(reg_xml, parser)
 
-    if xml_tree.tag == '{eregs}notice':
-        print("Cannot check terms in notice files")
-        sys.exit(1)
-
     # Validate the file relative to schema
     validator = get_validator(xml_tree)
     validator.validate_interp_targets(xml_tree, file, label=label)
-    
+
 
 @cli.command('check-changes')
 @click.argument('file')
@@ -330,7 +327,7 @@ def check_changes(file, label=None):
     validator = get_validator(xml_tree)
     validator.remove_duplicate_changes(xml_tree, file, label=label)
     validator.remove_empty_refs(xml_tree, file)
-    
+
 
 @cli.command('check-keyterms')
 @click.argument('file')
@@ -389,8 +386,8 @@ def migrate_analysis(cfr_title, cfr_part):
     while answer not in ['y', 'n']:
         answer = raw_input('Migrate all analysis? y/n: ')
     if answer != 'y':
-        return 
-    
+        return
+
     # Migrate regulation files
     regml_reg_files = find_all(cfr_part)
     for reg_file in regml_reg_files:
@@ -419,7 +416,7 @@ def migrate_analysis(cfr_title, cfr_part):
         validator.validate_reg(xml_tree)
 
 
-# 
+#
 @cli.command('fix-analysis')
 @click.argument('file')
 @click.option('--always-save', is_flag=True)
@@ -431,7 +428,7 @@ def fix_analysis(file, always_save=False):
         reg_xml = f.read()
     parser = etree.XMLParser(huge_tree=True)
     xml_tree = etree.fromstring(reg_xml, parser)
-    
+
     if xml_tree.tag != '{eregs}notice':
         print("Can only check changes in notice files")
         sys.exit(1)
@@ -448,7 +445,7 @@ def fix_analysis(file, always_save=False):
     # Validate the file relative to schema
     print("Validating updated notice xml")
     validator = get_validator(new_xml_tree)
-    print("Validation complete!")  
+    print("Validation complete!")
 
     # Write the new xml tree
     new_xml_string = etree.tostring(new_xml_tree,
@@ -462,7 +459,7 @@ def fix_analysis(file, always_save=False):
     else:
         answer = None
 
-    while answer not in ["", "y", "n"]: 
+    while answer not in ["", "y", "n"]:
         answer = raw_input('Save updated analysis to notice file? y/n [y] ')
 
     if answer in ["", "y"]:
@@ -472,7 +469,7 @@ def fix_analysis(file, always_save=False):
             f.write(new_xml_string)
     else:
         # Cancel save
-        print("Canceling analysis fixes - changes have not been saved.")    
+        print("Canceling analysis fixes - changes have not been saved.")
 
 
 # Validate the given regulation file (or files) and generate the JSON
@@ -554,7 +551,7 @@ def json_through(ctx, cfr_title, cfr_part, start=None, through=None, suppress_ou
 
     regml_regs.sort(key=lambda n: n[1])
     regulation_files = [r[2] for r in regml_regs]
-    
+
     # Generate prompt for user
     print(colored("\nAvailable RegML documents for reg {}:".format(cfr_part),
           attrs=['bold']))
@@ -579,10 +576,10 @@ def json_through(ctx, cfr_title, cfr_part, start=None, through=None, suppress_ou
     elif start is not None:
         print("Command-line: selected start document number '{}'".format(start))
         answer = possible_regs[-1] # JSON all documents
-    else: 
+    else:
         # Get user input to specify end version
         answer = None
-        while answer not in [""] + possible_indices + possible_regs: 
+        while answer not in [""] + possible_indices + possible_regs:
             answer = raw_input('Press enter to apply all or enter document number: [all] ')
         print("Answer: '{}'".format(answer))
 
@@ -663,7 +660,7 @@ def apply_notice(regulation_file, notice_file):
         left_reg_xml = f.read()
     parser = etree.XMLParser(huge_tree=True)
     left_xml_tree = etree.fromstring(left_reg_xml, parser)
-        
+
     # Read the notice file
     notice_file = find_file(notice_file, is_notice=True)
     with open(notice_file, 'r') as f:
@@ -748,7 +745,10 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
         regml_notices.append((doc_number, effective_date, applies_to, file_name))
 
     regml_notices.sort(key=lambda n: n[1])
-    
+
+    for nt in regml_notices:
+        print(nt)
+
     regs = [nn[2] for nn in regml_notices]
     regs.sort()
 
@@ -781,10 +781,10 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
     if through is not None:
         print("Command-line option selected notice '{}'".format(through))
         answer = through
-    else: 
+    else:
         # Get user input to specify end version
         answer = None
-        while answer not in [""] + possible_indices + possible_notices: 
+        while answer not in [""] + possible_indices + possible_notices:
             answer = raw_input('Press enter to apply all or enter notice number: [all] ')
 
     if len(answer) == 0:
@@ -933,7 +933,7 @@ def notice_changes(notice_file):
     doc_number = notice_xml.find(
             './{eregs}preamble/{eregs}documentNumber').text
 
-    print(colored("{} makes the following changes:".format(doc_number), 
+    print(colored("{} makes the following changes:".format(doc_number),
                   attrs=['bold']))
 
     changes = notice_xml.findall('./{eregs}changeset/{eregs}change')
@@ -961,7 +961,7 @@ def apply_notices(cfr_part, version, notices):
         left_reg_xml = f.read()
     parser = etree.XMLParser(huge_tree=True)
     left_xml_tree = etree.fromstring(left_reg_xml, parser)
-    
+
     prev_notice = version
     prev_tree = left_xml_tree
     for notice in notices:
@@ -971,7 +971,7 @@ def apply_notices(cfr_part, version, notices):
             notice_string = f.read()
         parser = etree.XMLParser(huge_tree=True)
         notice_xml = etree.fromstring(notice_string, parser)
-        
+
         # Process the notice changeset
         new_xml_tree = process_changes(prev_tree, notice_xml)
 
@@ -1040,7 +1040,7 @@ def versions(title, part, from_fr=False, from_regml=True):
         if previous_notice[0] != notice[2]:
             print(colored("\t\tWarning: {} does not apply to "
                           "previous notice {}".format(
-                                notice[0], 
+                                notice[0],
                                 previous_notice[0]), 'yellow'))
 
 
@@ -1122,7 +1122,7 @@ def ecfr_all(title, file, act_title, act_section,
 @click.option('--act-title', default=0, type=int)
 @click.option('--with-version', is_flag=True,
               help="output the full reg tree version")
-@click.option('--without-notice', is_flag=True, 
+@click.option('--without-notice', is_flag=True,
               help="output the notice changeset")
 def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
         act_section, with_version=False, without_notice=False):
@@ -1134,7 +1134,7 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
     parser = etree.XMLParser(huge_tree=True)
     xml_tree = etree.fromstring(reg_xml, parser)
     doc_number = xml_tree.find('.//{eregs}documentNumber').text
-            
+
     # Validate the file relative to schema
     validator = get_validator(xml_tree)
 
@@ -1148,7 +1148,8 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
     # Fetch the notices from the FR API and find the notice we're
     # looking for
     builder.fetch_notices_json()
-    notice_json = next((n for n in builder.notices_json 
+    print([n['document_number'] for n in builder.notices_json])
+    notice_json = next((n for n in builder.notices_json
                         if n['document_number'] == notice))
 
     # Build the notice
@@ -1179,7 +1180,7 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
                              reg_tree=reg_tree,
                              layers=layers,
                              last_version=last_version)
-        
+
     # Write the regulation file for the new notice
     if with_version:
         builder.write_regulation(new_tree, layers=layers)
@@ -1190,7 +1191,7 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
 @click.argument('regml_file')
 def ecfr_analysis(ecfr_file, regml_file):
     """ Extract analysis from eCFR XML using using XSL
-        
+
         This is a blunt-force attempt to extract SxS analysis from an
         eCFR XML file and force it into RegML using XSL
         (utils/ecfr_sxs_to_regml.xsl).
@@ -1204,7 +1205,7 @@ def ecfr_analysis(ecfr_file, regml_file):
     parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
     ecfr_tree = etree.fromstring(ecfr_xml, parser)
 
-    # Get the regml 
+    # Get the regml
     with open(regml_file, 'r') as f:
         reg_xml = f.read()
     parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
@@ -1225,13 +1226,13 @@ def ecfr_analysis(ecfr_file, regml_file):
     # "Section-by-Section Analysis" in the text.
     hd1_elms = ecfr_tree.findall('.//HD[@SOURCE="HD1"]')
     try:
-        hd1_sxs = next((e for e in hd1_elms 
+        hd1_sxs = next((e for e in hd1_elms
                         if 'Section-by-Section Analysis' in e.text))
     except StopIteration:
         print(colored('No section-by-section analysis found', 'red'))
         return
     print(colored('Found section-by-section header', 'green'))
-    
+
     hd1_next = hd1_elms[hd1_elms.index(hd1_sxs)+1]
 
     # The SxS is everything between those two HD1s
@@ -1264,7 +1265,7 @@ def ecfr_analysis(ecfr_file, regml_file):
         existing_analysis.append(etree.Comment("Added analysis from eCFR"))
         for section_elm in result_tree:
             existing_analysis.append(section_elm)
-        
+
     else:
         print(colored('Adding analysis to RegML', 'green'))
         regml_tree.append(result_tree)
@@ -1278,7 +1279,7 @@ def ecfr_analysis(ecfr_file, regml_file):
         f.write(regml_string)
 
     # Remind the user that hand-editing to add the appropriate
-    # attributes and structure is *required* 
+    # attributes and structure is *required*
     print(colored('Saved analysis in {}'.format(regml_file),
                   'green', attrs=['bold']))
 
@@ -1288,7 +1289,7 @@ def ecfr_analysis(ecfr_file, regml_file):
                   'following attributes added:', 'yellow', attrs=['bold']))
     print(colored('    target="THE TARGET" notice="{}" date="{}"'.format(
                   doc_number, date), attrs=['bold']))
-    
+
 
 if __name__ == "__main__":
     cli()
