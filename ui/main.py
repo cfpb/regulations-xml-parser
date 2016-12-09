@@ -278,7 +278,7 @@ class EregsApp(tk.Frame):
 
         self.preview_text.tag_configure('section_header', font='helvetica 14 bold')
         self.preview_text.tag_configure('ref', background='green')
-        self.preview_text.tag_configure('def', background='blue')
+        self.preview_text.tag_configure('def', background='orange')
 
     def add_element_to_tree(self, element, parent):
 

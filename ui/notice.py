@@ -61,7 +61,7 @@ class Notice:
 
     def replace_node(self, label, new_element):
 
-        current_element = self.tree.find('.//*[@label="{}"]'.format(label))
+        current_element = self.tree.find('.//{}[@label="{}"]'.format(new_element.tag, label))
         current_element_parent = current_element.find('..')
         current_element_parent.replace(current_element, new_element)
         self.modified = True
