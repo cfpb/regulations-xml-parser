@@ -62,6 +62,11 @@ class Notice:
     def replace_node(self, label, new_element):
 
         current_element = self.tree.find('.//{}[@label="{}"]'.format(new_element.tag, label))
+        if not current_element:
+            current_element = self.tree.find('.//{{eregs}}{}[@label="{}"]'.format(new_element.tag, label))
+        if not current_element:
+            raise ValueError('Element {} not found!'.format(new_element.tag))
+
         current_element_parent = current_element.find('..')
         current_element_parent.replace(current_element, new_element)
         self.modified = True
