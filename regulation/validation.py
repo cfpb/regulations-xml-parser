@@ -493,7 +493,7 @@ class EregsValidator:
         :return: None
         """
         paragraphs = tree.findall('.//{eregs}paragraph') + tree.findall('.//{eregs}interpParagraph')
-        pattern = re.compile('([0-9]{4}\.([0-9]+)(\(([a-zA-Z]|[0-9])+\))+)')
+        pattern = re.compile('([0-9]{4}\.([0-9]+)(\(([a-zA-Z]+|[0-9])+\))+)')
         ignore = set()
         always = set()
         problem_flag = False
@@ -514,7 +514,7 @@ class EregsValidator:
             offsets_and_values = []
 
             for match in matches:
-                locations = set(find_all_occurrences(par_text, match))
+                locations = set(find_all_occurrences(par_text, match, boundary=False))
                 input_state = None
                 for loc in locations:
                     if not enclosed_in_tag(par_text, 'ref', loc):
