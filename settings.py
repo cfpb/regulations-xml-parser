@@ -2,8 +2,8 @@ import os
 
 # XSD_FILE provides the local path or URL to the RegML schema file.
 # The schema is available at http://cfpb.github.io/regulations-schema/src/eregs.xsd
-# 
-# A local copy should generally be a clone or fork of 
+#
+# A local copy should generally be a clone or fork of
 # https://github.com/cfpb/regulations-schema
 XSD_FILE = 'http://cfpb.github.io/regulations-schema/src/eregs.xsd'
 
@@ -11,20 +11,20 @@ XSD_FILE = 'http://cfpb.github.io/regulations-schema/src/eregs.xsd'
 # intended to parse. Files in this location are expected to be stored
 # under regulation/[PART NUMBER] and notice/[PART NUMBER] for regulation
 # and notice files respectively.
-# 
+#
 # This should generally be a clone or fork of
 # https://github.com/cfpb/regulations-xml.
 XML_ROOT = '../regulations-xml'
 
 # JSON_ROOT is the path to the JSON output of this parser that is
-# expected by regulations-core. 
-# 
-# This should generally be a clone or fork of 
+# expected by regulations-core.
+#
+# This should generally be a clone or fork of
 # https://github.com/cfpb/regulations-stub
 JSON_ROOT = '../regulations-xml-json'
 
 # SPECIAL_SINGULAR_NOURS provides overrides for singular nouns that the
-# inflect module has problems with. 
+# inflect module has problems with.
 SPECIAL_SINGULAR_NOUNS = [
     'bonus',
     'escrow account analysis',
@@ -32,20 +32,20 @@ SPECIAL_SINGULAR_NOUNS = [
 ]
 
 CUSTOM_NOTICE_ORDER = {
-    '1005': ['2013-06861', '2012-1728', '2012-16245', '2012-19702', '2013-10604', '2013-19503', '2014-20681', '2016-24506']
+    # '1005': ['2013-06861', '2012-1728', '2012-16245', '2012-19702', '2013-10604', '2013-19503', '2014-20681', '2016-24506']
 }
 
 
 #######################################################################
 ## eCFR Parser Settings
 # This parser provides a convenience wrapper to generate RegML files
-# from eCFR XML sources of regulations using 
+# from eCFR XML sources of regulations using
 # https://github.com/cfpb/regulations-parser.
 # These are settings for the eCFR parser.
 
 # Try to import configuration from a Python package called 'regconfig'. If
 # it doesn't exist, just go with our default settings.
-# For CFPB regulations, the source of this package is 
+# For CFPB regulations, the source of this package is
 # https://github.com/cfpb/regulations-configs
 try:
     from regconfig import *
