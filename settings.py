@@ -21,7 +21,7 @@ XML_ROOT = '../regulations-xml'
 # 
 # This should generally be a clone or fork of 
 # https://github.com/cfpb/regulations-stub
-JSON_ROOT = '../regulations-stub/stub/'
+JSON_ROOT = '../regulations-xml-json'
 
 # SPECIAL_SINGULAR_NOURS provides overrides for singular nouns that the
 # inflect module has problems with. 
@@ -30,6 +30,10 @@ SPECIAL_SINGULAR_NOUNS = [
     'escrow account analysis',
     'surplus',
 ]
+
+CUSTOM_NOTICE_ORDER = {
+    '1005': ['2013-06861', '2012-1728', '2012-16245', '2012-19702', '2013-10604', '2013-19503', '2014-20681', '2016-24506']
+}
 
 
 #######################################################################

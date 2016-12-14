@@ -316,7 +316,7 @@ def xml_node_equality(node1, node2):
         return False
 
 
-def find_all_occurrences(source, target):
+def find_all_occurrences(source, target, boundary=True):
     """
     Find all occurrences of `target` in `source`
 
@@ -329,7 +329,10 @@ def find_all_occurrences(source, target):
     :rtype: :class:`list` of :class:`int`
     """
     positions = []
-    results = re.finditer(r"\b" + re.escape(target) + r"\b", source)
+    if boundary:
+        results = re.finditer(r"\b" + re.escape(target) + r"\b", source)
+    else:
+        results = re.finditer(r"\b" + re.escape(target), source)
     for match in results:
         positions.append(match.start())
     return positions

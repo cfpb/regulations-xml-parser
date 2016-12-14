@@ -205,7 +205,7 @@ def cli():
 
 # Perform validation on the given RegML file without any additional
 # actions.
-@cli.command()
+@cli.command('validate')
 @click.argument('file')
 @click.option('--no-terms', is_flag=True, 
     help="don't try to validate terms")
@@ -448,7 +448,7 @@ def fix_analysis(file, always_save=False):
     # Validate the file relative to schema
     print("Validating updated notice xml")
     validator = get_validator(new_xml_tree)
-    print("Validation complete!")  
+    print("Validation complete!")
 
     # Write the new xml tree
     new_xml_string = etree.tostring(new_xml_tree,
@@ -747,7 +747,11 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
 
         regml_notices.append((doc_number, effective_date, applies_to, file_name))
 
-    regml_notices.sort(key=lambda n: n[1])
+    if cfr_part in settings.CUSTOM_NOTICE_ORDER:
+        order = settings.CUSTOM_NOTICE_ORDER[cfr_part]
+        regml_notices.sort(key=lambda n: order.index(n[0]))
+    else:
+        regml_notices.sort(key=lambda n: n[1])
     
     regs = [nn[2] for nn in regml_notices]
     regs.sort()
@@ -828,9 +832,10 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
     for notice in regml_notices[:last_ver_idx+1]:
         doc_number, effective_date, prev_notice, file_name = notice
 
-        print("[{}] Applying notice {} to version {}".format(kk,
-                                                             doc_number,
-                                                             prev_notice))
+        print("[{}] Applying notice {} from {} to version {}".format(kk,
+                                                                     doc_number,
+                                                                     file_name,
+                                                                     prev_notice))
 
         # Open the notice file
         notice_file = find_file(file_name, is_notice=True)
@@ -875,6 +880,8 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
             print('Fixing notice number {}:'.format(doc_number))
             notice_validator.validate_terms(notice_xml, terms_layer)
             notice_validator.validate_term_references(notice_xml, terms_layer, notice_file)
+            notice_terms_layer = build_terms_layer(notice_xml)
+            notice_validator.validate_term_references(notice_xml, notice_terms_layer, notice_file)
             notice_validator.fix_omitted_cites(notice_xml, notice_file)
             reload_notice = True
 
@@ -1289,6 +1296,18 @@ def ecfr_analysis(ecfr_file, regml_file):
     print(colored('    target="THE TARGET" notice="{}" date="{}"'.format(
                   doc_number, date), attrs=['bold']))
     
+@cli.command('gui')
+def run_gui():
+
+    import Tkinter as tk
+    from ui.main import EregsApp
+
+    root = tk.Tk()
+    root.title('Eregs')
+    root.geometry("1280x1024+300+300")
+    app = EregsApp(root)
+    root.mainloop()
+
 
 if __name__ == "__main__":
     cli()
