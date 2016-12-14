@@ -21,7 +21,7 @@ XML_ROOT = '../regulations-xml'
 #
 # This should generally be a clone or fork of
 # https://github.com/cfpb/regulations-stub
-JSON_ROOT = '../regulations-xml-json'
+JSON_ROOT = '../regulations-stub'
 
 # SPECIAL_SINGULAR_NOURS provides overrides for singular nouns that the
 # inflect module has problems with.
