@@ -6,6 +6,7 @@ import tkMessageBox
 import tkSimpleDialog
 import ttk
 import inflect
+import cPickle
 
 from lxml import etree
 from notice import Notice
@@ -55,16 +56,18 @@ class EregsApp(tk.Frame):
         self.grid(sticky=tk.N+tk.S+tk.E+tk.W)
 
         self.notices = []
+        self.notices_files = []
         self.trees = {}
         self.current_notice = None
         self.current_node = None
         self.root_notice = None
+        self.root_notice_file = None
         self.terms = []
         self.always_fix = set()
         self.never_fix = set()
         self.inf = inflect.engine()
         self.initialize_gui()
-
+        self.work_state_filename = None
 
     def initialize_gui(self):
 
@@ -75,6 +78,7 @@ class EregsApp(tk.Frame):
         menubar.add_cascade(menu=menu_action, label='Action')
         menu_file.add_command(label='Open root notice', command=self.open_root_notice)
         menu_file.add_command(label='Open additional notices', command=self.open_additional_notice)
+        menu_file.add_command(label='Load work state', command=self.load_work_state)
         menu_file.add_separator()
         menu_file.add_command(label='Save modified notices', command=self.save)
         menu_file.add_separator()
@@ -154,6 +158,7 @@ class EregsApp(tk.Frame):
                 self.current_notice = notice.document_number
                 self.notices.append(notice.document_number)
                 self.root_notice = notice
+                self.root_notice_file = notice_file
                 self.add_element_to_tree(notice.tree, None)
                 self.update_notices_list()
                 self.trees[notice.document_number] = self.root_notice
@@ -167,6 +172,7 @@ class EregsApp(tk.Frame):
                     "are very large."
                 result = tkMessageBox.askokcancel('Load all notices?', message)
                 if result:
+                    self.notices_files = all_notice_files
                     all_notices = [Notice(notice_file) for notice_file in all_notice_files]
                     all_notices.sort(key=lambda n: n.effective_date)
                     for notice in all_notices:
@@ -190,7 +196,41 @@ class EregsApp(tk.Frame):
 
             if replace_notice:
                 self.notices.append(notice.document_number)
+                self.notices_files.append(notice_file)
                 self.trees[notice.document_number] = notice
+                self.update_notices_list()
+                self.populate_definitions()
+
+    def load_work_state(self, event=None):
+
+        message = 'Any unsaved work that you have open will be lost. Continue?'
+        load_work = tkMessageBox.askyesno('Load work state?', message)
+
+        if load_work:
+            work_state_file = tkFileDialog.askopenfilename()
+            if work_state_file:
+                self.work_state_filename = work_state_file
+                work_state = cPickle.load(open(self.work_state_filename, 'r'))
+                self.root_notice_file = work_state['root_notice']
+                self.notices_files = work_state['open_notices']
+                self.terms = work_state['definitions']
+                self.always_fix = work_state['always_fix']
+                self.never_fix = work_state['never_fix']
+
+                self.root_notice = Notice(self.root_notice_file)
+                self.current_notice = self.root_notice.document_number
+                self.add_element_to_tree(self.root_notice.tree, None)
+                self.trees[self.root_notice.document_number] = self.root_notice
+                self.populate_definitions()
+                self.notices.append(self.root_notice.document_number)
+
+                notices = [Notice(notice_file) for notice_file in self.notices_files]
+                notices.sort(key=lambda n: n.effective_date)
+
+                for notice in notices:
+                    self.notices.append(notice.document_number)
+                    self.trees[notice.document_number] = notice
+
                 self.update_notices_list()
                 self.populate_definitions()
 
@@ -198,7 +238,23 @@ class EregsApp(tk.Frame):
 
         for notice in self.trees.itervalues():
             if notice.modified:
+                print 'Saving {}'.format(notice.document_number)
                 notice.save()
+
+        self.save_work_state()
+
+    def save_work_state(self):
+
+        work_state = {'root_notice': self.root_notice_file,
+                      'open_notices': self.notices_files,
+                      'definitions': self.gather_defined_terms(),
+                      'always_fix': self.always_fix,
+                      'never_fix': self.never_fix}
+
+        if self.work_state_filename is None or not os.path.exists(self.work_state_filename):
+            self.work_state_filename = tkFileDialog.asksaveasfilename()
+
+        cPickle.dump(work_state, open(self.work_state_filename, 'w'))
 
     def select_notice(self, item):
 
@@ -230,13 +286,12 @@ class EregsApp(tk.Frame):
                 element = notice.tree.find('.//*[@label="{}"]'.format(label))
             self.current_node = element
 
-            print element
-
             if element is not None and element.tag.replace('{eregs}', '') in \
                     ['paragraph', 'interpParagraph', 'section',
                      'interpSection', 'appendixSection', 'changeset', 'change']:
                 self.set_xml_text(etree.tostring(element, pretty_print=True).replace(xmlns_prop, ''))
                 self.set_preview_text(element)
+                self.scan_current_node_for_terms()
 
     def set_xml_text(self, text):
 
@@ -300,8 +355,12 @@ class EregsApp(tk.Frame):
 
         self.definitions.delete(0, tk.END)
         terms = self.gather_defined_terms()
-        for defn in terms:
+        for i, defn in enumerate(terms):
             self.definitions.insert(tk.END, '{}: {} ({})'.format(defn[0], defn[1], defn[2]))
+            if (defn[0], defn[1]) in self.always_fix:
+                self.definitions.itemconfigure(i, {'bg': 'green'})
+            elif (defn[0], defn[1]) in self.never_fix:
+                self.definitions.itemconfigure(i, {'bg': 'red'})
 
     def gather_defined_terms(self):
 
@@ -316,7 +375,6 @@ class EregsApp(tk.Frame):
 
         node_text = self.xml_text.get('1.0', tk.END)
         label = self.current_node.get('label')
-        print label
         self.terms = []
         self.unmarked_defs.delete(0, tk.END)
 
@@ -336,7 +394,8 @@ class EregsApp(tk.Frame):
 
                 if not enclosed_in_tag(node_text, 'ref', start) and \
                         not enclosed_in_tag(node_text, 'def', start) and \
-                        not enclosed_in_tag(node_text, 'title', start):
+                        not enclosed_in_tag(node_text, 'title', start) and \
+                        not enclosed_in_tag(node_text, 'subject', start):
                     term_data = (term_to_use, start, end, start_index, end_index, def_label)
                     if term_data not in self.terms:
                         self.terms.append(term_data)
@@ -358,7 +417,8 @@ class EregsApp(tk.Frame):
 
             selection = self.definitions.curselection()
             for item in selection:
-                term = self.definitions.get(item).split(':')[0]
+                term_split = self.definitions.get(item).split(':')
+                term = (term_split[0], term_split[1].split()[0].strip())
                 if term in self.always_fix:
                     self.definitions.itemconfigure(item, {'bg': 'white'})
                     try:
@@ -377,7 +437,8 @@ class EregsApp(tk.Frame):
 
             selection = self.definitions.curselection()
             for item in selection:
-                term = self.definitions.get(item).split(':')[0]
+                term_split = self.definitions.get(item).split(':')
+                term = (term_split[0], term_split[1].split()[0].strip())
                 if term in self.never_fix:
                     self.definitions.itemconfigure(selection, {'bg': 'white'})
                     try:
@@ -403,7 +464,8 @@ class EregsApp(tk.Frame):
         selections = self.unmarked_defs.curselection()
         for index in range(self.unmarked_defs.size()):
             term = self.terms[index]
-            if (index in selections or term[0] in self.always_fix) and not term[0] in self.never_fix:
+            if (index in selections or (term[0], term[5]) in self.always_fix) and \
+                    not (term[0], term[5]) in self.never_fix:
                 ref = '<ref target="{}" reftype="term">{}</ref>'.format(term[5], term[0])
                 offsets_and_values.append((ref, [term[1], term[2]]))
 
@@ -431,6 +493,7 @@ class EregsApp(tk.Frame):
             else:
                 self.xml_text.tag_remove('undefined_highlighted_term', start_index, end_index)
         self.xml_text.tag_configure('undefined_highlighted_term', background='red')
+        self.xml_text.tag_raise('undefined_highlighted_term')
 
     def focus_on_term(self, event):
 
