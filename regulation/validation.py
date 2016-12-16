@@ -181,7 +181,7 @@ class EregsValidator:
 
                 # Next we check for possible fragments of the keyterm
                 # that could be left in.
-                elif any(w for w in keyterm_text.split() 
+                elif any(w for w in keyterm_text.split()
                         if content.text.startswith(w)):
                     msg = 'Possible keyterm fragment: ' \
                           'in {} a fragment of keyterm "{}" appears in ' \
@@ -316,7 +316,7 @@ class EregsValidator:
                 print(colored("{} is not a defined term".format(term),
                     'red'))
                 return
-            terms = set([(term, reference), 
+            terms = set([(term, reference),
                          (term[0].upper() + term[1:], reference)])
 
         # Pick out our working section of the tree. If no label was
@@ -374,7 +374,7 @@ class EregsValidator:
                                     offsets_and_values.append((ref, [term_loc, term_loc + len(term_to_use)]))
                                     if input_state == 'a':
                                         always.add(term[0])
-                                    
+
                                 elif input_state == 'i':
                                     ignore.add(term[0])
 
@@ -668,32 +668,18 @@ class EregsValidator:
         :type label: :class:`str`
         :return: None
         """
-            
+
         problem_flag = False
 
-        # Pick out our working section of the tree. If no label was
-        # given, we're working on the interpretations node in the tree.
-        if label is not None:
-            working_section = tree.find(
-                    './/*[@label="{}"]'.format(label))
-            if working_section.tag not in (
-                    '{eregs}interpretations',
-                    '{eregs}interpSection', 
-                    '{eregs}interpParagraph'):
-                print("{} is not a part of an interpretation".format(
-                    label))
-                return 
-        else:
-            working_section = tree.find('.//{eregs}interpretations')
-
         # Find all paragraphs with a target attribute
-        paragraphs = working_section.findall(
+        paragraphs = tree.findall(
                 './/{eregs}interpParagraph[@target]')
+
 
         for paragraph in paragraphs:
             target = paragraph.get('target')
             label = paragraph.get('label')
-            
+
             # If the label doesn't end with '-Interp' it shouldn't have
             # a target.
             if not label.endswith('-Interp') and target is not None:
@@ -718,7 +704,7 @@ class EregsValidator:
                     target, label), 'green'))
 
         if problem_flag:
-            print(colored('The tree has been altered! Do you want to' 
+            print(colored('The tree has been altered! Do you want to'
                 'write the result to disk?', 'red'))
             answer = None
             while answer not in ['y', 'n']:
@@ -747,7 +733,7 @@ class EregsValidator:
         changes = {c.get('label'): c for c in change_elms}
 
         if label is not None:
-            changes = {c.get('label'): c for c in change_elms 
+            changes = {c.get('label'): c for c in change_elms
                        if c.get('label') == label}
 
         unresolved_dups = []
@@ -767,7 +753,7 @@ class EregsValidator:
                     parent_op), OP_COLORS[parent_op])
 
                 # Don't automatically remove "modified" or "moved"
-                # operations. Let the user resolve those. 
+                # operations. Let the user resolve those.
                 if op not in ("modified", "moved") and \
                         op == parent_op:
                     print('{change} will be changed by parent '
@@ -791,7 +777,7 @@ class EregsValidator:
                     f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
 
         if len(unresolved_dups) > 0:
-            print(colored(str(len(unresolved_dups)), 'red'), 
+            print(colored(str(len(unresolved_dups)), 'red'),
                   'potentially duplicate changes remain unresolved:')
             for change, parent in unresolved_dups:
                 print(change, '/', parent)

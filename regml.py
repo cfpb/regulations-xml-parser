@@ -86,7 +86,7 @@ def find_file(file, is_notice=False, ecfr=False):
 
 
 def find_all(part, is_notice=False):
-    """ Find all regulation RegML files for the given part. 
+    """ Find all regulation RegML files for the given part.
 
         If is_notice is True, all notice RegML files will be returned. """
     regml_base = base_path(is_notice=is_notice)
@@ -115,7 +115,7 @@ def write_layer(layer_object, reg_number, notice, layer_type,
               separators=(',', ':'))
 
 
-def get_validator(xml_tree):
+def get_validator(xml_tree, raise_instead_of_exiting=False):
     # Validate the file relative to schema
     validator = EregsValidator(settings.XSD_FILE)
     validator.validate_reg(xml_tree)
@@ -123,7 +123,10 @@ def get_validator(xml_tree):
     if not validator.is_valid:
         for event in validator.events:
             print(str(event))
-        sys.exit(0)
+        if raise_instead_of_exiting:
+            raise event
+        else:
+            sys.exit(0)
 
     return validator
 
@@ -204,11 +207,11 @@ def cli():
 # actions.
 @cli.command('validate')
 @click.argument('file')
-@click.option('--no-terms', is_flag=True, 
+@click.option('--no-terms', is_flag=True,
     help="don't try to validate terms")
-@click.option('--no-citations', is_flag=True, 
+@click.option('--no-citations', is_flag=True,
     help="don't try to validate citations")
-@click.option('--no-keyterms', is_flag=True, 
+@click.option('--no-keyterms', is_flag=True,
     help="don't try to validate keyterms")
 def validate(file, no_terms=False, no_citations=False, no_keyterms=False):
     """ Validate a RegML file """
@@ -290,23 +293,20 @@ def check_terms(file, label=None, term=None, with_notice=None):
 @cli.command()
 @click.argument('file')
 @click.option('--label')
-def check_interp_targets(file, label=None):
+@click.option('--is-notice', is_flag=True)
+def check_interp_targets(file, label=None, is_notice=False):
     """ Check the interpretations targets in a RegML file """
 
-    file = find_file(file)
+    file = find_file(file, is_notice=is_notice)
     with open(file, 'r') as f:
         reg_xml = f.read()
     parser = etree.XMLParser(huge_tree=True)
     xml_tree = etree.fromstring(reg_xml, parser)
 
-    if xml_tree.tag == '{eregs}notice':
-        print("Cannot check terms in notice files")
-        sys.exit(1)
-
     # Validate the file relative to schema
     validator = get_validator(xml_tree)
     validator.validate_interp_targets(xml_tree, file, label=label)
-    
+
 
 @cli.command('check-changes')
 @click.argument('file')
@@ -327,7 +327,7 @@ def check_changes(file, label=None):
     validator = get_validator(xml_tree)
     validator.remove_duplicate_changes(xml_tree, file, label=label)
     validator.remove_empty_refs(xml_tree, file)
-    
+
 
 @cli.command('check-keyterms')
 @click.argument('file')
@@ -386,8 +386,8 @@ def migrate_analysis(cfr_title, cfr_part):
     while answer not in ['y', 'n']:
         answer = raw_input('Migrate all analysis? y/n: ')
     if answer != 'y':
-        return 
-    
+        return
+
     # Migrate regulation files
     regml_reg_files = find_all(cfr_part)
     for reg_file in regml_reg_files:
@@ -416,7 +416,7 @@ def migrate_analysis(cfr_title, cfr_part):
         validator.validate_reg(xml_tree)
 
 
-# 
+#
 @cli.command('fix-analysis')
 @click.argument('file')
 @click.option('--always-save', is_flag=True)
@@ -428,7 +428,7 @@ def fix_analysis(file, always_save=False):
         reg_xml = f.read()
     parser = etree.XMLParser(huge_tree=True)
     xml_tree = etree.fromstring(reg_xml, parser)
-    
+
     if xml_tree.tag != '{eregs}notice':
         print("Can only check changes in notice files")
         sys.exit(1)
@@ -459,7 +459,7 @@ def fix_analysis(file, always_save=False):
     else:
         answer = None
 
-    while answer not in ["", "y", "n"]: 
+    while answer not in ["", "y", "n"]:
         answer = raw_input('Save updated analysis to notice file? y/n [y] ')
 
     if answer in ["", "y"]:
@@ -469,7 +469,7 @@ def fix_analysis(file, always_save=False):
             f.write(new_xml_string)
     else:
         # Cancel save
-        print("Canceling analysis fixes - changes have not been saved.")    
+        print("Canceling analysis fixes - changes have not been saved.")
 
 
 # Validate the given regulation file (or files) and generate the JSON
@@ -480,7 +480,8 @@ def fix_analysis(file, always_save=False):
 @cli.command('json')
 @click.argument('regulation_files', nargs=-1, required=True)
 @click.option('--check-terms', is_flag=True)
-def json_command(regulation_files, from_notices=[], check_terms=False):
+@click.option('--skip_diffs', is_flag=True, help="Suppresses generation of diffs between versions.")
+def json_command(regulation_files, from_notices=[], check_terms=False, skip_diffs=False):
     """ Generate JSON from RegML files """
 
     # If the "file" is a directory, assume we want to operate on all the
@@ -494,18 +495,23 @@ def json_command(regulation_files, from_notices=[], check_terms=False):
     versions = {}
     reg_number = None
     for file in regulation_files:
-        print(file)
+        print("Building JSON for {}".format(file))
         reg_number, notice, reg_xml_tree = generate_json(
             file, check_terms=check_terms)
         versions[notice] = reg_xml_tree
 
     # Generate diff JSON between each version
     # now build diffs - include "empty" diffs comparing a version to itself
-    for left_version, left_tree in versions.items():
-        for right_version, right_tree in versions.items():
-            diff = generate_diff(left_tree, right_tree)
-            write_layer(diff, reg_number, right_version, 'diff',
-                        diff_notice=left_version)
+    if not skip_diffs:
+        print(colored("\nBuilding inter-version diffs.", attrs=['bold']))
+        print(colored("WARNING: This may take an extended period of time.",
+              'red', attrs=['bold']))
+        print("To skip diff creation, use the --skip_diffs command line argument.\n")
+        for left_version, left_tree in versions.items():
+            for right_version, right_tree in versions.items():
+                diff = generate_diff(left_tree, right_tree)
+                write_layer(diff, reg_number, right_version, 'diff',
+                            diff_notice=left_version)
 
 
 # Given a regulation title and part number, prompts the user to select
@@ -513,12 +519,19 @@ def json_command(regulation_files, from_notices=[], check_terms=False):
 @cli.command('json-through')
 @click.argument('cfr_title')
 @click.argument('cfr_part')
+@click.option('--start', help="Performs JSON starting from document number" +
+              "(format: --from YYYY-#####). " +
+              "If no 'through' specified, goes til end.")
 @click.option('--through',
-              help="Skips prompt and performs JSON through given document number " +
-                   "(e.g. --through YYYY-#####")
+              help="Performs JSON through given document number " +
+                   "(e.g. --through YYYY-#####). " +
+                   "If no 'start' specified, starts from beginning.")
+@click.option('--skip_diffs', is_flag=True,
+              help="Suppresses generation of diffs between versions.")
 @click.option('--suppress_output', is_flag=True,
               help="Suppresses output except for errors")
-def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
+@click.pass_context
+def json_through(ctx, cfr_title, cfr_part, start=None, through=None, suppress_output=False, skip_diffs=False):
     # Get list of available regs
     regml_reg_files = find_all(cfr_part)
 
@@ -538,7 +551,7 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
 
     regml_regs.sort(key=lambda n: n[1])
     regulation_files = [r[2] for r in regml_regs]
-    
+
     # Generate prompt for user
     print(colored("\nAvailable RegML documents for reg {}:".format(cfr_part),
           attrs=['bold']))
@@ -553,12 +566,20 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
 
     # If number is supplied, use that one
     if through is not None:
-        print("Command-line option selected document number '{}'".format(through))
+        if start is not None:
+            print("Command-line: selected documents '{}'-'{}'".format(start, through))
+
+        else:
+            print("Command-line: selected document number '{}'".format(through))
+
         answer = through
-    else: 
+    elif start is not None:
+        print("Command-line: selected start document number '{}'".format(start))
+        answer = possible_regs[-1] # JSON all documents
+    else:
         # Get user input to specify end version
         answer = None
-        while answer not in [""] + possible_indices + possible_regs: 
+        while answer not in [""] + possible_indices + possible_regs:
             answer = raw_input('Press enter to apply all or enter document number: [all] ')
         print("Answer: '{}'".format(answer))
 
@@ -577,14 +598,52 @@ def json_through(cfr_title, cfr_part, through=None, suppress_output=False):
               colored("does not exist - no changes have been made.", attrs=['bold']))
         return
 
-    print(colored("\nApplying JSON through {0[0]}\n".format(
-                  regml_regs[last_ver_idx]),
-          attrs=['bold']))
+    # Support for telling user what we're doing on whether or not diffs will be created.
+    if skip_diffs:
+        skip_text = ", skipping creation of diffs."
+    else:
+        skip_text = ", including diffs."
 
-    # Perform the json application process
-    # Unlike apply-through, since json outputs its own command line output, here we
-    # reuse the existing json structure
-    json_command(regulation_files[:last_ver_idx+1])
+    if start is not None:
+        if start in possible_regs:
+            first_ver_idx = possible_regs.index(start)
+        else:
+            print(colored("ERROR: Document chosen for start", attrs=['bold']),
+                  colored("{}".format(start), 'red', attrs=['bold']),
+                  colored("does not exist - no changes have been made.", attrs=['bold']))
+            return
+
+        # Check that first_ver_idx < last_ver_idx
+        if first_ver_idx > last_ver_idx:
+            print(colored("ERROR: Start document", attrs=['bold']),
+                  colored("{}".format(regml_regs[first_ver_idx][0]), 'red', attrs=['bold']),
+                  colored("is not before 'through' notice"),
+                  colored("{}".format(regml_regs[last_ver_idx][0]), 'red', attrs=['bold']))
+            return
+
+        print(colored("\nApplying JSON from {1[0]} through {0[0]}{2}\n".format(
+                      regml_regs[last_ver_idx], regml_regs[first_ver_idx], skip_text),
+              attrs=['bold']))
+
+        # Perform the json application process
+        # Unlike apply-through, since json outputs its own command line output, here we
+        # reuse the existing json structure
+        ctx.invoke(json_command,
+                   regulation_files=regulation_files[first_ver_idx:last_ver_idx+1],
+                   skip_diffs=skip_diffs)
+
+    else:
+        print(colored("\nApplying JSON through {0[0]}{1}\n".format(
+                      regml_regs[last_ver_idx], skip_text),
+              attrs=['bold']))
+
+        # Perform the json application process
+        # Unlike apply-through, since json outputs its own command line output, here we
+        # reuse the existing json structure
+        # json_command(regulation_files[:last_ver_idx+1], skip_diffs=skip_diffs)
+        ctx.invoke(json_command,
+                   regulation_files=regulation_files[:last_ver_idx+1],
+                   skip_diffs=skip_diffs)
 
 
 # Given a notice, apply it to a previous RegML regulation verson to
@@ -601,7 +660,7 @@ def apply_notice(regulation_file, notice_file):
         left_reg_xml = f.read()
     parser = etree.XMLParser(huge_tree=True)
     left_xml_tree = etree.fromstring(left_reg_xml, parser)
-        
+
     # Read the notice file
     notice_file = find_file(notice_file, is_notice=True)
     with open(notice_file, 'r') as f:
@@ -639,7 +698,7 @@ def apply_notice(regulation_file, notice_file):
 @click.argument('cfr_part')
 @click.option('--through',
               help="Skips prompt and applies notices through given notice number " +
-                   "(e.g. --through YYYY-#####")
+                   "(e.g. --through YYYY-#####)")
 @click.option('--fix-notices',
               help="If set to True, use the validator to fix notices as you apply them.")
 @click.option('--skip-fix-notices', multiple=True,
@@ -647,8 +706,9 @@ def apply_notice(regulation_file, notice_file):
                    "nargs='*' doesn't work in click.")
 @click.option('--skip-fix-notices-through',
               help='Skip fixing notices through the specified document number.')
-def apply_through(cfr_title, cfr_part, through=None, fix_notices=False,
-                  skip_fix_notices=[], skip_fix_notices_through=None):
+def apply_through(cfr_title, cfr_part, start=None, through=None,
+                  fix_notices=False, skip_fix_notices=[],
+                  skip_fix_notices_through=None):
     # Get list of notices that apply to this reg
     # Look for locally available notices
     regml_notice_files = find_all(cfr_part, is_notice=True)
@@ -687,6 +747,7 @@ def apply_through(cfr_title, cfr_part, through=None, fix_notices=False,
     if cfr_part in settings.CUSTOM_NOTICE_ORDER:
         order = settings.CUSTOM_NOTICE_ORDER[cfr_part]
         regml_notices.sort(key=lambda n: order.index(n[0]))
+
     else:
         regml_notices.sort(key=lambda n: n[1])
     
@@ -722,10 +783,10 @@ def apply_through(cfr_title, cfr_part, through=None, fix_notices=False,
     if through is not None:
         print("Command-line option selected notice '{}'".format(through))
         answer = through
-    else: 
+    else:
         # Get user input to specify end version
         answer = None
-        while answer not in [""] + possible_indices + possible_notices: 
+        while answer not in [""] + possible_indices + possible_notices:
             answer = raw_input('Press enter to apply all or enter notice number: [all] ')
 
     if len(answer) == 0:
@@ -782,10 +843,26 @@ def apply_through(cfr_title, cfr_part, through=None, fix_notices=False,
 
         notice_xml = etree.fromstring(notice_string, parser)
 
+        # TODO: Validate labels for json-compliance?
+        # Example: JSON fails on upload only for interpParagraphs without "Interp" in them
+
         # Validate the files
         regulation_validator = get_validator(prev_tree)
         terms_layer = build_terms_layer(prev_tree)
-        notice_validator = get_validator(notice_xml)
+
+        try:
+            notice_validator = get_validator(notice_xml, raise_instead_of_exiting=True)
+        except Exception as e:
+            print("[{}]".format(kk),
+                  colored("Exception occurred in notice", 'red'),
+                  colored(doc_number, attrs=['bold']),
+                  colored("; details are below. ", 'red'),
+                  "To retry this single notice, use:\n\n",
+                  colored("> ./regml.py apply-notice {0}/{1} {0}/{2}\n".format(cfr_part,
+                                                                               prev_notice,
+                                                                               doc_number),
+                          attrs=['bold']))
+            sys.exit(0)
 
         # validate the notice XML with the layers derived from the
         # tree of the previous version
@@ -820,7 +897,7 @@ def apply_through(cfr_title, cfr_part, through=None, fix_notices=False,
         except Exception as e:
             print("[{}]".format(kk),
                   colored("Exception occurred; details are below. ".format(kk), 'red'),
-                  "When ready to retry, use:\n\n",
+                  "To retry this single notice, use:\n\n",
                   colored("> ./regml.py apply-notice {0}/{1} {0}/{2}\n".format(cfr_part,
                                                                                prev_notice,
                                                                                doc_number),
@@ -861,7 +938,7 @@ def notice_changes(notice_file):
     doc_number = notice_xml.find(
             './{eregs}preamble/{eregs}documentNumber').text
 
-    print(colored("{} makes the following changes:".format(doc_number), 
+    print(colored("{} makes the following changes:".format(doc_number),
                   attrs=['bold']))
 
     changes = notice_xml.findall('./{eregs}changeset/{eregs}change')
@@ -889,7 +966,7 @@ def apply_notices(cfr_part, version, notices):
         left_reg_xml = f.read()
     parser = etree.XMLParser(huge_tree=True)
     left_xml_tree = etree.fromstring(left_reg_xml, parser)
-    
+
     prev_notice = version
     prev_tree = left_xml_tree
     for notice in notices:
@@ -899,7 +976,7 @@ def apply_notices(cfr_part, version, notices):
             notice_string = f.read()
         parser = etree.XMLParser(huge_tree=True)
         notice_xml = etree.fromstring(notice_string, parser)
-        
+
         # Process the notice changeset
         new_xml_tree = process_changes(prev_tree, notice_xml)
 
@@ -968,7 +1045,7 @@ def versions(title, part, from_fr=False, from_regml=True):
         if previous_notice[0] != notice[2]:
             print(colored("\t\tWarning: {} does not apply to "
                           "previous notice {}".format(
-                                notice[0], 
+                                notice[0],
                                 previous_notice[0]), 'yellow'))
 
 
@@ -1050,7 +1127,7 @@ def ecfr_all(title, file, act_title, act_section,
 @click.option('--act-title', default=0, type=int)
 @click.option('--with-version', is_flag=True,
               help="output the full reg tree version")
-@click.option('--without-notice', is_flag=True, 
+@click.option('--without-notice', is_flag=True,
               help="output the notice changeset")
 def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
         act_section, with_version=False, without_notice=False):
@@ -1062,7 +1139,7 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
     parser = etree.XMLParser(huge_tree=True)
     xml_tree = etree.fromstring(reg_xml, parser)
     doc_number = xml_tree.find('.//{eregs}documentNumber').text
-            
+
     # Validate the file relative to schema
     validator = get_validator(xml_tree)
 
@@ -1076,7 +1153,8 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
     # Fetch the notices from the FR API and find the notice we're
     # looking for
     builder.fetch_notices_json()
-    notice_json = next((n for n in builder.notices_json 
+    print([n['document_number'] for n in builder.notices_json])
+    notice_json = next((n for n in builder.notices_json
                         if n['document_number'] == notice))
 
     # Build the notice
@@ -1107,7 +1185,7 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
                              reg_tree=reg_tree,
                              layers=layers,
                              last_version=last_version)
-        
+
     # Write the regulation file for the new notice
     if with_version:
         builder.write_regulation(new_tree, layers=layers)
@@ -1118,7 +1196,7 @@ def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
 @click.argument('regml_file')
 def ecfr_analysis(ecfr_file, regml_file):
     """ Extract analysis from eCFR XML using using XSL
-        
+
         This is a blunt-force attempt to extract SxS analysis from an
         eCFR XML file and force it into RegML using XSL
         (utils/ecfr_sxs_to_regml.xsl).
@@ -1132,7 +1210,7 @@ def ecfr_analysis(ecfr_file, regml_file):
     parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
     ecfr_tree = etree.fromstring(ecfr_xml, parser)
 
-    # Get the regml 
+    # Get the regml
     with open(regml_file, 'r') as f:
         reg_xml = f.read()
     parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
@@ -1153,13 +1231,13 @@ def ecfr_analysis(ecfr_file, regml_file):
     # "Section-by-Section Analysis" in the text.
     hd1_elms = ecfr_tree.findall('.//HD[@SOURCE="HD1"]')
     try:
-        hd1_sxs = next((e for e in hd1_elms 
+        hd1_sxs = next((e for e in hd1_elms
                         if 'Section-by-Section Analysis' in e.text))
     except StopIteration:
         print(colored('No section-by-section analysis found', 'red'))
         return
     print(colored('Found section-by-section header', 'green'))
-    
+
     hd1_next = hd1_elms[hd1_elms.index(hd1_sxs)+1]
 
     # The SxS is everything between those two HD1s
@@ -1192,7 +1270,7 @@ def ecfr_analysis(ecfr_file, regml_file):
         existing_analysis.append(etree.Comment("Added analysis from eCFR"))
         for section_elm in result_tree:
             existing_analysis.append(section_elm)
-        
+
     else:
         print(colored('Adding analysis to RegML', 'green'))
         regml_tree.append(result_tree)
@@ -1206,7 +1284,7 @@ def ecfr_analysis(ecfr_file, regml_file):
         f.write(regml_string)
 
     # Remind the user that hand-editing to add the appropriate
-    # attributes and structure is *required* 
+    # attributes and structure is *required*
     print(colored('Saved analysis in {}'.format(regml_file),
                   'green', attrs=['bold']))
 
