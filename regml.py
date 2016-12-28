@@ -16,28 +16,37 @@ from termcolor import colored, cprint
 from regulation.validation import EregsValidator
 import regulation.settings as settings
 
-from regulation.tree import (build_analysis,
-                             build_external_citations_layer,
-                             build_formatting_layer,
-                             build_graphics_layer,
-                             build_internal_citations_layer,
-                             build_interp_layer,
-                             build_keyterm_layer,
-                             build_meta_layer,
-                             build_notice,
-                             build_paragraph_marker_layer,
-                             build_reg_tree,
-                             build_terms_layer,
-                             build_toc_layer)
-from regulation.changes import (process_changes,
-                               process_analysis,
-                               generate_diff,
-                               rectify_analysis)
+from regulation.tree import (
+    build_analysis,
+    build_external_citations_layer,
+    build_formatting_layer,
+    build_graphics_layer,
+    build_internal_citations_layer,
+    build_interp_layer,
+    build_keyterm_layer,
+    build_meta_layer,
+    build_notice,
+    build_paragraph_marker_layer,
+    build_reg_tree,
+    build_terms_layer,
+    build_toc_layer
+)
+from regulation.changes import (
+    process_changes,
+    process_analysis,
+    generate_diff,
+    rectify_analysis
+)
 
 # Import regparser here with the eventual goal of breaking off the parts
 # we're using in the RegML parser into a library both can share.
 from regparser.federalregister import fetch_notice_json
-from regparser.builder import LayerCacheAggregator, tree_and_builder, Builder
+from regparser.builder import (
+    Builder,
+    Checkpointer,
+    LayerCacheAggregator,
+    tree_and_builder
+)
 from regparser.notice.compiler import compile_regulation
 
 if (sys.version_info < (3, 0)):
@@ -750,7 +759,7 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
 
     else:
         regml_notices.sort(key=lambda n: n[1])
-    
+
     regs = [nn[2] for nn in regml_notices]
     regs.sort()
 
@@ -1071,14 +1080,16 @@ def ecfr():
               help="do not output any notice changesets")
 @click.option('--only-notice', default=None,
               help="only write output for this notice number")
+@click.option('--checkpoints',
+              help="path to store/retrieve ecfr parser checkpoints")
 def ecfr_all(title, file, act_title, act_section,
-         with_all_versions=False, without_versions=False,
-         without_notices=False, only_notice=None):
+             with_all_versions=False, without_versions=False,
+             without_notices=False, only_notice=None, checkpoints=None):
     """ Parse eCFR into RegML """
 
     # Get the tree and layers
     reg_tree, builder = tree_and_builder(
-        file, title, writer_type='XML')
+        file, title, checkpoints, writer_type='XML')
     layer_cache = LayerCacheAggregator()
     layers = builder.generate_layers(reg_tree,
                                      [act_title, act_section],
@@ -1130,7 +1141,7 @@ def ecfr_all(title, file, act_title, act_section,
 @click.option('--without-notice', is_flag=True,
               help="output the notice changeset")
 def ecfr_notice(title, cfr_part, notice, applies_to, act_title,
-        act_section, with_version=False, without_notice=False):
+                act_section, with_version=False, without_notice=False):
     """ Generate RegML for a single notice from eCFR XML. """
 
     # Get the notice the new one applies to
@@ -1294,7 +1305,7 @@ def ecfr_analysis(ecfr_file, regml_file):
                   'following attributes added:', 'yellow', attrs=['bold']))
     print(colored('    target="THE TARGET" notice="{}" date="{}"'.format(
                   doc_number, date), attrs=['bold']))
-    
+
 @cli.command('gui')
 def run_gui():
 
