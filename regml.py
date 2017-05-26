@@ -12,9 +12,11 @@ import sys
 import click
 from lxml import etree
 from termcolor import colored, cprint
+from itertools import combinations
 
 from regulation.validation import EregsValidator
 import regulation.settings as settings
+from regulation.diff import diff_files
 
 from regulation.tree import (build_analysis,
                              build_external_citations_layer,
@@ -36,9 +38,9 @@ from regulation.changes import (process_changes,
 
 # Import regparser here with the eventual goal of breaking off the parts
 # we're using in the RegML parser into a library both can share.
-from regparser.federalregister import fetch_notice_json
-from regparser.builder import LayerCacheAggregator, tree_and_builder, Builder
-from regparser.notice.compiler import compile_regulation
+#from regparser.federalregister import fetch_notice_json
+#from regparser.builder import LayerCacheAggregator, tree_and_builder, Builder
+#from regparser.notice.compiler import compile_regulation
 
 if (sys.version_info < (3, 0)):
     reload(sys)  # noqa
@@ -690,6 +692,39 @@ def apply_notice(regulation_file, notice_file):
         print("Writing regulation to {}".format(new_path))
         f.write(new_xml_string)
 
+
+# Given a regulation part number, iterate over all existing *regulations* (not notices)
+# and write out the XML files representing the diffs.
+@cli.command('generate-diff-xml')
+@click.argument('cfr_part')
+@click.option('--versions',
+              help="If provided, supplies the list of regulations from which to generate diffs",
+              multiple=True)
+def generate_diff_xml(cfr_part, versions=None):
+
+    def version(regml_file):
+        return os.path.split(regml_file)[-1].replace('.xml', '')
+
+    if versions:
+        regml_files = [item for item in find_all(cfr_part) if version(item) not in versions]
+    else:
+        regml_files = find_all(cfr_part)
+
+    import time
+
+    diff_base = os.path.join(settings.XML_ROOT, 'diff', cfr_part)
+    if not os.path.exists(diff_base):
+        os.mkdir(diff_base)
+
+    start_time = time.clock()
+    for pair in combinations(regml_files, 2):
+        tree, left_version, right_version = diff_files(pair[0], pair[1])
+        diff_path = os.path.join(diff_base, '{}:{}.xml'.format(left_version, right_version))
+        with open(diff_path, 'w') as f:
+            print('Writing diff from {} to {} to {}'.format(left_version, right_version, diff_path))
+            f.write(etree.tostring(tree, pretty_print=True, xml_declaration=True, encoding='UTF-8'))
+    end_time = time.clock()
+    print('Diff calculation for part {} took {} minutes'.format(cfr_part, (end_time - start_time) / 60.0))
 
 # Given a regulation title and part number, prompts the user to select
 # which notice to stop at and applies all notices applicable to the reg

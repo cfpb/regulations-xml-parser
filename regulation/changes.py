@@ -10,9 +10,40 @@ from lxml import etree
 
 # Import regparser here with the eventual goal of breaking off the parts
 # we're using in the RegML parser into a library both can share.
-from regparser.tree.paragraph import p_levels
-from regparser.tree.struct import FrozenNode
-from regparser.diff.tree import changes_between
+#from regparser.tree.paragraph import p_levels
+#from regparser.tree.struct import FrozenNode
+#from regparser.diff.tree import changes_between
+
+import string
+
+def roman_nums():
+    """Generator for roman numerals."""
+    mapping = [(1, 'i'), (4, 'iv'), (5, 'v'), (9, 'ix'),
+               (10, 'x'), (40, 'xl'), (50, 'l'), (90, 'xc'),
+               (100, 'c'), (400, 'cd'), (500, 'd'), (900, 'cm'),
+               (1000, 'm')]
+    i = 1
+    while True:
+        next_str = ''
+        remaining_int = i
+        remaining_mapping = list(mapping)
+        while remaining_mapping:
+            (amount, chars) = remaining_mapping.pop()
+            while remaining_int >= amount:
+                next_str += chars
+                remaining_int -= amount
+        yield next_str
+        i += 1
+
+p_levels = [
+    list(string.ascii_lowercase),
+    [str(i) for i in range(1, 51)],
+    list(itertools.islice(roman_nums(), 0, 50)),
+    list(string.ascii_uppercase),
+    ['<E T="03">' + str(i) + '</E>' for i in range(1, 51)],
+    ['<E T="03">' + i + '</E>'
+     for i in itertools.islice(roman_nums(), 0, 50)]
+]
 
 from regulation.tree import build_reg_tree
 
@@ -148,7 +179,8 @@ def process_changes(original_xml, original_notice_xml, dry=False):
     movements = notice_xml.findall(
         './/{eregs}change[@operation="moved"]')
     relabelings = notice_xml.findall(
-        './/{eregs}change[@operation="changeTarget"]')
+        './/{eregs}change[@operation="changeTarget"]') + \
+        notice_xml.findall('.//{eregs}change[@operation="changeLabel"]')
 
 
     # Sort them appropriately by label using our custom comparison
@@ -338,6 +370,17 @@ def process_changes(original_xml, original_notice_xml, dry=False):
             for ref in references:
                 if target_text is None or ref.text.lower() == target_text.lower():
                     ref.set('target', new_target)
+
+        if op == 'changeLabel':
+
+            new_label = change.get('newLabel')
+            if new_label is None:
+                raise ValueError('Need to know the new label to assign to the target')
+            matching_elm = new_xml.find('.//*[@label="{}"]'.format(label))
+            logging.debug("Performing {} operation on '{}'".format(op, label))
+            if matching_elm is None:
+                raise KeyError("Unable to find label {} to be {}".format(label, op))
+            matching_elm.set('label', new_label)
 
     return new_xml
 
