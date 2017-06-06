@@ -12,7 +12,7 @@ import sys
 import click
 from lxml import etree
 from termcolor import colored, cprint
-from itertools import combinations
+from itertools import permutations
 
 from regulation.validation import EregsValidator
 import regulation.settings as settings
@@ -717,7 +717,7 @@ def generate_diff_xml(cfr_part, versions=None):
         os.mkdir(diff_base)
 
     start_time = time.clock()
-    for pair in combinations(regml_files, 2):
+    for pair in permutations(regml_files, 2):
         tree, left_version, right_version = diff_files(pair[0], pair[1])
         diff_path = os.path.join(diff_base, '{}:{}.xml'.format(left_version, right_version))
         with open(diff_path, 'w') as f:

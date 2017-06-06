@@ -80,13 +80,68 @@ def set_descendants_property(root, prop_name, prop_value):
         set_descendants_property(child, prop_name, prop_value)
 
 
+def set_modified_toc_entry(root, element):
+
+    if element.get('label', None) is not None:
+        label = element.get('label')
+        section_label = '-'.join(label.split('-')[0:2])
+        sec_toc_item = root.find('.//{{eregs}}tocSecEntry[@target="{}"]'.format(section_label))
+        app_toc_item = root.find('.//{{eregs}}tocAppEntry[@target="{}"]'.format(section_label))
+        int_toc_item = root.find('.//{{eregs}}tocInterpEntry[@target="{}"]'.format(section_label))
+
+        #print 'looking for toc element for {}'.format(section_label)
+        #import ipdb; ipdb.set_trace()
+        for item in [sec_toc_item, app_toc_item, int_toc_item]:
+            if item is not None:
+                item.set('action', 'modified')
+
+
+def merge_tocs(left_toc, right_toc):
+
+    left_toc_entries = left_toc.children
+    right_toc_entries = right_toc.children
+
+    merged_toc = etree.Element('{eregs}tableOfContents')
+
+    current_left = left_toc_entries[0]
+    current_right = right_toc_entries[0]
+    stop = False
+
+    while not stop:
+        if current_left.tag == current_right.tag:
+            pass
+
+    # deleted labels
+    only_left_entries = [entry for entry in left_toc_entries if entry.get('target') is not None
+                         and right_toc.find('.//*[target="{}"]'.format(entry.get('target'))) is None]
+    # added labels
+    only_right_entries = [entry for entry in right_toc_entries if entry.get('target') is not None
+                          and left_toc.find('.//*[target="{}"]'.format(entry.get('target'))) is None]
+
+    common_entries = [entry for entry in left_toc_entries if entry.get('target') is not None
+                      and right_toc.find('.//*[target="{}"]'.format(entry.get('target'))) is not None]
+
+
 def diff_files(left_filename, right_filename, output_file='diff.xml'):
 
     left_tree = load_xml(left_filename)
     right_tree = load_xml(right_filename)
 
+    comments = left_tree.xpath('//comment()')
+    for comment in comments:
+        parent = comment.getparent()
+        parent.remove(comment)
+
+    comments = right_tree.xpath('//comment()')
+    for comment in comments:
+        parent = comment.getparent()
+        parent.remove(comment)
+
     left_labels = gather_labels(left_tree)
     right_labels = gather_labels(right_tree)
+
+    right_toc = right_tree.find('.//{eregs}tableOfContents')
+    left_toc = left_tree.find('.//{eregs}tableOfContents')
 
     only_left_labels = [label for label in left_labels if label not in right_labels]
     only_right_labels = [label for label in right_labels if label not in left_labels]
@@ -151,6 +206,7 @@ def diff_files(left_filename, right_filename, output_file='diff.xml'):
                 right_subject_el.tag = '{eregs}rightSubject'
                 left_subject_el.addnext(right_subject_el)
                 left_element.attrib['action'] = 'modified'
+                set_modified_toc_entry(right_tree, left_element)
 
         elif left_element.tag == '{eregs}interpSection':
             try:
@@ -171,6 +227,7 @@ def diff_files(left_filename, right_filename, output_file='diff.xml'):
                     right_title_el.tag = '{eregs}rightTitle'
                     left_title_el.addnext(deepcopy(right_title_el))
                     left_element.attrib['action'] = 'modified'
+                    set_modified_toc_entry(right_tree, left_element)
 
         elif left_element.tag == '{eregs}paragraph' or left_element.tag == '{eregs}interpParagraph':
             try:
@@ -191,6 +248,7 @@ def diff_files(left_filename, right_filename, output_file='diff.xml'):
                     right_title_el.tag = '{eregs}rightTitle'
                     left_title_el.addnext(deepcopy(right_title_el))
                     left_element.attrib['action'] = 'modified'
+                    set_modified_toc_entry(right_tree, left_element)
 
             left_content = left_element.find('{eregs}content')
             left_text = xml_node_text(left_content).strip()
@@ -202,9 +260,11 @@ def diff_files(left_filename, right_filename, output_file='diff.xml'):
                 right_content.tag = '{eregs}rightContent'
                 left_content.addnext(deepcopy(right_content))
                 left_element.attrib['action'] = 'modified'
+                set_modified_toc_entry(right_tree, left_element)
 
     #with open(output_file, 'w') as f:
     #    f.write(etree.tostring(left_tree, pretty_print=True))
+    left_toc.getparent().replace(left_toc, right_toc)
     return left_tree, extract_version(left_tree), extract_version(right_tree)
 
 
@@ -221,7 +281,7 @@ def left_tree_ancestor(left_tree, right_node):
     stop = False
     current_right = right_node
 
-    while not common_ancestor and not stop:
+    while common_ancestor is None and not stop:
         right_node_parent = current_right.getparent()
         left_ancestor = left_tree.find('.//*[@label="{}"]'.format(right_node_parent.get('label')))
         #if left_ancestor is None:
@@ -235,10 +295,12 @@ def left_tree_ancestor(left_tree, right_node):
 
     stop = False
 
-    while not left_sibling and not stop:
+    while left_sibling is None and not stop:
         for child in common_ancestor:
-            if child.get('label') == right_node.getprevious().get('label'):
-                left_sibling = child
+            right_previous = right_node.getprevious()
+            if right_previous is not None:
+                if child.get('label') == right_node.getprevious().get('label'):
+                    left_sibling = child
         stop = True
 
     return common_ancestor, left_sibling
