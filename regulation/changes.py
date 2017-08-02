@@ -10,9 +10,9 @@ from lxml import etree
 
 # Import regparser here with the eventual goal of breaking off the parts
 # we're using in the RegML parser into a library both can share.
-#from regparser.tree.paragraph import p_levels
-#from regparser.tree.struct import FrozenNode
-#from regparser.diff.tree import changes_between
+from regparser.tree.paragraph import p_levels
+from regparser.tree.struct import FrozenNode
+from regparser.diff.tree import changes_between
 
 import string
 
