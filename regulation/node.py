@@ -138,7 +138,7 @@ class RegNode:
         :return: an integer representing the hash of the node's fields.
         :rtype: :class:`int`
         """
-        return hash(self.node_type + self.text + self.source_xml)
+        return hash((self.node_type or '') + (self.text or '') + (self.source_xml or ''))
 
     @property
     def string_label(self):
