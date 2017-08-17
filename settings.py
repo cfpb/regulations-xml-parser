@@ -1,11 +1,11 @@
 import os
 
-# XSD_FILE provides the local path or URL to the RegML schema file.
-# The schema is available at http://cfpb.github.io/regulations-schema/src/eregs.xsd
+# XSD_FILE provides the local path or URL (HTTP, FTP) to the RegML schema file.
+# Schema documentation is available at http://cfpb.github.io/regulations-schema
 #
 # A local copy should generally be a clone or fork of
 # https://github.com/cfpb/regulations-schema
-XSD_FILE = 'http://cfpb.github.io/regulations-schema/src/eregs.xsd'
+XSD_FILE = '../regulations-schema/src/eregs.xsd'
 
 # XML_ROOT is the path to Regulations XML files that this parser is
 # intended to parse. Files in this location are expected to be stored
