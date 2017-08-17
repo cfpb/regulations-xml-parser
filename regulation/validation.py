@@ -85,14 +85,14 @@ class EregsValidator:
         :return: :class:`etree.XMLSchema`: the schema object used to validate the reg.
         """
         try:
-            schema = etree.XMLSchema(file=self.xsd_file)
-
-        except Exception as ex:
-            cprint('Exception occurred when reading file: {0!s}'.format(
-                ex), 'red')
-            return None
-
-        return schema
+            return etree.XMLSchema(file=self.xsd_file)
+        except etree.XMLSchemaParseError:
+            cprint(
+                'Error occurred when reading schema file {}; did you forget '
+                'to set settings.XSD_FILE to a local or remote path '
+                'containing the eregs schema?'.format(self.xsd_file), 'red'
+            )
+            raise
 
     def validate_reg(self, tree):
         """

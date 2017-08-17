@@ -1,15 +1,42 @@
 # -*- coding: utf-8 -*-
-
-from unittest import TestCase
-
 import lxml.etree as etree
+import os
+import settings
+import shutil
+import tempfile
+
+from git import Repo
+from unittest import TestCase
 
 from regulation.validation import EregsValidator, Severity
 
-import settings
-
 
 class EregsValidatorTests(TestCase):
+    GIT_URL = 'https://github.com/cfpb/regulations-schema.git'
+
+    @classmethod
+    def setUpClass(cls):
+        cls.schemadir = tempfile.mkdtemp()
+        Repo.clone_from(cls.GIT_URL, cls.schemadir)
+        settings.XSD_FILE = os.path.join(cls.schemadir, 'src/eregs.xsd')
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.schemadir, ignore_errors=True)
+
+    def test_load_schema_works_if_schema_is_local(self):
+        try:
+            EregsValidator(settings.XSD_FILE).load_schema()
+        except etree.XMLSchemaParseError:
+            self.fail('schema should load successfully from local path')
+
+    def test_load_schema_raises_if_local_schema_does_not_exist(self):
+        with self.assertRaises(etree.XMLSchemaParseError):
+            EregsValidator('/some/non/existent/path').load_schema()
+
+    def test_load_schema_raises_if_remote_schema_does_not_exist(self):
+        with self.assertRaises(etree.XMLSchemaParseError):
+            EregsValidator('http://some.non/existent.url').load_schema()
 
     def test_validate_keyterms(self):
         tree = etree.fromstring("""
