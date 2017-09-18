@@ -773,7 +773,7 @@ def build_toc_layer(root):
             parent = parent.getparent()
 
         label = parent.get('label')
-        
+
         # Warn user about elements without labels
         if label is None:
             raise ValueError("TOC parent element {} has no label; this will cause JSON issues.".format(parent.tag))
@@ -787,7 +787,7 @@ def build_toc_layer(root):
             toc_entry = {'index': target, 'title': subject}
             toc_dict[label].append(toc_entry)
 
-        # Build appendix sections 
+        # Build appendix sections
         for appendix_section in toc.findall('{eregs}tocAppEntry'):
             target = appendix_section.get('target').split('-')
             subject = appendix_section.find('{eregs}appendixSubject').text
@@ -858,6 +858,7 @@ def build_meta_layer(root):
                       '1022': 'V', '1023': 'W', '1024': 'X',
                       '1025': 'Y', '1026': 'Z', '1027': 'AA',
                       '1028': 'BB', '1029': 'CC', '1030': 'DD',
+                      '1040': '1040',
                       }
 
     preamble = root.find('{eregs}preamble')
@@ -1114,9 +1115,9 @@ def is_intro_text(item):
         if child_num > 1:
             return False
 
-        # Note: item[0] is always a <content> tag - check that 
+        # Note: item[0] is always a <content> tag - check that
         # element's children
-        if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT, 
+        if len(filter(lambda child: child.tag in NON_PARA_SUBELEMENT,
                       item[0].getchildren())) == 0:
             return True
 
