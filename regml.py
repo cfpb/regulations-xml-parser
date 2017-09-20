@@ -256,7 +256,9 @@ def validate(file, no_terms=False, no_citations=False, no_keyterms=False):
     if xml_tree.tag == '{eregs}notice':
         pass
 
-    return validator
+    if validator.has_critical_errors:
+        print('Validation failed with critical errors.')
+        sys.exit(1)
 
 
 @cli.command('check-terms')
