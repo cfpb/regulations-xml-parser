@@ -139,7 +139,7 @@ def get_validator(xml_tree, raise_instead_of_exiting=False):
         if raise_instead_of_exiting:
             raise event
         else:
-            sys.exit(0)
+            sys.exit(int(validator.has_critical_errors))
 
     return validator
 
