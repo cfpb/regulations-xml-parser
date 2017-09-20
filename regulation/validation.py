@@ -648,10 +648,11 @@ class EregsValidator:
 
     @property
     def is_valid(self):
-        for error in self.events:
-            if error.severity != Severity.OK:
-                return False
-        return True
+        return all(e.severity == Severity.OK for e in self.events)
+
+    @property
+    def has_critical_errors(self):
+        return any(e.severity == Severity.CRITICAL for e in self.events)
 
     def validate_interp_targets(self, tree, regulation_file, label=None):
         """

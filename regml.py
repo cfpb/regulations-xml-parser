@@ -139,7 +139,7 @@ def get_validator(xml_tree, raise_instead_of_exiting=False):
         if raise_instead_of_exiting:
             raise event
         else:
-            sys.exit(0)
+            sys.exit(int(validator.has_critical_errors))
 
     return validator
 
@@ -256,7 +256,9 @@ def validate(file, no_terms=False, no_citations=False, no_keyterms=False):
     if xml_tree.tag == '{eregs}notice':
         pass
 
-    return validator
+    if validator.has_critical_errors:
+        print('Validation failed with critical errors.')
+        sys.exit(1)
 
 
 @cli.command('check-terms')

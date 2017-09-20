@@ -8,7 +8,9 @@ import tempfile
 from git import Repo
 from unittest import TestCase
 
-from regulation.validation import EregsValidator, Severity
+from regulation.validation import (
+    EregsValidationEvent, EregsValidator, Severity
+)
 
 
 class EregsValidatorTests(TestCase):
@@ -163,3 +165,85 @@ class EregsValidatorTests(TestCase):
         # The empty change should've been deleted.
         self.assertEqual(len(result.findall('.//{eregs}change')), 0)
 
+    def test_is_valid_with_no_errors(self):
+        validator = EregsValidator(settings.XSD_FILE)
+        self.assertTrue(validator.is_valid)
+
+    def test_is_not_valid_with_any_errors(self):
+        validator = EregsValidator(settings.XSD_FILE)
+        validator.events = [EregsValidationEvent('test', Severity.INFO)]
+        self.assertFalse(validator.is_valid)
+
+    def test_has_critical_errors_false_with_no_errors(self):
+        validator = EregsValidator(settings.XSD_FILE)
+        self.assertFalse(validator.has_critical_errors)
+
+    def test_has_critical_errors_false_with_non_severe_errors(self):
+        validator = EregsValidator(settings.XSD_FILE)
+        validator.events = [EregsValidationEvent('test', Severity.INFO)]
+        self.assertFalse(validator.has_critical_errors)
+
+    def test_has_critical_errors_true_with_critical_errors(self):
+        validator = EregsValidator(settings.XSD_FILE)
+        validator.events = [EregsValidationEvent('test', Severity.CRITICAL)]
+        self.assertTrue(validator.has_critical_errors)
+
+    def test_valid_content_is_valid_and_has_no_critical_errors(self):
+        xml = etree.fromstring("""<regulation xmlns="eregs">
+  <fdsys>
+    <cfrTitleNum>99</cfrTitleNum>
+    <cfrTitleText>TESTING</cfrTitleText>
+    <volume>99</volume>
+    <date>2017-01-01</date>
+    <originalDate>2017-01-01</originalDate>
+    <title>TEST</title>
+  </fdsys>
+  <preamble>
+    <agency>Bureau of Consumer Financial Protection</agency>
+    <regLetter>TEST</regLetter>
+    <cfr>
+      <title>123</title>
+      <section>4567</section>
+    </cfr>
+    <documentNumber>9999-99999</documentNumber>
+    <effectiveDate>2017-01-01</effectiveDate>
+    <federalRegisterURL>https://www.foo.gov/testing</federalRegisterURL>
+  </preamble>
+  <part label="9999">
+    <content></content>
+  </part>
+</regulation>""")
+        validator = EregsValidator(settings.XSD_FILE)
+        validator.validate_reg(xml)
+        self.assertTrue(validator.is_valid)
+        self.assertFalse(validator.has_critical_errors)
+
+    def test_invalid_content_is_not_valid_and_has_critical_errors(self):
+        xml = etree.fromstring("""<regulation xmlns="eregs">
+  <fdsys>
+    <cfrTitleNum>this-should-be-a-number</cfrTitleNum>
+    <cfrTitleText>TESTING</cfrTitleText>
+    <volume>99</volume>
+    <date>2017-01-01</date>
+    <originalDate>2017-01-01</originalDate>
+    <title>TEST</title>
+  </fdsys>
+  <preamble>
+    <agency>Bureau of Consumer Financial Protection</agency>
+    <regLetter>TEST</regLetter>
+    <cfr>
+      <title>123</title>
+      <section>4567</section>
+    </cfr>
+    <documentNumber>9999-99999</documentNumber>
+    <effectiveDate>2017-01-01</effectiveDate>
+    <federalRegisterURL>https://www.foo.gov/testing</federalRegisterURL>
+  </preamble>
+  <part label="9999">
+    <content></content>
+  </part>
+</regulation>""")
+        validator = EregsValidator(settings.XSD_FILE)
+        validator.validate_reg(xml)
+        self.assertFalse(validator.is_valid)
+        self.assertTrue(validator.has_critical_errors)
