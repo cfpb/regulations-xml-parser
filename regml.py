@@ -536,6 +536,7 @@ def json_command(regulation_files, from_notices=[], check_terms=False, skip_diff
 @click.argument('cfr_part')
 @click.option('--start', help="Performs JSON starting from document number" +
               "(format: --from YYYY-#####). " +
+              "Specify -1 to use first document number. " +
               "If no 'through' specified, goes til end.")
 @click.option('--through',
               help="Performs JSON through given document number " +
@@ -578,6 +579,9 @@ def json_through(ctx, cfr_title, cfr_part, start=None, through=None, suppress_ou
     # Possible answers are blank (all), the numbers, or the doc names
     possible_indices = [str(kk) for kk in range(len(regml_regs))]
     possible_regs = [nn[0] for nn in regml_regs]
+
+    if start == '-1':
+        start = possible_regs[0]
 
     # If number is supplied, use that one
     if through is not None:
