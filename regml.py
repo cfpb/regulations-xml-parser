@@ -184,7 +184,6 @@ def extract_notice_file_meta(notice_file):
         return
 
     return Notice(doc_number, effective_date, applies_to_doc_number, applies_to_eff_date, file_name)
-    #return (doc_number, effective_date, applies_to_doc_number, file_name)
 
 
 def write_layer(layer_object, reg_number, notice, layer_type,
@@ -883,11 +882,6 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
         regml_dependency_chain[notice] = set(applies_to)
 
     sorted_notices = [list(notice)[0] for notice in list(toposort(regml_dependency_chain))]
-    import pprint
-    pprint.pprint(regml_notice_files)
-    pprint.pprint(regml_notices)
-    pprint.pprint(regml_dependency_chain)
-    pprint.pprint(list(toposort(regml_dependency_chain)))
     doc_counts = Counter([notice.document_number for notice in sorted_notices])
 
     # If no notices found, issue error message
