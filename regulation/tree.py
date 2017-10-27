@@ -869,7 +869,7 @@ def build_meta_layer(root):
     statutory_name = fdsys.find('{eregs}title').text
     part = preamble.find('{eregs}cfr').find('{eregs}section').text
 
-    part_letter = part_to_letter[part]
+    part_letter = part_to_letter.get(part, part)
 
     meta_dict[part] = [
         {

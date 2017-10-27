@@ -6,6 +6,7 @@ import copy
 from enum import Enum
 import operator
 import re
+import sys
 
 from termcolor import colored, cprint
 from lxml import etree
@@ -13,7 +14,6 @@ from .node import xml_node_text, find_all_occurrences, interpolate_string, enclo
 from .changes import get_parent_label
 
 import inflect
-import re
 
 import regulation.settings as settings
 
@@ -481,7 +481,7 @@ class EregsValidator:
 
         self.events.append(event)
 
-    def fix_omitted_cites(self, tree, regulation_file):
+    def fix_omitted_cites(self, tree, regulation_file, fix_all=False):
         """
         Try a simple fix to pick up internal citations that have been missed by regparser.
         There's no complicated grammar parsing going on here, just stupid regexing. Prompts to overwrite original file.
@@ -497,6 +497,17 @@ class EregsValidator:
         ignore = set()
         always = set()
         problem_flag = False
+
+        if fix_all:
+            msg = 'You have chosen to always fix missing references. If you do this, you will not be ' \
+                  'prompted for any changes, except to save the final result. Are you sure you want to do this?: '
+            input_state = None
+            print(colored(msg, 'yellow'))
+            while input_state not in ['y', 'n']:
+                input_state = raw_input('(y)es/(n)o: ')
+            if input_state == 'n':
+                print(colored('Exiting!', 'red'))
+                sys.exit(1)
 
         def marker_to_target(marker_string):
             marker = marker_string.replace('.', '-')
@@ -518,31 +529,37 @@ class EregsValidator:
                 input_state = None
                 for loc in locations:
                     if not enclosed_in_tag(par_text, 'ref', loc):
-                        highlighted_par = colored(par_text[0:loc], 'yellow') + \
-                                          colored(match, 'red') + \
-                                          colored(par_text[loc + len(match):], 'yellow')
 
-                        msg = colored('You appear to have used a reference to "{}" in {} without tagging it: \n'.format(
-                              match, label), 'yellow') + \
-                              '{}\n'.format(highlighted_par) + \
-                              colored('Would you like the automatically fix this reference in the source?', 'yellow')
-                        print(msg)
-                        if match not in always:
-                            while input_state not in ['y', 'n', 'i', 'a']:
-                                input_state = raw_input('(y)es/(n)o/(i)gnore this reference/(a)lways correct: ')
+                        if not fix_all:
+                            highlighted_par = colored(par_text[0:loc], 'yellow') + \
+                                              colored(match, 'red') + \
+                                              colored(par_text[loc + len(match):], 'yellow')
+                            msg = colored('You appear to have used a reference to "{}" in {} without tagging it: \n'.format(
+                                  match, label), 'yellow') + \
+                                  '{}\n'.format(highlighted_par) + \
+                                  colored('Would you like the automatically fix this reference in the source?', 'yellow')
+                            print(msg)
 
-                            if input_state in ['y', 'a'] or match in always:
-                                problem_flag = True
-                                ref = '<ref target="{}" reftype="internal">{}</ref>'.format(
-                                    marker_to_target(match), match)
-                                offsets_and_values.append((ref, [loc, loc + len(match)]))
-                                if input_state == 'a':
-                                    always.add(match)
+                            if match not in always:
+                                while input_state not in ['y', 'n', 'i', 'a']:
+                                    input_state = raw_input('(y)es/(n)o/(i)gnore this reference/(a)lways correct: ')
 
-                            elif input_state == 'i':
-                                ignore.add(match)
+                                if input_state in ['y', 'a'] or match in always:
+                                    problem_flag = True
+                                    ref = '<ref target="{}" reftype="internal">{}</ref>'.format(
+                                        marker_to_target(match), match)
+                                    offsets_and_values.append((ref, [loc, loc + len(match)]))
+                                    if input_state == 'a':
+                                        always.add(match)
 
-                            input_state = None
+                                elif input_state == 'i':
+                                    ignore.add(match)
+
+                                input_state = None
+                        else:
+                            problem_flag = True
+                            ref = '<ref target="{}" reftype="internal">{}</ref>'.format(marker_to_target(match), match)
+                            offsets_and_values.append((ref, [loc, loc + len(match)]))
 
             if offsets_and_values != []:
                 offsets_and_values = sorted(offsets_and_values, key=lambda x: x[1][0])
@@ -551,7 +568,8 @@ class EregsValidator:
                 highlight = interpolate_string(par_text, offsets, values, colorize=True)
                 new_content = etree.fromstring(new_par_text)
                 paragraph.replace(content, new_content)
-                print(highlight)
+                if not fix_all:
+                    print(highlight)
 
         if problem_flag:
             print(colored('The tree has been altered! Do you want to write the result to disk?'))
@@ -560,7 +578,7 @@ class EregsValidator:
                 answer = raw_input('Save? y/n: ')
             if answer == 'y':
                 with open(regulation_file, 'w') as f:
-                    f.write(etree.tostring(tree, pretty_print=True))
+                    f.write(etree.tostring(tree, pretty_print=True, encoding='UTF-8'))
 
     def headerize_interps(self, tree, regulation_file):
         """

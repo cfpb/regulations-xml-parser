@@ -13,6 +13,9 @@ import click
 from lxml import etree
 from termcolor import colored, cprint
 from itertools import permutations
+from toposort import toposort
+from dateutil import parser as dtp
+from collections import Counter
 
 from regulation.validation import EregsValidator
 import regulation.settings as settings
@@ -57,6 +60,40 @@ if (sys.version_info < (3, 0)):
     reload(sys)  # noqa
     sys.setdefaultencoding('UTF8')
 
+# Convenience class for notice
+
+
+class Notice:
+
+    def __init__(self, document_number=None, effective_date=None, applies_to_doc=None, applies_to_eff_date=None, path=None):
+        self.document_number = document_number
+        if effective_date is not None:
+            try:
+                self.effective_date = dtp.parse(effective_date)
+            except Exception:
+                self.effective_date = None
+        else:
+            self.effective_date = None
+        self.applies_to_doc = applies_to_doc
+        if applies_to_eff_date is not None:
+            try:
+                self.applies_to_eff_date = dtp.parse(applies_to_eff_date)
+            except Exception:
+                self.applies_to_eff_date = None
+        else:
+            self.applies_to_eff_date = None
+        self.path = path
+
+    @property
+    def expanded_filename(self):
+
+        return '_'
+
+    def __str__(self):
+        return '<Notice {} effective on {}>'.format(self.document_number, self.effective_date)
+
+    def __repr__(self):
+        return self.__str__()
 
 # Utility Functions ####################################################
 
@@ -112,6 +149,42 @@ def find_version(part, notice, is_notice=False):
     """ Wrap find file in a semantic sort of way to find a RegML version
         of a particular part """
     return find_file(os.path.join(part, notice), is_notice=is_notice)
+
+
+def extract_notice_file_meta(notice_file):
+
+    file_name = os.path.join(notice_file)
+    with open(file_name, 'r') as f:
+        notice_xml = f.read()
+    parser = etree.XMLParser(huge_tree=True)
+
+    try:
+        xml_tree = etree.fromstring(notice_xml, parser)
+    except etree.XMLSyntaxError as e:
+        print(colored('Syntax error in {}'.format(notice_file), 'red'))
+        print(e)
+        return
+
+    doc_number = xml_tree.find(
+        './{eregs}preamble/{eregs}documentNumber').text
+    effective_date = xml_tree.find(
+        './{eregs}preamble/{eregs}effectiveDate').text
+    applies_to_doc_number = xml_tree.find(
+        './{eregs}changeset').get('leftDocumentNumber')
+    applies_to_eff_date = xml_tree.find(
+        './{eregs}changeset').get('leftEffectiveDate', None)
+
+    if applies_to_doc_number is None:
+        # Major problem here
+        print(colored("Error locating"),
+              colored("leftDocumentNumber", attrs=['bold']),
+              colored("attribute in"),
+              colored("{}".format(doc_number), 'red',
+                      attrs=['bold']))
+        return
+
+    return Notice(doc_number, effective_date, applies_to_doc_number, applies_to_eff_date, file_name)
+    #return (doc_number, effective_date, applies_to_doc_number, file_name)
 
 
 def write_layer(layer_object, reg_number, notice, layer_type,
@@ -231,7 +304,7 @@ def validate(file, no_terms=False, no_citations=False, no_keyterms=False):
     file = find_file(file)
     with open(file, 'r') as f:
         reg_xml = f.read()
-    parser = etree.XMLParser(huge_tree=True)
+    parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
     xml_tree = etree.fromstring(reg_xml, parser)
 
     # Validate the file relative to schema
@@ -485,6 +558,20 @@ def fix_analysis(file, always_save=False):
     else:
         # Cancel save
         print("Canceling analysis fixes - changes have not been saved.")
+
+@cli.command('fix-citations')
+@click.argument('file')
+@click.option('--always-fix', is_flag=True)
+def fix_citations(file, always_fix=False):
+    """Checks and fixes the citations in a notice RegML file"""
+    file = find_file(file, is_notice=True)
+    with open(file, 'r') as f:
+        reg_xml = f.read()
+    parser = etree.XMLParser(huge_tree=True, remove_blank_text=True, remove_comments=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
+
+    validator = get_validator(xml_tree)
+    validator.fix_omitted_cites(xml_tree, file, always_fix)
 
 
 # Validate the given regulation file (or files) and generate the JSON
@@ -765,46 +852,43 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
     # Look for locally available notices
     regml_notice_files = find_all(cfr_part, is_notice=True)
 
-    regml_notices = []
-    for notice_file in regml_notice_files:
-        file_name = os.path.join(notice_file)
-        with open(file_name, 'r') as f:
-            notice_xml = f.read()
-        parser = etree.XMLParser(huge_tree=True)
+    regml_dependency_chain = {}
+    regml_notices = [extract_notice_file_meta(notice_file) for notice_file in regml_notice_files]
 
-        try:
-            xml_tree = etree.fromstring(notice_xml, parser)
-        except etree.XMLSyntaxError as e:
-            print(colored('Syntax error in {}'.format(notice_file), 'red'))
-            print(e)
-            return
+    def depends_on(n1, n2):
+        # if n1 depends on n2, True, else False
+        if n1 == n2:
+            return False
 
-        doc_number = xml_tree.find(
-            './{eregs}preamble/{eregs}documentNumber').text
-        effective_date = xml_tree.find(
-            './{eregs}preamble/{eregs}effectiveDate').text
-        applies_to = xml_tree.find(
-            './{eregs}changeset').get('leftDocumentNumber')
-        if applies_to is None:
-            # Major problem here
-            print(colored("Error locating"),
-                  colored("leftDocumentNumber", attrs=['bold']),
-                  colored("attribute in"),
-                  colored("{}".format(doc_number), 'red',
-                          attrs=['bold']))
-            return
+        if n1.applies_to_eff_date == n2.effective_date:
+            if n1.applies_to_doc == n2.document_number:
+                return True
+            else:
+                return False
+        elif n1.applies_to_eff_date is None:
+            if n1.applies_to_doc == n2.document_number:
+                return True
+            else:
+                return False
+        else:
+            return False
 
-        regml_notices.append((doc_number, effective_date, applies_to, file_name))
+    for notice in regml_notices:
+        applies_to = [n for n in regml_notices if depends_on(notice, n)]
+        if len(applies_to) == 1:
+            notice.applies_to_eff_date = applies_to[0].effective_date
+        elif len(applies_to) > 1:
+            raise ValueError('Notice {} cannot apply to multiple notices: {}!'.format(notice.document_number,
+                                                                                      [a.document_number for a in applies_to]))
+        regml_dependency_chain[notice] = set(applies_to)
 
-    if cfr_part in settings.CUSTOM_NOTICE_ORDER:
-        order = settings.CUSTOM_NOTICE_ORDER[cfr_part]
-        regml_notices.sort(key=lambda n: order.index(n[0]))
-
-    else:
-        regml_notices.sort(key=lambda n: n[1])
-
-    regs = [nn[2] for nn in regml_notices]
-    regs.sort()
+    sorted_notices = [list(notice)[0] for notice in list(toposort(regml_dependency_chain))]
+    import pprint
+    pprint.pprint(regml_notice_files)
+    pprint.pprint(regml_notices)
+    pprint.pprint(regml_dependency_chain)
+    pprint.pprint(list(toposort(regml_dependency_chain)))
+    doc_counts = Counter([notice.document_number for notice in sorted_notices])
 
     # If no notices found, issue error message
     if not regml_notices:
@@ -812,24 +896,24 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
         return
 
     # If initial version is not findable, issue error message
-    if regs[0] is None:
+    if sorted_notices[0].document_number is None:
         print(colored("\nError reading initial version and apply order for reg {} in part {}. No changes have been made.".format(cfr_part, cfr_title),
                       attrs=['bold']))
         return
 
     # Generate prompt for user
-    print(colored("\nAvailable notices for reg {}:".format(cfr_part),
-          attrs=['bold']))
-    print("{:>3}. {:<22}(Initial version)".format(0, regs[0]))
+    print(colored("\nAvailable notices for reg {}:".format(cfr_part), attrs=['bold']))
+    print("{:>3}. {:<22}(Initial version)".format(0, sorted_notices[0].applies_to_doc))
     # Process notices found
-    for kk in range(len(regml_notices)):
-        print("{0:>3}. {1[0]:<22}(Effective: {1[1]})".format(kk+1,
-                                               regml_notices[kk]))
+    for k, notice in enumerate(sorted_notices):
+        print("{0:>3}. {1:<22}(Effective: {2})".format(k + 1,
+                                                       notice.document_number,
+                                                       notice.effective_date.strftime('%Y-%m-%d')))
     print()
 
     # Possible answers are blank (all), the numbers, or the notice names
-    possible_indices = [str(kk) for kk in range(len(regml_notices) + 1)]
-    possible_notices = [nn[0] for nn in regml_notices]
+    possible_indices = [str(kk) for kk in range(len(sorted_notices) + 1)]
+    possible_notices = [nn for nn in sorted_notices]
 
     # If notice number is supplied, use that one
     if through is not None:
@@ -843,11 +927,11 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
 
     if len(answer) == 0:
         # Apply notices
-        last_ver_idx = len(regml_notices) - 1
+        last_ver_idx = len(sorted_notices) - 1
     elif answer is "0":
         # Cancel - this is just the initial version
         print(colored("CANCELED: Version", attrs=['bold']),
-              colored("{}".format(regs[0]), 'yellow', attrs=['bold']),
+              colored("{}".format(sorted_notices[0].applies_to_doc), 'yellow', attrs=['bold']),
               colored("is the initial version - no changes have been made.", attrs=['bold']))
         return
     elif answer in possible_indices:
@@ -862,14 +946,15 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
               colored("does not exist - no changes have been made.", attrs=['bold']))
         return
 
-    print(colored("\nApplying notices through {0[0]}\n".format(regml_notices[last_ver_idx]),
+    print(colored("\nApplying notices through {0}\n".format(sorted_notices[last_ver_idx].document_number),
           attrs=['bold']))
 
+    applicable_notices = sorted_notices[:last_ver_idx + 1]
     # Perform the notice application process
     reg_path = os.path.abspath(os.path.join(settings.XML_ROOT,
                                             'regulation',
                                             cfr_part,
-                                            '{}.xml'.format(regs[0])))
+                                            '{}.xml'.format(sorted_notices[0].applies_to_doc)))
     print("Opening initial version {}".format(reg_path))
     regulation_file = find_file(reg_path)
     with open(regulation_file, 'r') as f:
@@ -877,18 +962,17 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
     parser = etree.XMLParser(huge_tree=True)
     left_xml_tree = etree.fromstring(left_reg_xml, parser)
 
-    kk = 1
     prev_tree = left_xml_tree
-    for notice in regml_notices[:last_ver_idx+1]:
-        doc_number, effective_date, prev_notice, file_name = notice
+    for kk, notice in enumerate(applicable_notices):
 
-        print("[{}] Applying notice {} from {} to version {}".format(kk,
-                                                                     doc_number,
-                                                                     file_name,
-                                                                     prev_notice))
+        print("[{}] Applying notice {} from {} to version {} (effective on {})".format(kk + 1,
+                                                                                       notice.document_number,
+                                                                                       notice.path,
+                                                                                       notice.applies_to_doc,
+                                                                                       notice.effective_date.strftime('%Y-%m-%d')))
 
         # Open the notice file
-        notice_file = find_file(file_name, is_notice=True)
+        notice_file = find_file(notice.path, is_notice=True)
         with open(notice_file, 'r') as f:
             notice_string = f.read()
         parser = etree.XMLParser(huge_tree=True)
@@ -905,14 +989,14 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
         try:
             notice_validator = get_validator(notice_xml, raise_instead_of_exiting=True)
         except Exception as e:
-            print("[{}]".format(kk),
+            print("[{}]".format(kk + 1),
                   colored("Exception occurred in notice", 'red'),
-                  colored(doc_number, attrs=['bold']),
+                  colored(notice.document_number, attrs=['bold']),
                   colored("; details are below. ", 'red'),
                   "To retry this single notice, use:\n\n",
                   colored("> ./regml.py apply-notice {0}/{1} {0}/{2}\n".format(cfr_part,
-                                                                               prev_notice,
-                                                                               doc_number),
+                                                                               notice.applies_to_doc,
+                                                                               notice.document_number),
                           attrs=['bold']))
             sys.exit(0)
 
@@ -926,8 +1010,8 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
                 last_fix_idx = possible_notices.index(skip_fix_notices_through)
                 skip_notices.extend(possible_notices[:last_fix_idx + 1])
 
-        if fix_notices and doc_number not in skip_notices:
-            print('Fixing notice number {}:'.format(doc_number))
+        if fix_notices and notice.document_number not in skip_notices:
+            print('Fixing notice number {}:'.format(notice.document_number))
             notice_validator.validate_terms(notice_xml, terms_layer)
             notice_validator.validate_term_references(notice_xml, terms_layer, notice_file)
             notice_terms_layer = build_terms_layer(notice_xml)
@@ -948,11 +1032,11 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
             new_xml_tree = process_changes(prev_tree, notice_xml)
         except Exception as e:
             print("[{}]".format(kk),
-                  colored("Exception occurred; details are below. ".format(kk), 'red'),
+                  colored("Exception occurred; details are below. ".format(kk + 1), 'red'),
                   "To retry this single notice, use:\n\n",
                   colored("> ./regml.py apply-notice {0}/{1} {0}/{2}\n".format(cfr_part,
-                                                                               prev_notice,
-                                                                               doc_number),
+                                                                               notice.applies_to_doc,
+                                                                               notice.document_number),
                           attrs=['bold']))
             raise e
 
@@ -964,15 +1048,20 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
                                         pretty_print=True,
                                         xml_declaration=True,
                                         encoding='UTF-8')
-        new_path = os.path.join(
-            os.path.dirname(regulation_file),
-            os.path.basename(notice_file))
+        if doc_counts[notice.document_number] == 1:
+            new_path = os.path.join(
+                os.path.dirname(regulation_file),
+                os.path.basename(notice_file))
+        elif doc_counts[notice.document_number] > 1:
+            new_path = os.path.join(
+                os.path.dirname(regulation_file),
+                notice.document_number + '_' + notice.effective_date.strftime('%Y%m%d') + '.xml')
+
         with open(new_path, 'w') as f:
-            print("[{}] Writing regulation to {}".format(kk, new_path))
+            print("[{}] Writing regulation to {}".format(kk + 1, new_path))
             f.write(new_xml_string)
 
         prev_tree = new_xml_tree
-        kk += 1
 
 
 # Given a notice, apply it to a previous RegML regulation verson to

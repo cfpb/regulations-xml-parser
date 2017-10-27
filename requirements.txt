@@ -4,5 +4,6 @@ inflect==0.2.5
 lxml==3.5.0
 pyparsing==1.5.7
 termcolor==1.1.0
+toposort==1.5
 -e git+https://github.com/cfpb/regulations-configs.git#egg=regulations_configs
 -e git+https://github.com/cfpb/regulations-parser#egg=regulations_parser
