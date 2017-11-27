@@ -488,6 +488,33 @@ def fix_analysis(file, always_save=False):
         print("Canceling analysis fixes - changes have not been saved.")
 
 
+@cli.command('fix-citations')
+@click.argument('file')
+@click.option('--always-fix', is_flag=True)
+def fix_citations(file, always_fix=False):
+    """Checks and fixes the citations in a notice RegML file"""
+    file = find_file(file, is_notice=True)
+    with open(file, 'r') as f:
+        reg_xml = f.read()
+    parser = etree.XMLParser(huge_tree=True, remove_blank_text=True, remove_comments=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
+
+    validator = get_validator(xml_tree)
+    validator.fix_omitted_cites(xml_tree, file, always_fix)
+
+@cli.command('headerize-interps')
+@click.argument('file')
+def headerize_interps(file):
+
+    file = find_file(file, is_notice=True)
+    with open(file, 'r') as f:
+        reg_xml = f.read()
+    parser = etree.XMLParser(huge_tree=True, remove_blank_text=True, remove_comments=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
+
+    validator = get_validator(xml_tree)
+    validator.headerize_interps(xml_tree, file)
+
 # Validate the given regulation file (or files) and generate the JSON
 # output expected by regulations-core and regulations-site if the RegML
 # validates.
@@ -961,35 +988,13 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
         # Add in any new analysis
         new_xml_tree = process_analysis(new_xml_tree, notice_xml)
 
-        # Write the new xml tree
-        new_xml_string = etree.tostring(new_xml_tree,
-                                        pretty_print=True,
-                                        xml_declaration=True,
-                                        encoding='UTF-8')
-<<<<<<< HEAD
         new_path = os.path.join(
             os.path.dirname(regulation_file),
             os.path.basename(notice_file))
-        with open(new_path, 'w') as f:
-            print("[{}] Writing regulation to {}".format(kk, new_path))
-            f.write(new_xml_string)
-=======
-        if doc_counts[notice.document_number] == 1:
-            new_path = os.path.join(
-                os.path.dirname(regulation_file),
-                os.path.basename(notice_file))
-        elif doc_counts[notice.document_number] > 1:
-            new_path = os.path.join(
-                os.path.dirname(regulation_file),
-                notice.document_number + '_' + notice.effective_date.strftime('%Y%m%d') + '.xml')
 
-        #with open(new_path, 'w') as f:
-        print("[{}] Writing regulation to {}".format(kk + 1, new_path))
+        print("[{}] Writing regulation to {}".format(kk, new_path))
 
         save_regulation(new_xml_tree, new_path, breakout=True)
-            #f.write(new_xml_string)
->>>>>>> 713eca3... breaking out the regulation files into separate section files that are then xincluded
-
         prev_tree = new_xml_tree
         kk += 1
 
