@@ -3,9 +3,9 @@
 from __future__ import unicode_literals
 from __future__ import print_function
 
+import os
 from copy import deepcopy
 from collections import OrderedDict
-import string
 
 import inflect
 
@@ -801,6 +801,19 @@ def build_toc_layer(root):
             toc_entry = {'index': target, 'title': subject}
             toc_dict[label].append(toc_entry)
 
+        # Build subpart sections
+        for subpart in toc.findall('{eregs}tocSubpartEntry'):
+            target = subpart.get('target', None)
+            subject = subpart.find('{eregs}subpartTitle').text
+            letter = subpart.find('{eregs}subpartLetter').text
+            part = root.find('.//{eregs}part').get('label')
+            if target:
+                target = target.split('-')
+            else:
+                target = [part, 'Subpart', letter]
+            toc_entry = {'index': target, 'title': subject}
+            toc_dict[label].append(toc_entry)
+
     return toc_dict
 
 
@@ -1168,3 +1181,34 @@ def get_offset(element, marker='', title=None):
         keyterm_offset = 0
 
     return marker_offset + keyterm_offset
+
+
+def save_regulation(tree, filename, breakout=False):
+
+    tree_copy = deepcopy(tree)
+    if breakout:
+        sections = tree_copy.findall('.//{eregs}section')
+        appendix_sections = tree_copy.findall('.//{eregs}appendixSection')
+        interp_sections = tree_copy.findall('.//{eregs}interpSection')
+        document_number = tree_copy.find('.//{eregs}documentNumber').text
+        all_sections = [section for section in (sections + appendix_sections + interp_sections) if section.get('label') is not None]
+
+        root, notice_file = os.path.split(os.path.abspath(filename))
+        notice_dir = os.path.join(root, document_number)
+        if not os.path.exists(notice_dir):
+            os.mkdir(notice_dir)
+
+        #print([section.get('label') for section in all_sections])
+
+        for section in all_sections:
+            parent = section.getparent()
+            section_file = os.path.join(notice_dir, section.get('label') + '.xml')
+            with open(section_file, 'w') as f:
+                print('Saving section {} to {}'.format(section.get('label'), section_file))
+                f.write(etree.tostring(section, encoding='utf-8', pretty_print='true', xml_declaration='true'))
+            include_element = etree.Element('{http://www.w3.org/2003/XInclude}include', {'href': section_file})
+            parent.replace(section, include_element)
+
+    with open(filename, 'w') as f:
+        print('Saving tree to {}'.format(filename))
+        f.write(etree.tostring(tree_copy, encoding='utf-8', pretty_print=True, xml_declaration=True))

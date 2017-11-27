@@ -31,7 +31,8 @@ from regulation.tree import (
     build_paragraph_marker_layer,
     build_reg_tree,
     build_terms_layer,
-    build_toc_layer
+    build_toc_layer,
+    save_regulation
 )
 from regulation.changes import (
     process_changes,
@@ -873,9 +874,10 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
     print("Opening initial version {}".format(reg_path))
     regulation_file = find_file(reg_path)
     with open(regulation_file, 'r') as f:
-        left_reg_xml = f.read()
-    parser = etree.XMLParser(huge_tree=True)
-    left_xml_tree = etree.fromstring(left_reg_xml, parser)
+        parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
+        left_xml_tree = etree.parse(f, parser)
+        left_xml_tree.xinclude()
+        left_xml_tree = left_xml_tree.getroot()
 
     kk = 1
     prev_tree = left_xml_tree
@@ -964,12 +966,29 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
                                         pretty_print=True,
                                         xml_declaration=True,
                                         encoding='UTF-8')
+<<<<<<< HEAD
         new_path = os.path.join(
             os.path.dirname(regulation_file),
             os.path.basename(notice_file))
         with open(new_path, 'w') as f:
             print("[{}] Writing regulation to {}".format(kk, new_path))
             f.write(new_xml_string)
+=======
+        if doc_counts[notice.document_number] == 1:
+            new_path = os.path.join(
+                os.path.dirname(regulation_file),
+                os.path.basename(notice_file))
+        elif doc_counts[notice.document_number] > 1:
+            new_path = os.path.join(
+                os.path.dirname(regulation_file),
+                notice.document_number + '_' + notice.effective_date.strftime('%Y%m%d') + '.xml')
+
+        #with open(new_path, 'w') as f:
+        print("[{}] Writing regulation to {}".format(kk + 1, new_path))
+
+        save_regulation(new_xml_tree, new_path, breakout=True)
+            #f.write(new_xml_string)
+>>>>>>> 713eca3... breaking out the regulation files into separate section files that are then xincluded
 
         prev_tree = new_xml_tree
         kk += 1
