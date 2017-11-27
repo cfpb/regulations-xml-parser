@@ -1198,13 +1198,10 @@ def save_regulation(tree, filename, breakout=False):
         if not os.path.exists(notice_dir):
             os.mkdir(notice_dir)
 
-        #print([section.get('label') for section in all_sections])
-
         for section in all_sections:
             parent = section.getparent()
             section_file = os.path.join(notice_dir, section.get('label') + '.xml')
             with open(section_file, 'w') as f:
-                print('Saving section {} to {}'.format(section.get('label'), section_file))
                 f.write(etree.tostring(section, encoding='utf-8', pretty_print='true', xml_declaration='true'))
             include_element = etree.Element('{http://www.w3.org/2003/XInclude}include', {'href': section_file})
             parent.replace(section, include_element)
