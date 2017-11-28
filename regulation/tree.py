@@ -801,19 +801,6 @@ def build_toc_layer(root):
             toc_entry = {'index': target, 'title': subject}
             toc_dict[label].append(toc_entry)
 
-        # Build subpart sections
-        for subpart in toc.findall('{eregs}tocSubpartEntry'):
-            target = subpart.get('target', None)
-            subject = subpart.find('{eregs}subpartTitle').text
-            letter = subpart.find('{eregs}subpartLetter').text
-            part = root.find('.//{eregs}part').get('label')
-            if target:
-                target = target.split('-')
-            else:
-                target = [part, 'Subpart', letter]
-            toc_entry = {'index': target, 'title': subject}
-            toc_dict[label].append(toc_entry)
-
     return toc_dict
 
 
