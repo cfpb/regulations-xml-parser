@@ -759,9 +759,11 @@ def generate_diff_xml(cfr_part, versions=None):
                    "nargs='*' doesn't work in click.")
 @click.option('--skip-fix-notices-through',
               help='Skip fixing notices through the specified document number.')
+@click.option('--breakout',
+              help='Break generated regulation out into separate section files.')
 def apply_through(cfr_title, cfr_part, start=None, through=None,
                   fix_notices=False, skip_fix_notices=[],
-                  skip_fix_notices_through=None):
+                  skip_fix_notices_through=None, breakout=False):
     # Get list of notices that apply to this reg
     # Look for locally available notices
     regml_notice_files = find_all(cfr_part, is_notice=True)
@@ -771,7 +773,7 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
         file_name = os.path.join(notice_file)
         with open(file_name, 'r') as f:
             notice_xml = f.read()
-        parser = etree.XMLParser(huge_tree=True)
+        parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
 
         try:
             xml_tree = etree.fromstring(notice_xml, parser)
@@ -967,7 +969,7 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
 
         print("[{}] Writing regulation to {}".format(kk, new_path))
 
-        save_regulation(new_xml_tree, new_path, breakout=True)
+        save_regulation(new_xml_tree, new_path, breakout=breakout)
         prev_tree = new_xml_tree
         kk += 1
 

@@ -1181,18 +1181,23 @@ def save_regulation(tree, filename, breakout=False):
         all_sections = [section for section in (sections + appendix_sections + interp_sections) if section.get('label') is not None]
 
         root, notice_file = os.path.split(os.path.abspath(filename))
+        cur_dir = os.path.abspath(os.curdir)
         notice_dir = os.path.join(root, document_number)
+        os.chdir(notice_dir)
+
         if not os.path.exists(notice_dir):
             os.mkdir(notice_dir)
 
         for section in all_sections:
             parent = section.getparent()
-            section_file = os.path.join(notice_dir, section.get('label') + '.xml')
+            section_file = section.get('label') + '.xml'
             with open(section_file, 'w') as f:
                 f.write(etree.tostring(section, encoding='utf-8', pretty_print='true', xml_declaration='true'))
-            include_element = etree.Element('{http://www.w3.org/2003/XInclude}include', {'href': section_file})
+            include_element = etree.Element('{http://www.w3.org/2003/XInclude}include',
+                                            {'href': document_number + '/' + section_file})
             parent.replace(section, include_element)
 
+        os.chdir(cur_dir)
+
     with open(filename, 'w') as f:
-        print('Saving tree to {}'.format(filename))
         f.write(etree.tostring(tree_copy, encoding='utf-8', pretty_print=True, xml_declaration=True))
