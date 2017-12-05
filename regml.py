@@ -486,6 +486,32 @@ def fix_analysis(file, always_save=False):
         # Cancel save
         print("Canceling analysis fixes - changes have not been saved.")
 
+@cli.command('fix-citations')
+@click.argument('file')
+@click.option('--always-fix', is_flag=True)
+def fix_citations(file, always_fix=False):
+    """Checks and fixes the citations in a notice RegML file"""
+    file = find_file(file, is_notice=True)
+    with open(file, 'r') as f:
+        reg_xml = f.read()
+    parser = etree.XMLParser(huge_tree=True, remove_blank_text=True, remove_comments=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
+
+    validator = get_validator(xml_tree)
+    validator.fix_omitted_cites(xml_tree, file, always_fix)
+
+@cli.command('headerize-interps')
+@click.argument('file')
+def headerize_interps(file):
+
+    file = find_file(file, is_notice=True)
+    with open(file, 'r') as f:
+        reg_xml = f.read()
+    parser = etree.XMLParser(huge_tree=True, remove_blank_text=True, remove_comments=True)
+    xml_tree = etree.fromstring(reg_xml, parser)
+
+    validator = get_validator(xml_tree)
+    validator.headerize_interps(xml_tree, file)
 
 # Validate the given regulation file (or files) and generate the JSON
 # output expected by regulations-core and regulations-site if the RegML
