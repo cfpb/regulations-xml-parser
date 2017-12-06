@@ -897,25 +897,26 @@ def build_interp_layer(root):
     """
 
     layer_dict = OrderedDict()
-    interpretations = root.find('.//{eregs}interpretations')
+    interpretations = root.findall('.//{eregs}interpretations')
 
     if interpretations is not None:
-        first_label = interpretations.get('label')
-        first_key = first_label.split('-')[0]
-        layer_dict[first_key] = [{'reference': first_label}]
+        for interpretation in interpretations:
+            first_label = interpretation.get('label')
+            first_key = first_label.split('-')[0]
+            layer_dict[first_key] = [{'reference': first_label}]
 
-        interp_sections = interpretations.findall(
-            './/{eregs}interpSection')
-        interp_paragraphs = interpretations.findall(
-            './/{eregs}interpParagraph')
-        targetted_interps = [i for i in
-            interp_sections + interp_paragraphs
-            if i.get('target') is not None]
+            interp_sections = interpretation.findall(
+                './/{eregs}interpSection')
+            interp_paragraphs = interpretation.findall(
+                './/{eregs}interpParagraph')
+            targetted_interps = [i for i in
+                interp_sections + interp_paragraphs
+                if i.get('target') is not None]
 
-        for interp in targetted_interps:
-            target = interp.get('target')
-            label = interp.get('label')
-            layer_dict[target] = [{'reference': label}]
+            for interp in targetted_interps:
+                target = interp.get('target')
+                label = interp.get('label')
+                layer_dict[target] = [{'reference': label}]
 
     return layer_dict
 

@@ -891,7 +891,7 @@ def apply_through(cfr_title, cfr_part, start=None, through=None,
         notice_file = find_file(file_name, is_notice=True)
         with open(notice_file, 'r') as f:
             notice_string = f.read()
-        parser = etree.XMLParser(huge_tree=True)
+        parser = etree.XMLParser(huge_tree=True, remove_blank_text=True)
 
         notice_xml = etree.fromstring(notice_string, parser)
 
