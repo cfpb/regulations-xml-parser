@@ -5,7 +5,8 @@ import os
 #
 # A local copy should generally be a clone or fork of
 # https://github.com/cfpb/regulations-schema
-XSD_FILE = '../regulations-schema/src/eregs.xsd'
+# XSD_FILE = '../regulations-schema/src/eregs.xsd'
+XSD_FILE = os.environ.get('XSD_FILE', '../regulations-schema/src/eregs.xsd')
 
 # XML_ROOT is the path to Regulations XML files that this parser is
 # intended to parse. Files in this location are expected to be stored
@@ -14,14 +15,16 @@ XSD_FILE = '../regulations-schema/src/eregs.xsd'
 #
 # This should generally be a clone or fork of
 # https://github.com/cfpb/regulations-xml.
-XML_ROOT = '../regulations-xml'
+# XML_ROOT = '../regulations-xml'
+XML_ROOT = os.environ.get('XML_ROOT', '../regulations-xml')
 
 # JSON_ROOT is the path to the JSON output of this parser that is
 # expected by regulations-core.
 #
 # This should generally be a clone or fork of
 # https://github.com/cfpb/regulations-stub
-JSON_ROOT = '../regulations-stub/stub'
+# JSON_ROOT = '../regulations-stub/stub'
+JSON_ROOT = os.environ.get('JSON_ROOT', '../regulations-stub/stub')
 
 # SPECIAL_SINGULAR_NOURS provides overrides for singular nouns that the
 # inflect module has problems with.
@@ -35,7 +38,7 @@ CUSTOM_NOTICE_ORDER = {
 
     '1005': ['2013-06861', '2012-1728', '2012-16245', '2012-19702',
              '2013-10604', '2013-19503', '2014-20681', '2016-24506',
-             '2016-24503']
+             '2016-24503', '2017-08341', '2018-01305' ]
 }
 
 
@@ -57,7 +60,7 @@ except ImportError:
 
 # Set the output directory for the eCFR parser to our XML_ROOT defined
 # above. The output from the eCFR parser will be RegML files.
-OUTPUT_DIR=os.environ.get('OUTPUT_DIR', XML_ROOT)
+OUTPUT_DIR = os.environ.get('OUTPUT_DIR', XML_ROOT)
 
 # This is a path that contains editted eCFR files (if the expected eCFR
 # files don't exist, they'll be downloaded).
