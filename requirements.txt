@@ -1,7 +1,7 @@
-click==6.2
+click==6.6
 enum34==1.1.2
 inflect==0.2.5
-lxml==3.5.0
+lxml==4.1.0
 pyparsing==1.5.7
 termcolor==1.1.0
 -e git+https://github.com/cfpb/regulations-configs.git#egg=regulations_configs
