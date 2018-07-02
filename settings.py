@@ -41,7 +41,6 @@ CUSTOM_NOTICE_ORDER = {
              '2016-24503', '2017-08341', '2018-01305' ]
 }
 
-
 #######################################################################
 ## eCFR Parser Settings
 # This parser provides a convenience wrapper to generate RegML files
